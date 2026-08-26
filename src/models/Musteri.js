@@ -118,6 +118,17 @@ const MusteriSchema = new mongoose.Schema(
             default: ""
         },
 
+        fotograf: {
+            type: String,
+            default: "",
+            validate: {
+                validator(value) {
+                    return !value || /^data:image\/(png|jpe?g|webp);base64,/i.test(value);
+                },
+                message: "Müşteri fotoğrafı geçerli bir PNG, JPG veya WebP olmalıdır."
+            }
+        },
+
         aktif: {
             type: Boolean,
             default: true

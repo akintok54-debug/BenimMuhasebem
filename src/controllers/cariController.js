@@ -173,6 +173,7 @@ async function musteriTahsilat(req, res, next) {
             tutar,
             aciklama: body.aciklama || "Müşteri tahsilatı",
             kaynak: "TAHSILAT",
+            tarih: body.tarih || new Date(),
             kullaniciId:
                 req.kullanici?._id ||
                 req.user?._id ||

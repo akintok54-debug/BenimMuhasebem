@@ -1809,6 +1809,12 @@ async function dashboardYukle() {
                                 ></textarea>
                             </label>
 
+                            <label class="full">
+                                Müşteri Fotoğrafı
+                                <input name="fotografDosya" type="file" accept="image/png,image/jpeg,image/webp">
+                                <small>PNG, JPG veya WebP; en fazla 1 MB.</small>
+                            </label>
+
                         </div>
 
                     </div>
@@ -1872,30 +1878,39 @@ async function dashboardYukle() {
 
                 event.preventDefault();
 
-                const veri =
-                    musteriFormVerisi(form);
+                const veri = musteriFormVerisi(form);
 
                 const mesaj =
                     document.getElementById(
                         "musteriFormMesaj"
                     );
 
-                mesaj.innerHTML = `
-                    <div class="dashboard-panel">
-                        <strong>
-                            Müşteri bilgileri hazır.
-                        </strong>
-                        <p>
-                            Kayıt API'si doğrulandığında
-                            Kaydet işlemi doğrudan bağlanacak.
-                        </p>
-                    </div>
-                `;
-
-                console.log(
-                    "MÜŞTER KARTI:",
-                    veri
-                );
+                const dosya = form.elements.fotografDosya?.files?.[0];
+                try {
+                    if (dosya) {
+                        if (dosya.size > 1024 * 1024) throw new Error("Fotoğraf 1 MB'dan büyük olamaz.");
+                        veri.fotograf = await new Promise((resolve, reject) => {
+                            const okuyucu = new FileReader();
+                            okuyucu.onload = () => resolve(okuyucu.result);
+                            okuyucu.onerror = () => reject(new Error("Fotoğraf okunamadı."));
+                            okuyucu.readAsDataURL(dosya);
+                        });
+                    }
+                    mesaj.innerHTML = "<div class=\"dashboard-loading\">Müşteri kaydediliyor ve doğrulanıyor...</div>";
+                    const olusan = await api("/api/tenant/musteriler", {
+                        method: "POST",
+                        body: JSON.stringify(veri)
+                    });
+                    const musteri = olusan.musteri;
+                    const dogrulama = await api(`/api/tenant/musteriler/${encodeURIComponent(musteri._id)}`);
+                    if (!dogrulama.musteri || dogrulama.musteri.kod !== musteri.kod) {
+                        throw new Error("Kayıt oluşturuldu ancak MongoDB doğrulaması başarısız oldu.");
+                    }
+                    kapat();
+                    await musteriAnaSayfaAc(musteri._id);
+                } catch (error) {
+                    mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+                }
             }
         );
     }
@@ -2018,6 +2033,17 @@ async function dashboardYukle() {
                     0
                 );
 
+            const simdi = new Date();
+            const satisTutari = x => Number(x.genelToplam || x.toplam || x.tutar || 0);
+            const satisTarihi = x => new Date(x.tarih || x.createdAt || 0);
+            const aylikSatis = satislar.filter(x => {
+                const d = satisTarihi(x);
+                return d.getFullYear() === simdi.getFullYear() && d.getMonth() === simdi.getMonth();
+            }).reduce((t, x) => t + satisTutari(x), 0);
+            const yillikSatis = satislar.filter(x => satisTarihi(x).getFullYear() === simdi.getFullYear())
+                .reduce((t, x) => t + satisTutari(x), 0);
+            const kullanilabilirLimit = Math.max(0, risk - Math.max(0, bakiye));
+
             content.innerHTML = `
 
                 <div class="dashboard-panel">
@@ -2030,6 +2056,7 @@ async function dashboardYukle() {
                         flex-wrap:wrap;
                     ">
 
+                        ${m.fotograf ? `<img src="${escapeHtml(m.fotograf)}" alt="${escapeHtml(ad)}" style="width:76px;height:76px;object-fit:cover;border-radius:50%;border:3px solid #e2e8f0">` : ""}
                         <div>
                             <div style="color:#64748b;font-size:13px;">
                                 ${escapeHtml(m.kod || "-")}
@@ -2087,6 +2114,24 @@ async function dashboardYukle() {
                         <div class="dashboard-card-title">Risk Limiti</div>
                         <div class="dashboard-card-value">${para(risk)}</div>
                         <div class="dashboard-card-info">Tanımlı limit</div>
+                    </div>
+
+                    <div class="dashboard-card positive">
+                        <div class="dashboard-card-title">Kullanılabilir Limit</div>
+                        <div class="dashboard-card-value">${para(kullanilabilirLimit)}</div>
+                        <div class="dashboard-card-info">Risk limiti - bakiye</div>
+                    </div>
+
+                    <div class="dashboard-card positive">
+                        <div class="dashboard-card-title">Aylık Satış</div>
+                        <div class="dashboard-card-value">${para(aylikSatis)}</div>
+                        <div class="dashboard-card-info">Bu ay</div>
+                    </div>
+
+                    <div class="dashboard-card positive">
+                        <div class="dashboard-card-title">Yıllık Satış</div>
+                        <div class="dashboard-card-value">${para(yillikSatis)}</div>
+                        <div class="dashboard-card-info">Bu yıl</div>
                     </div>
 
                     <div class="dashboard-card positive">
@@ -2621,6 +2666,94 @@ async function dashboardYukle() {
         }
     }
 
+    function excelMusteriPaneli(hedef, mevcutMusteriler) {
+        const kolonlar = [
+            "Müşteri Kodu", "Müşteri Adı", "Ünvan", "Yetkili", "Telefon",
+            "WhatsApp", "E-posta", "Vergi Dairesi", "Vergi No", "Adres",
+            "İl", "İlçe", "Posta Kodu", "Vade", "Limit", "Risk Limiti", "Notlar"
+        ];
+        const alanlar = {
+            "Müşteri Kodu": "kod", "Müşteri Adı": "adSoyad", "Ünvan": "unvan",
+            "Yetkili": "yetkili", "Telefon": "telefon", "WhatsApp": "whatsapp",
+            "E-posta": "email", "Vergi Dairesi": "vergiDairesi", "Vergi No": "vergiNo",
+            "Adres": "adres", "İl": "il", "İlçe": "ilce", "Posta Kodu": "postaKodu",
+            "Vade": "vadeGun", "Limit": "limit", "Risk Limiti": "riskLimiti", "Notlar": "notlar"
+        };
+        let satirlar = [];
+        hedef.innerHTML = `
+            <div class="dashboard-panel">
+                <div class="panel-heading"><div><h2>Excel Müşteri Aktarımı</h2><p>Şablonu doldurun, önizleyin ve geçerli kayıtları aktarın.</p></div></div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+                    <button id="excelSablonIndir" class="erp-primary-button">Şablon İndir</button>
+                    <input id="excelMusteriDosya" type="file" accept=".xlsx,.xls">
+                    <button id="excelMusteriAktar" class="erp-primary-button" disabled>Müşterileri Aktar</button>
+                </div>
+                <div id="excelMusteriSonuc" style="margin-top:16px"></div>
+                <div id="excelMusteriOnizleme" style="margin-top:16px"></div>
+            </div>`;
+        const sonucEl = document.getElementById("excelMusteriSonuc");
+        const onizleme = document.getElementById("excelMusteriOnizleme");
+        const aktar = document.getElementById("excelMusteriAktar");
+
+        document.getElementById("excelSablonIndir").addEventListener("click", () => {
+            if (!window.XLSX) return alert("Excel kitaplığı yüklenemedi.");
+            const ws = XLSX.utils.aoa_to_sheet([kolonlar]);
+            ws["!cols"] = kolonlar.map(x => ({ wch: Math.max(14, x.length + 2) }));
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Müşteriler");
+            XLSX.writeFile(wb, "musteri-yukleme-sablonu.xlsx");
+        });
+
+        document.getElementById("excelMusteriDosya").addEventListener("change", async event => {
+            try {
+                if (!window.XLSX) throw new Error("Excel kitaplığı yüklenemedi.");
+                const dosya = event.target.files[0];
+                if (!dosya) return;
+                const wb = XLSX.read(await dosya.arrayBuffer(), { type: "array" });
+                const ham = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+                const mevcutKodlar = new Set(mevcutMusteriler.map(x => String(x.kod).trim().toUpperCase()));
+                const dosyaKodlari = new Set();
+                satirlar = ham.map((row, index) => {
+                    const veri = {};
+                    kolonlar.forEach(k => veri[alanlar[k]] = row[k] ?? "");
+                    veri.kod = String(veri.kod).trim().toUpperCase();
+                    ["vadeGun", "limit", "riskLimiti"].forEach(k => veri[k] = Number(veri[k] || 0));
+                    const hatalar = [];
+                    if (!veri.kod) hatalar.push("Müşteri kodu zorunlu");
+                    if (!String(veri.adSoyad).trim() && !String(veri.unvan).trim()) hatalar.push("Müşteri adı veya ünvan zorunlu");
+                    if (mevcutKodlar.has(veri.kod)) hatalar.push("Kod sistemde mevcut");
+                    if (dosyaKodlari.has(veri.kod)) hatalar.push("Kod dosyada mükerrer");
+                    if (veri.kod) dosyaKodlari.add(veri.kod);
+                    if ([veri.vadeGun, veri.limit, veri.riskLimiti].some(x => !Number.isFinite(x) || x < 0)) hatalar.push("Sayısal alan geçersiz");
+                    return { satir: index + 2, veri, hatalar };
+                });
+                const gecerli = satirlar.filter(x => !x.hatalar.length).length;
+                sonucEl.innerHTML = `<strong>${satirlar.length} satır okundu:</strong> ${gecerli} geçerli, ${satirlar.length - gecerli} hatalı.`;
+                onizleme.innerHTML = `<div class="table-scroll"><table><thead><tr><th>Satır</th><th>Kod</th><th>Müşteri</th><th>Durum</th></tr></thead><tbody>${satirlar.map(x => `<tr><td>${x.satir}</td><td>${escapeHtml(x.veri.kod)}</td><td>${escapeHtml(x.veri.unvan || x.veri.adSoyad)}</td><td>${x.hatalar.length ? `<span style="color:#b91c1c">${escapeHtml(x.hatalar.join(", "))}</span>` : `<span style="color:#15803d">Geçerli</span>`}</td></tr>`).join("")}</tbody></table></div>`;
+                aktar.disabled = gecerli === 0;
+            } catch (error) {
+                sonucEl.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+            }
+        });
+
+        aktar.addEventListener("click", async () => {
+            aktar.disabled = true;
+            const hatalar = [];
+            let eklenen = 0;
+            for (const row of satirlar.filter(x => !x.hatalar.length)) {
+                try {
+                    const created = await api("/api/tenant/musteriler", { method: "POST", body: JSON.stringify(row.veri) });
+                    await api(`/api/tenant/musteriler/${encodeURIComponent(created.musteri._id)}`);
+                    eklenen++;
+                } catch (error) {
+                    hatalar.push(`Satır ${row.satir}: ${error.message}`);
+                }
+            }
+            sonucEl.innerHTML = `<div class="dashboard-panel"><strong>${eklenen} müşteri eklendi, ${hatalar.length} hata oluştu.</strong>${hatalar.length ? `<ul>${hatalar.map(x => `<li>${escapeHtml(x)}</li>`).join("")}</ul>` : ""}</div>`;
+            aktar.disabled = false;
+        });
+    }
+
     async function musterilerYukle() {
 
         setTitle("Müşteriler");
@@ -2814,13 +2947,7 @@ async function dashboardYukle() {
             document
                 .getElementById("excelMusteriBtn")
                 .addEventListener("click", () => {
-
-                    altPanel.innerHTML = `
-                        <div class="dashboard-panel">
-                            <h2>Excel Müşteri Aktarımı</h2>
-                            <p>Şablon indirme ve yükleme paneli ikinci aşamada bağlanacak.</p>
-                        </div>
-                    `;
+                    excelMusteriPaneli(altPanel, musteriler);
                 });
 
             document

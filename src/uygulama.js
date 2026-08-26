@@ -20,6 +20,10 @@ uygulama.use(morgan("dev"));
 
 const publicKlasoru = path.join(__dirname, "..", "public");
 uygulama.use(express.static(publicKlasoru));
+uygulama.use(
+    "/vendor/xlsx",
+    express.static(path.join(__dirname, "..", "node_modules", "xlsx", "dist"))
+);
 
 uygulama.get("/", (req, res) => {
     res.json({
