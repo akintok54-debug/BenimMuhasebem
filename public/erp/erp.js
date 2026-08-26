@@ -1475,6 +1475,7 @@ async function dashboardYukle() {
             limit: Number(fd.get("limit") || 0),
             riskLimiti: Number(fd.get("riskLimiti") || 0),
             notlar: String(fd.get("notlar") || "").trim(),
+            grup: String(fd.get("grup") || "Genel").trim() || "Genel",
             aktif: true
         };
     }
@@ -1573,7 +1574,9 @@ async function dashboardYukle() {
 
                 <form id="musteriForm">
 
-                    <div class="dashboard-panel">
+                    <div style="display:flex;gap:8px;margin-bottom:14px"><button type="button" class="erp-small-button" data-musteri-step="1">1. Temel</button><button type="button" class="erp-small-button" data-musteri-step="2">2. Vergi / Adres</button><button type="button" class="erp-small-button" data-musteri-step="3">3. Ticari</button></div>
+
+                    <div class="dashboard-panel" data-musteri-adim="1">
 
                         <div class="panel-heading">
                             <div>
@@ -1627,7 +1630,7 @@ async function dashboardYukle() {
 
                     </div>
 
-                    <div class="dashboard-panel">
+                    <div class="dashboard-panel" data-musteri-adim="1">
 
                         <div class="panel-heading">
                             <div>
@@ -1671,7 +1674,7 @@ async function dashboardYukle() {
 
                     </div>
 
-                    <div class="dashboard-panel">
+                    <div class="dashboard-panel" data-musteri-adim="2">
 
                         <div class="panel-heading">
                             <div>
@@ -1704,7 +1707,7 @@ async function dashboardYukle() {
 
                     </div>
 
-                    <div class="dashboard-panel">
+                    <div class="dashboard-panel" data-musteri-adim="2">
 
                         <div class="panel-heading">
                             <div>
@@ -1754,7 +1757,7 @@ async function dashboardYukle() {
 
                     </div>
 
-                    <div class="dashboard-panel">
+                    <div class="dashboard-panel" data-musteri-adim="3">
 
                         <div class="panel-heading">
                             <div>
@@ -1800,6 +1803,11 @@ async function dashboardYukle() {
                                 >
                             </label>
 
+                            <label>
+                                Müşteri Grubu
+                                <input name="grup" value="Genel" placeholder="Genel, VIP, Bayi...">
+                            </label>
+
                             <label class="full">
                                 Notlar
                                 <textarea
@@ -1833,6 +1841,9 @@ async function dashboardYukle() {
                         >
                             Vazgeç
                         </button>
+
+                        <button type="button" id="musteriGeri" class="erp-small-button secondary">Geri</button>
+                        <button type="button" id="musteriIleri" class="erp-primary-button">İleri</button>
 
                         <button
                             type="submit"
@@ -1913,11 +1924,98 @@ async function dashboardYukle() {
                 }
             }
         );
+        musteriFormAdim = 1;
+        musteriPanelRenderAdim(1);
+        document.getElementById("musteriGeri")?.addEventListener("click", () => musteriPanelRenderAdim(Math.max(1, musteriFormAdim - 1)));
+        document.getElementById("musteriIleri")?.addEventListener("click", () => {
+            const gorunen = [...form.querySelectorAll(`[data-musteri-adim="${musteriFormAdim}"] input[required]`)];
+            if (!gorunen.every(x => x.reportValidity())) return;
+            musteriPanelRenderAdim(Math.min(3, musteriFormAdim + 1));
+        });
+        form.querySelectorAll("[data-musteri-step]").forEach(btn => btn.addEventListener("click", () => musteriPanelRenderAdim(Number(btn.dataset.musteriStep))));
     }
     function musteriFormRenderAdimGecerli() {
         musteriPanelRenderAdim(
             musteriFormAdim || 1
         );
+    }
+
+    function musteriModalKapat() {
+        document.getElementById("musteriIslemOverlay")?.remove();
+    }
+
+    async function musteriTahsilatFormu(musteri) {
+        const finans = await api("/api/tenant/finans/ozet");
+        const hesaplar = [
+            ...(finans.kasalar || []).map(x => ({ ...x, tip: "KASA", adGoster: x.ad })),
+            ...(finans.bankalar || []).map(x => ({ ...x, tip: "BANKA", adGoster: x.bankaAdi }))
+        ].filter(x => x.aktif !== false);
+        musteriModalKapat();
+        const overlay = document.createElement("div");
+        overlay.id = "musteriIslemOverlay";
+        overlay.className = "erp-modal-overlay";
+        overlay.innerHTML = `<div class="erp-modal" style="max-width:680px;width:95%">
+            <div class="erp-modal-header"><div><h2>Tahsilat Yap</h2><p>${escapeHtml(musteri.kod)} · ${escapeHtml(musteri.unvan || musteri.adSoyad)}</p></div><button class="erp-modal-close" type="button">×</button></div>
+            <form id="musteriTahsilatForm"><div class="erp-form-grid">
+                <label>Tutar<input name="tutar" type="number" min="0.01" max="${Number(musteri.bakiye || 0)}" step="0.01" required></label>
+                <label>Tarih<input name="tarih" type="date" value="${new Date().toISOString().slice(0,10)}" required></label>
+                <label class="full">Kasa / Banka<select name="hesap" required><option value="">Hesap seçin</option>${hesaplar.map(x => `<option value="${x.tip}|${x._id}">${x.tip} · ${escapeHtml(x.kod || "")} ${escapeHtml(x.adGoster || "")} (${para(x.bakiye)})</option>`).join("")}</select></label>
+                <label class="full">Açıklama<textarea name="aciklama">Müşteri tahsilatı</textarea></label>
+            </div><div id="tahsilatMesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button secondary" data-kapat>Vazgeç</button><button class="erp-primary-button" type="submit">Kaydet</button></div></form></div>`;
+        document.body.appendChild(overlay);
+        overlay.querySelectorAll(".erp-modal-close,[data-kapat]").forEach(x => x.addEventListener("click", musteriModalKapat));
+        overlay.querySelector("form").addEventListener("submit", async event => {
+            event.preventDefault();
+            const fd = new FormData(event.currentTarget);
+            const [hesapTipi, hesapId] = String(fd.get("hesap")).split("|");
+            const mesaj = document.getElementById("tahsilatMesaj");
+            try {
+                const oncekiBakiye = Number(musteri.bakiye || 0);
+                const sonuc = await api("/api/tenant/cari/musteri/tahsilat", { method: "POST", body: JSON.stringify({ musteriId: musteri._id, tutar: Number(fd.get("tutar")), tarih: fd.get("tarih"), hesapTipi, hesapId, aciklama: fd.get("aciklama") }) });
+                const kontrol = await api(`/api/tenant/musteriler/${encodeURIComponent(musteri._id)}`);
+                if (Number(kontrol.musteri.bakiye) !== Number(sonuc.musteriBakiye) || Number(kontrol.musteri.bakiye) >= oncekiBakiye) throw new Error("Tahsilat sonrası bakiye doğrulanamadı.");
+                musteriModalKapat();
+                await musteriAnaSayfaAc(musteri._id);
+            } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; }
+        });
+    }
+
+    async function musteriBelgeFormu(tur, musteri) {
+        const [urunData, stokData] = await Promise.all([api("/api/tenant/urunler"), api("/api/tenant/stok/depolar")]);
+        const urunler = (urunData.urunler || []).filter(x => x.aktif !== false);
+        const depolar = (stokData.depolar || []).filter(x => x.aktif !== false);
+        const ayar = {
+            satis: { baslik: "Satış Yap", no: "Belge No", endpoint: "/api/tenant/satis", noAlan: "belgeNo", depo: true },
+            teklif: { baslik: "Teklif Hazırla", no: "Teklif No", endpoint: "/api/tenant/teklifler", noAlan: "teklifNo", depo: false },
+            siparis: { baslik: "Sipariş Oluştur", no: "Sipariş No", endpoint: "/api/tenant/siparisler", noAlan: "siparisNo", depo: true }
+        }[tur];
+        if (!urunler.length) throw new Error("İşlem için aktif ürün bulunamadı.");
+        if (ayar.depo && !depolar.length) throw new Error("İşlem için aktif depo bulunamadı.");
+        const no = `${tur === "satis" ? "SAT" : tur === "teklif" ? "TEK" : "SIP"}-${Date.now()}`;
+        musteriModalKapat();
+        const overlay = document.createElement("div");
+        overlay.id = "musteriIslemOverlay"; overlay.className = "erp-modal-overlay";
+        const urunOptions = urunler.map(x => `<option value="${x._id}" data-fiyat="${Number(x.satisFiyati || 0)}" data-kdv="${Number(x.kdv ?? 20)}">${escapeHtml(x.kod)} · ${escapeHtml(x.ad)}</option>`).join("");
+        const satirHtml = () => `<div class="erp-form-grid belge-kalem" style="padding:10px;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:8px"><label class="full">Ürün<select name="urunId" required><option value="">Ürün seçin</option>${urunOptions}</select></label><label>Miktar<input name="miktar" type="number" min="0.0001" step="0.0001" value="1" required></label><label>Birim Fiyat<input name="birimFiyat" type="number" min="0" step="0.01" required></label><label>KDV %<input name="kdv" type="number" min="0" step="0.01" value="20"></label><label>İskonto %<input name="iskonto" type="number" min="0" max="100" step="0.01" value="0"></label><button type="button" class="erp-small-button secondary kalem-sil">Satırı Sil</button></div>`;
+        overlay.innerHTML = `<div class="erp-modal" style="max-width:900px;width:96%"><div class="erp-modal-header"><div><h2>${ayar.baslik}</h2><p>${escapeHtml(musteri.kod)} · ${escapeHtml(musteri.unvan || musteri.adSoyad)}</p></div><button type="button" class="erp-modal-close">×</button></div><form id="musteriBelgeForm"><div class="erp-form-grid"><label>${ayar.no}<input name="no" value="${no}" required></label><label>Tarih<input name="tarih" type="date" value="${new Date().toISOString().slice(0,10)}" required></label>${ayar.depo ? `<label class="full">Depo<select name="depoId" required><option value="">Depo seçin</option>${depolar.map(x => `<option value="${x._id}">${escapeHtml(x.kod)} · ${escapeHtml(x.ad)}</option>`).join("")}</select></label>` : `<label>Geçerlilik Tarihi<input name="gecerlilikTarihi" type="date"></label>`}</div><h3>Kalemler</h3><div id="belgeKalemler">${satirHtml()}</div><button type="button" id="kalemEkle" class="erp-small-button">+ Kalem Ekle</button><label style="display:block;margin-top:12px">Notlar<textarea name="notlar" style="width:100%"></textarea></label><div id="belgeMesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button secondary" data-kapat>Vazgeç</button><button type="submit" class="erp-primary-button">Kaydet</button></div></form></div>`;
+        document.body.appendChild(overlay);
+        const kalemlerEl = document.getElementById("belgeKalemler");
+        const bagla = root => {
+            root.querySelector("select[name=urunId]").addEventListener("change", e => {
+                const opt = e.target.selectedOptions[0]; root.querySelector("input[name=birimFiyat]").value = opt?.dataset.fiyat || 0; root.querySelector("input[name=kdv]").value = opt?.dataset.kdv || 20;
+            });
+            root.querySelector(".kalem-sil").addEventListener("click", () => { if (kalemlerEl.children.length > 1) root.remove(); });
+        };
+        [...kalemlerEl.children].forEach(bagla);
+        document.getElementById("kalemEkle").addEventListener("click", () => { kalemlerEl.insertAdjacentHTML("beforeend", satirHtml()); bagla(kalemlerEl.lastElementChild); });
+        overlay.querySelectorAll(".erp-modal-close,[data-kapat]").forEach(x => x.addEventListener("click", musteriModalKapat));
+        overlay.querySelector("form").addEventListener("submit", async event => {
+            event.preventDefault(); const fd = new FormData(event.currentTarget); const mesaj = document.getElementById("belgeMesaj");
+            const kalemler = [...kalemlerEl.querySelectorAll(".belge-kalem")].map(x => ({ urunId: x.querySelector("[name=urunId]").value, miktar: Number(x.querySelector("[name=miktar]").value), birimFiyat: Number(x.querySelector("[name=birimFiyat]").value), kdv: Number(x.querySelector("[name=kdv]").value), iskonto: Number(x.querySelector("[name=iskonto]").value) }));
+            const body = { musteriId: musteri._id, tarih: fd.get("tarih"), depoId: fd.get("depoId") || undefined, gecerlilikTarihi: fd.get("gecerlilikTarihi") || undefined, notlar: fd.get("notlar"), kalemler }; body[ayar.noAlan] = fd.get("no");
+            try { await api(ayar.endpoint, { method: "POST", body: JSON.stringify(body) }); musteriModalKapat(); await musteriAnaSayfaAc(musteri._id); }
+            catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; }
+        });
     }
 
     async function musteriAnaSayfaAc(id) {
@@ -2163,6 +2261,8 @@ async function dashboardYukle() {
                             Satışlar
                         </button>
 
+                        <button id="musteriSatisYap" style="background:#15803d;color:white;" class="erp-small-button">Satış Yap</button>
+
                         <button data-mtab="cari"
                             style="background:#7c3aed;color:white;"
                             class="erp-small-button">
@@ -2175,17 +2275,23 @@ async function dashboardYukle() {
                             Tahsilat
                         </button>
 
+                        <button id="musteriTahsilatYap" style="background:#0e7490;color:white;" class="erp-small-button">Tahsilat Yap</button>
+
                         <button data-mtab="teklif"
                             style="background:#ea580c;color:white;"
                             class="erp-small-button">
                             Teklifler
                         </button>
 
+                        <button id="musteriTeklifHazirla" style="background:#c2410c;color:white;" class="erp-small-button">Teklif Hazırla</button>
+
                         <button data-mtab="siparis"
                             style="background:#ca8a04;color:white;"
                             class="erp-small-button">
                             Siparişler
                         </button>
+
+                        <button id="musteriSiparisOlustur" style="background:#a16207;color:white;" class="erp-small-button">Sipariş Oluştur</button>
 
                         <button data-mtab="bilgi"
                             style="background:#475569;color:white;"
@@ -2291,15 +2397,7 @@ async function dashboardYukle() {
 
                 document
                     .getElementById("yeniSatisMusteri")
-                    ?.addEventListener("click", () => {
-
-                        sessionStorage.setItem(
-                            "erpSeciliMusteriId",
-                            id
-                        );
-
-                        sayfaYukle("satis");
-                    });
+                    ?.addEventListener("click", () => musteriBelgeFormu("satis", m).catch(error => alert(error.message)));
             };
 
 
@@ -2388,20 +2486,7 @@ async function dashboardYukle() {
                     .getElementById("tahsilatBaslat")
                     ?.addEventListener("click", async () => {
 
-                        sessionStorage.setItem(
-                            "erpSeciliMusteriId",
-                            id
-                        );
-
-                        if (
-                            typeof cariTahsilatFormu ===
-                            "function"
-                        ) {
-                            await cariTahsilatFormu(id);
-                            return;
-                        }
-
-                        sayfaYukle("cari");
+                        await musteriTahsilatFormu(m);
                     });
             };
 
@@ -2436,15 +2521,7 @@ async function dashboardYukle() {
 
                 document
                     .getElementById("yeniTeklifMusteri")
-                    ?.addEventListener("click", () => {
-
-                        sessionStorage.setItem(
-                            "erpSeciliMusteriId",
-                            id
-                        );
-
-                        sayfaYukle("teklifler");
-                    });
+                    ?.addEventListener("click", () => musteriBelgeFormu("teklif", m).catch(error => alert(error.message)));
             };
 
 
@@ -2478,15 +2555,7 @@ async function dashboardYukle() {
 
                 document
                     .getElementById("yeniSiparisMusteri")
-                    ?.addEventListener("click", () => {
-
-                        sessionStorage.setItem(
-                            "erpSeciliMusteriId",
-                            id
-                        );
-
-                        sayfaYukle("siparisler");
-                    });
+                    ?.addEventListener("click", () => musteriBelgeFormu("siparis", m).catch(error => alert(error.message)));
             };
 
 
@@ -2516,6 +2585,11 @@ async function dashboardYukle() {
                                 <input name="vergiNo" value="${escapeHtml(m.vergiNo || "")}" placeholder="Vergi No">
                                 <input name="vadeGun" type="number" value="${Number(m.vadeGun || 0)}" placeholder="Vade">
                                 <input name="riskLimiti" type="number" value="${Number(m.riskLimiti || 0)}" placeholder="Risk Limiti">
+                                <input name="limit" type="number" value="${Number(m.limit || 0)}" placeholder="Limit">
+                                <input name="grup" value="${escapeHtml(m.grup || "Genel")}" placeholder="Müşteri Grubu">
+                                <input name="il" value="${escapeHtml(m.il || "")}" placeholder="İl">
+                                <input name="ilce" value="${escapeHtml(m.ilce || "")}" placeholder="İlçe">
+                                <input name="postaKodu" value="${escapeHtml(m.postaKodu || "")}" placeholder="Posta Kodu">
 
                             </div>
 
@@ -2553,6 +2627,7 @@ async function dashboardYukle() {
 
                         body.riskLimiti =
                             Number(body.riskLimiti || 0);
+                        body.limit = Number(body.limit || 0);
 
                         const response = await fetch(
                             `/api/tenant/musteriler/${encodeURIComponent(id)}`,
@@ -2623,12 +2698,20 @@ async function dashboardYukle() {
                         tel = "90" + tel.substring(1);
                     }
 
-                    window.open(
-                        `https://wa.me/${tel}`,
-                        "_blank",
-                        "noopener"
-                    );
+                    musteriModalKapat();
+                    const overlay = document.createElement("div");
+                    overlay.id = "musteriIslemOverlay"; overlay.className = "erp-modal-overlay";
+                    const normal = `${ad} cari hesap özeti\nGüncel bakiye: ${para(bakiye)}\nTarih: ${new Date().toLocaleDateString("tr-TR")}`;
+                    const detay = `${normal}\n\nSon hareketler:\n${hareketler.slice(0, 20).map(x => `${tarih(x)} | ${x.tip || "İşlem"} | ${para(x.tutar)} | ${x.aciklama || ""}`).join("\n") || "Hareket bulunmuyor."}`;
+                    overlay.innerHTML = `<div class="erp-modal" style="max-width:600px;width:95%"><div class="erp-modal-header"><div><h2>WhatsApp Ekstre Paylaş</h2><p>${escapeHtml(tel)}</p></div><button class="erp-modal-close">×</button></div><div class="dashboard-panel"><p>Paylaşım türünü seçin. WhatsApp yeni sekmede açılır; mesaj gönderilmeden önce kullanıcı tarafından kontrol edilir.</p><div style="display:flex;gap:10px;flex-wrap:wrap"><a class="erp-primary-button" target="_blank" rel="noopener" href="https://wa.me/${tel}?text=${encodeURIComponent(normal)}">Normal Ekstre Paylaş</a><a class="erp-primary-button" target="_blank" rel="noopener" href="https://wa.me/${tel}?text=${encodeURIComponent(detay)}">Detaylı Ekstre Paylaş</a></div></div></div>`;
+                    document.body.appendChild(overlay);
+                    overlay.querySelector(".erp-modal-close").addEventListener("click", musteriModalKapat);
                 });
+
+            document.getElementById("musteriSatisYap")?.addEventListener("click", () => musteriBelgeFormu("satis", m).catch(error => alert(error.message)));
+            document.getElementById("musteriTahsilatYap")?.addEventListener("click", () => musteriTahsilatFormu(m).catch(error => alert(error.message)));
+            document.getElementById("musteriTeklifHazirla")?.addEventListener("click", () => musteriBelgeFormu("teklif", m).catch(error => alert(error.message)));
+            document.getElementById("musteriSiparisOlustur")?.addEventListener("click", () => musteriBelgeFormu("siparis", m).catch(error => alert(error.message)));
 
 
             document
@@ -2953,13 +3036,15 @@ async function dashboardYukle() {
             document
                 .getElementById("musteriGruplariBtn")
                 .addEventListener("click", () => {
-
-                    altPanel.innerHTML = `
-                        <div class="dashboard-panel">
-                            <h2>Müşteri Grupları</h2>
-                            <p>Müşteri sınıflandırmaları burada yönetilecek.</p>
-                        </div>
-                    `;
+                    const sayilar = musteriler.reduce((a, x) => { const g = x.grup || "Genel"; a[g] = (a[g] || 0) + 1; return a; }, {});
+                    altPanel.innerHTML = `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Müşteri Grupları</h2><p>Müşterileri satış ve takip gruplarına ayırın.</p></div></div>
+                        <div class="dashboard-grid">${Object.entries(sayilar).map(([g,n]) => `<div class="dashboard-card"><div class="dashboard-card-title">${escapeHtml(g)}</div><div class="dashboard-card-value">${n}</div><div class="dashboard-card-info">müşteri</div></div>`).join("")}</div>
+                        <form id="musteriGrupForm" class="erp-form-grid" style="margin-top:16px"><label>Müşteri<select name="musteriId" required><option value="">Müşteri seçin</option>${musteriler.map(x => `<option value="${x._id}">${escapeHtml(x.kod)} · ${escapeHtml(x.unvan || x.adSoyad)}</option>`).join("")}</select></label><label>Grup<input name="grup" required placeholder="Örn. VIP, Bayi, Perakende"></label><div class="full"><button class="erp-primary-button" type="submit">Grubu Kaydet</button></div></form><div id="musteriGrupMesaj"></div></div>`;
+                    document.getElementById("musteriGrupForm").addEventListener("submit", async event => {
+                        event.preventDefault(); const fd = new FormData(event.currentTarget); const mesaj = document.getElementById("musteriGrupMesaj");
+                        try { await api(`/api/tenant/musteriler/${encodeURIComponent(fd.get("musteriId"))}`, { method: "PATCH", body: JSON.stringify({ grup: String(fd.get("grup")).trim() }) }); mesaj.innerHTML = `<div class="dashboard-panel"><strong>Grup kaydedildi.</strong></div>`; setTimeout(() => musterilerYukle(), 600); }
+                        catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; }
+                    });
                 });
 
         } catch (error) {
@@ -3168,6 +3253,11 @@ async function dashboardYukle() {
                     ? Number(h.tutar || 0)
                     : 0
             }));
+            let yuruyen = 0;
+            [...rows].reverse().forEach(row => {
+                yuruyen += row.borc - row.alacak;
+                row.yuruyenBakiye = yuruyen;
+            });
 
             const overlay = document.createElement("div");
             overlay.className = "erp-modal-overlay";
@@ -3181,6 +3271,8 @@ async function dashboardYukle() {
                         </div>
 
                         <div class="invoice-toolbar-actions">
+                            <button id="normalEkstre" class="erp-small-button">Normal Ekstre</button>
+                            <button id="detayliEkstre" class="erp-small-button">Detaylı Ekstre</button>
                             <button id="cariYazdir" class="erp-primary-button">
                                 Yazdır / PDF
                             </button>
@@ -3231,8 +3323,10 @@ async function dashboardYukle() {
                                         <th>Tarih</th>
                                         <th>Tür</th>
                                         <th>Açıklama</th>
+                                        <th class="ekstre-detay">Kaynak / Belge</th>
                                         <th>Borç</th>
                                         <th>Alacak</th>
+                                        <th>Bakiye</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -3241,12 +3335,14 @@ async function dashboardYukle() {
                                             <td>${escapeHtml(row.tarihText)}</td>
                                             <td>${escapeHtml(row.tip || "-")}</td>
                                             <td>${escapeHtml(row.aciklama || "-")}</td>
+                                            <td class="ekstre-detay">${escapeHtml(row.kaynak || "-")}${row.kaynakId ? ` · ${escapeHtml(row.kaynakId)}` : ""}</td>
                                             <td>${row.borc ? para(row.borc) : "-"}</td>
                                             <td>${row.alacak ? para(row.alacak) : "-"}</td>
+                                            <td><strong>${para(row.yuruyenBakiye)}</strong></td>
                                         </tr>
                                     `).join("") : `
                                         <tr>
-                                            <td colspan="5" style="text-align:center">
+                                            <td colspan="7" style="text-align:center">
                                                 Henüz cari hareket bulunmuyor.
                                             </td>
                                         </tr>
@@ -3277,6 +3373,9 @@ async function dashboardYukle() {
             document.body.appendChild(overlay);
 
             document.getElementById("cariKapat").onclick = () => overlay.remove();
+            const detayGoster = goster => overlay.querySelectorAll(".ekstre-detay").forEach(x => x.style.display = goster ? "" : "none");
+            document.getElementById("normalEkstre").onclick = () => detayGoster(false);
+            document.getElementById("detayliEkstre").onclick = () => detayGoster(true);
             document.getElementById("cariYazdir").onclick = () => {
                 const page = document.getElementById("cariEkstreSayfa");
                 const old = document.body.innerHTML;

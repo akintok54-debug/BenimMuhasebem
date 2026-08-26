@@ -9,6 +9,7 @@ const Musteri = require("../models/Musteri");
 const Kasa = require("../models/Kasa");
 const Banka = require("../models/Banka");
 const ParaHareket = require("../models/ParaHareket");
+const CariHareket = require("../models/CariHareket");
 
 function tenantObjectId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
@@ -401,6 +402,19 @@ async function olustur(req, res, next) {
             musteri.bakiye += kalanTutar;
 
             await musteri.save();
+
+            await CariHareket.create({
+                tenantId,
+                tarafTipi: "MUSTERI",
+                tarafId: musteri._id,
+                tip: "BORC",
+                tutar: kalanTutar,
+                aciklama: `Satış ${belgeNo}`,
+                kaynak: "SATIS",
+                kaynakId: satis._id,
+                tarih: body.tarih || new Date(),
+                kullaniciId: req.kullanici?._id || req.user?._id || null
+            });
         }
 
         if (

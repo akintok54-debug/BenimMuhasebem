@@ -118,6 +118,13 @@ const MusteriSchema = new mongoose.Schema(
             default: ""
         },
 
+        grup: {
+            type: String,
+            trim: true,
+            default: "Genel",
+            index: true
+        },
+
         fotograf: {
             type: String,
             default: "",

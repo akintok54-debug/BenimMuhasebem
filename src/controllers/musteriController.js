@@ -115,6 +115,7 @@ async function olustur(req, res, next) {
             riskLimiti: Number(body.riskLimiti || 0),
             bakiye: 0,
             notlar: body.notlar || "",
+            grup: body.grup || "Genel",
             fotograf: body.fotograf || "",
             aktif: body.aktif !== false
         });
@@ -163,6 +164,7 @@ async function guncelle(req, res, next) {
             "limit",
             "riskLimiti",
             "notlar",
+            "grup",
             "fotograf",
             "aktif"
         ];
