@@ -1,0 +1,3139 @@
+﻿==================================================
+ BAHADIR ERP V2 - OTOMATIK PROJE INCELEME RAPORU
+ Tarih: 27.08.2026 00:35:58
+==================================================
+git : fatal: not a git repository (or any of the parent directories): .git
+At line:1 char:1
++ git status 2>&1 |
++ ~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (fatal: not a gi...ectories): .git:String) [], Rem 
+   oteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+
+==================================================
+ 2 - GIT REMOTE
+==================================================
+git : fatal: not a git repository (or any of the parent directories): .git
+At line:1 char:1
++ git remote -v 2>&1 |
++ ~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (fatal: not a gi...ectories): .git:String) [], Rem 
+   oteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+
+==================================================
+ 3 - SON COMMITLER
+==================================================
+git : fatal: not a git repository (or any of the parent directories): .git
+At line:1 char:1
++ git log --oneline -10 2>&1 |
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (fatal: not a gi...ectories): .git:String) [], Rem 
+   oteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+
+==================================================
+ 4 - PACKAGE.JSON
+==================================================
+{
+  "name": "bahadir-erp-v2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/sunucu.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "dev": "nodemon src/sunucu.js",
+    "start": "node src/sunucu.js",
+    "test": "node --test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.9.3",
+    "morgan": "^1.11.0",
+    "multer": "^2.2.0",
+    "xlsx": "^0.18.5",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
+
+
+==================================================
+ 5 - MUSTERI ROUTE
+==================================================
+const express = require("express");
+
+const kimlikKontrol = require("../middleware/kimlikKontrol");
+const tenantKontrol = require("../middleware/tenantKontrol");
+const musteriController = require("../controllers/musteriController");
+
+const router = express.Router();
+
+router.use(kimlikKontrol);
+router.use(tenantKontrol);
+
+router.get("/", musteriController.listele);
+router.get("/:id", musteriController.detay);
+router.post("/", musteriController.olustur);
+router.patch("/:id", musteriController.guncelle);
+router.patch("/:id/durum", musteriController.durumDegistir);
+
+module.exports = router;
+
+
+==================================================
+ 6 - MUSTERI MODEL
+==================================================
+const mongoose = require("mongoose");
+
+const MusteriSchema = new mongoose.Schema(
+    {
+        tenantId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Tenant",
+            required: true,
+            index: true
+        },
+
+        kod: {
+            type: String,
+            required: true,
+            trim: true,
+            uppercase: true
+        },
+
+        adSoyad: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+
+        unvan: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+
+        yetkili: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+
+        telefon: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+
+        whatsapp: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+
+        email: {
+            type: String,
+            lowercase: true,
+            trim: true,
+            default: ""
+        },
+
+        vergiDairesi: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+
+        vergiNo: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+
+        adres: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+
+        il: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+
+        ilce: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+
+        postaKodu: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+
+        vadeGun: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
+
+        limit: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
+
+        riskLimiti: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
+
+        bakiye: {
+            type: Number,
+            default: 0
+        },
+
+        notlar: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+
+        aktif: {
+            type: Boolean,
+            default: true
+        }
+    },
+    {
+        timestamps: true
+    }
+);
+
+MusteriSchema.index(
+    { tenantId: 1, kod: 1 },
+    { unique: true }
+);
+
+MusteriSchema.index({
+    tenantId: 1,
+    unvan: 1
+});
+
+MusteriSchema.index({
+    tenantId: 1,
+    telefon: 1
+});
+
+module.exports = mongoose.model("Musteri", MusteriSchema);
+
+
+==================================================
+ 7 - MUSTERI CONTROLLER
+==================================================
+const mongoose = require("mongoose");
+const Musteri = require("../models/Musteri");
+
+function tenantObjectId(req) {
+    return new mongoose.Types.ObjectId(String(req.tenantId));
+}
+
+async function listele(req, res, next) {
+    try {
+        const tenantId = tenantObjectId(req);
+        const arama = String(req.query.arama || "").trim();
+
+        const filter = {
+            tenantId
+        };
+
+        if (arama) {
+            filter.$or = [
+                { kod: { $regex: arama, $options: "i" } },
+                { adSoyad: { $regex: arama, $options: "i" } },
+                { unvan: { $regex: arama, $options: "i" } },
+                { yetkili: { $regex: arama, $options: "i" } },
+                { telefon: { $regex: arama, $options: "i" } },
+                { whatsapp: { $regex: arama, $options: "i" } }
+            ];
+        }
+
+        const musteriler = await Musteri.find(filter)
+            .sort({ createdAt: -1 })
+            .lean();
+
+        return res.json({
+            basarili: true,
+            toplam: musteriler.length,
+            musteriler
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+async function detay(req, res, next) {
+    try {
+        const tenantId = tenantObjectId(req);
+
+        const musteri = await Musteri.findOne({
+            _id: req.params.id,
+            tenantId
+        }).lean();
+
+        if (!musteri) {
+            return res.status(404).json({
+                basarili: false,
+                mesaj: "Müşteri bulunamadı."
+            });
+        }
+
+        return res.json({
+            basarili: true,
+            musteri
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+async function olustur(req, res, next) {
+    try {
+        const tenantId = tenantObjectId(req);
+        const body = req.body || {};
+
+        if (!body.kod) {
+            return res.status(400).json({
+                basarili: false,
+                mesaj: "Müşteri kodu zorunludur."
+            });
+        }
+
+        if (!body.unvan && !body.adSoyad) {
+            return res.status(400).json({
+                basarili: false,
+                mesaj: "Ünvan veya ad soyad zorunludur."
+            });
+        }
+
+        const mevcut = await Musteri.findOne({
+            tenantId,
+            kod: String(body.kod).trim().toUpperCase()
+        });
+
+        if (mevcut) {
+            return res.status(409).json({
+                basarili: false,
+                mesaj: "Bu müşteri kodu zaten kullanılıyor. Lütfen farklı bir müşteri kodu girin."
+            });
+        }
+
+        const musteri = await Musteri.create({
+            tenantId,
+            kod: String(body.kod).trim().toUpperCase(),
+            adSoyad: body.adSoyad || "",
+            unvan: body.unvan || "",
+            yetkili: body.yetkili || "",
+            telefon: body.telefon || "",
+            whatsapp: body.whatsapp || "",
+            email: body.email || "",
+            vergiDairesi: body.vergiDairesi || "",
+            vergiNo: body.vergiNo || "",
+            adres: body.adres || "",
+            il: body.il || "",
+            ilce: body.ilce || "",
+            postaKodu: body.postaKodu || "",
+            vadeGun: Number(body.vadeGun || 0),
+            limit: Number(body.limit || 0),
+            riskLimiti: Number(body.riskLimiti || 0),
+            bakiye: 0,
+            notlar: body.notlar || "",
+            aktif: body.aktif !== false
+        });
+
+        return res.status(201).json({
+            basarili: true,
+            musteri
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+async function guncelle(req, res, next) {
+    try {
+        const tenantId = tenantObjectId(req);
+        const body = req.body || {};
+
+        const musteri = await Musteri.findOne({
+            _id: req.params.id,
+            tenantId
+        });
+
+        if (!musteri) {
+            return res.status(404).json({
+                basarili: false,
+                mesaj: "Müşteri bulunamadı."
+            });
+        }
+
+        const alanlar = [
+            "kod",
+            "adSoyad",
+            "unvan",
+            "yetkili",
+            "telefon",
+            "whatsapp",
+            "email",
+            "vergiDairesi",
+            "vergiNo",
+            "adres",
+            "il",
+            "ilce",
+            "postaKodu",
+            "vadeGun",
+            "limit",
+            "riskLimiti",
+            "notlar",
+            "aktif"
+        ];
+
+        for (const alan of alanlar) {
+            if (body[alan] !== undefined) {
+                musteri[alan] =
+                    alan === "kod"
+                        ? String(body[alan]).trim().toUpperCase()
+                        : body[alan];
+            }
+        }
+
+        await musteri.save();
+
+        return res.json({
+            basarili: true,
+            musteri
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+async function durumDegistir(req, res, next) {
+    try {
+        const tenantId = tenantObjectId(req);
+
+        const musteri = await Musteri.findOneAndUpdate(
+            {
+                _id: req.params.id,
+                tenantId
+            },
+            {
+                aktif: Boolean(req.body?.aktif)
+            },
+            {
+                new: true
+            }
+        ).lean();
+
+        if (!musteri) {
+            return res.status(404).json({
+                basarili: false,
+                mesaj: "Müşteri bulunamadı."
+            });
+        }
+
+        return res.json({
+            basarili: true,
+            musteri
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+module.exports = {
+    listele,
+    detay,
+    olustur,
+    guncelle,
+    durumDegistir
+};
+
+
+
+==================================================
+ 8 - CARI ROUTE
+==================================================
+const express = require("express");
+
+const kimlikKontrol = require("../middleware/kimlikKontrol");
+const tenantKontrol = require("../middleware/tenantKontrol");
+const controller = require("../controllers/cariController");
+
+const router = express.Router();
+
+router.use(kimlikKontrol);
+router.use(tenantKontrol);
+
+router.get("/ozet", controller.ozet);
+router.get("/hareketler", controller.hareketler);
+
+router.post("/musteri/tahsilat", controller.musteriTahsilat);
+router.post("/tedarikci/odeme", controller.tedarikciOdeme);
+
+module.exports = router;
+
+
+==================================================
+ 9 - CARI CONTROLLER FONKSIYONLARI
+==================================================
+
+  src\controllers\cariController.js:3:const Musteri = require("../models/Musteri");
+  src\controllers\cariController.js:4:const Tedarikci = require("../models/Tedarikci");
+> src\controllers\cariController.js:5:const CariHareket = require("../models/CariHareket");
+  src\controllers\cariController.js:6:const Kasa = require("../models/Kasa");
+  src\controllers\cariController.js:7:const Banka = require("../models/Banka");
+> src\controllers\cariController.js:8:const ParaHareket = require("../models/ParaHareket");
+  src\controllers\cariController.js:9:
+  src\controllers\cariController.js:10:function tenantId(req) {
+  src\controllers\cariController.js:11:    return new mongoose.Types.ObjectId(String(req.tenant
+Id));
+  src\controllers\cariController.js:12:}
+  src\controllers\cariController.js:13:
+> src\controllers\cariController.js:14:async function hesapBul(req, hesapTipi, hesapId) {
+  src\controllers\cariController.js:15:    const tId = tenantId(req);
+  src\controllers\cariController.js:16:
+  src\controllers\cariController.js:17:    if (!["KASA", "BANKA"].includes(hesapTipi)) {
+  src\controllers\cariController.js:18:        return null;
+  src\controllers\cariController.js:19:    }
+  src\controllers\cariController.js:38:}
+  src\controllers\cariController.js:39:
+> src\controllers\cariController.js:40:async function ozet(req, res, next) {
+  src\controllers\cariController.js:41:    try {
+  src\controllers\cariController.js:42:        const tId = tenantId(req);
+  src\controllers\cariController.js:43:
+  src\controllers\cariController.js:44:        const [musteriler, tedarikciler] = await Promise
+.all([
+  src\controllers\cariController.js:45:            Musteri.find({
+  src\controllers\cariController.js:77:}
+  src\controllers\cariController.js:78:
+> src\controllers\cariController.js:79:async function hareketler(req, res, next) {
+  src\controllers\cariController.js:80:    try {
+  src\controllers\cariController.js:81:        const filter = {
+  src\controllers\cariController.js:82:            tenantId: tenantId(req)
+  src\controllers\cariController.js:83:        };
+  src\controllers\cariController.js:84:
+  src\controllers\cariController.js:91:        }
+  src\controllers\cariController.js:92:
+> src\controllers\cariController.js:93:        const hareketler = await CariHareket.find(filter
+)
+  src\controllers\cariController.js:94:            .sort({
+  src\controllers\cariController.js:95:                tarih: -1,
+  src\controllers\cariController.js:96:                createdAt: -1
+  src\controllers\cariController.js:97:            })
+  src\controllers\cariController.js:98:            .lean();
+  src\controllers\cariController.js:100:        return res.json({
+  src\controllers\cariController.js:101:            basarili: true,
+> src\controllers\cariController.js:102:            toplam: hareketler.length,
+> src\controllers\cariController.js:103:            hareketler
+  src\controllers\cariController.js:104:        });
+  src\controllers\cariController.js:105:    } catch (error) {
+  src\controllers\cariController.js:106:        next(error);
+  src\controllers\cariController.js:107:    }
+  src\controllers\cariController.js:108:}
+  src\controllers\cariController.js:109:
+> src\controllers\cariController.js:110:async function musteriTahsilat(req, res, next) {
+  src\controllers\cariController.js:111:    try {
+  src\controllers\cariController.js:112:        const tId = tenantId(req);
+  src\controllers\cariController.js:113:        const body = req.body || {};
+  src\controllers\cariController.js:114:        const tutar = Number(body.tutar || 0);
+  src\controllers\cariController.js:115:
+  src\controllers\cariController.js:124:            return res.status(400).json({
+  src\controllers\cariController.js:125:                basarili: false,
+> src\controllers\cariController.js:126:                mesaj: "Tahsilat hesabı KASA veya BANKA
+ olmalıdır."
+  src\controllers\cariController.js:127:            });
+  src\controllers\cariController.js:128:        }
+  src\controllers\cariController.js:129:
+  src\controllers\cariController.js:130:        const musteri = await Musteri.findOne({
+  src\controllers\cariController.js:131:            _id: body.musteriId,
+  src\controllers\cariController.js:143:            return res.status(409).json({
+  src\controllers\cariController.js:144:                basarili: false,
+> src\controllers\cariController.js:145:                mesaj: "Tahsilat müşteri bakiyesini aşa
+maz."
+  src\controllers\cariController.js:146:            });
+  src\controllers\cariController.js:147:        }
+  src\controllers\cariController.js:148:
+  src\controllers\cariController.js:149:        const hesap = await hesapBul(
+  src\controllers\cariController.js:150:            req,
+  src\controllers\cariController.js:156:            return res.status(404).json({
+  src\controllers\cariController.js:157:                basarili: false,
+> src\controllers\cariController.js:158:                mesaj: "Tahsilat hesabı bulunamadı."
+  src\controllers\cariController.js:159:            });
+  src\controllers\cariController.js:160:        }
+  src\controllers\cariController.js:161:
+  src\controllers\cariController.js:162:        musteri.bakiye -= tutar;
+  src\controllers\cariController.js:163:        hesap.bakiye += tutar;
+  src\controllers\cariController.js:166:        await hesap.save();
+  src\controllers\cariController.js:167:
+> src\controllers\cariController.js:168:        const cariHareket = await CariHareket.create({
+  src\controllers\cariController.js:169:            tenantId: tId,
+  src\controllers\cariController.js:170:            tarafTipi: "MUSTERI",
+  src\controllers\cariController.js:171:            tarafId: musteri._id,
+  src\controllers\cariController.js:172:            tip: "TAHSILAT",
+  src\controllers\cariController.js:173:            tutar,
+> src\controllers\cariController.js:174:            aciklama: body.aciklama || "Müşteri tahsila
+tı",
+  src\controllers\cariController.js:175:            kaynak: "TAHSILAT",
+  src\controllers\cariController.js:176:            kullaniciId:
+  src\controllers\cariController.js:177:                req.kullanici?._id ||
+  src\controllers\cariController.js:178:                req.user?._id ||
+  src\controllers\cariController.js:179:                null
+  src\controllers\cariController.js:180:        });
+  src\controllers\cariController.js:181:
+> src\controllers\cariController.js:182:        const paraHareket = await ParaHareket.create({
+  src\controllers\cariController.js:183:            tenantId: tId,
+  src\controllers\cariController.js:184:            hesapTipi: body.hesapTipi,
+  src\controllers\cariController.js:185:            hesapId: hesap._id,
+  src\controllers\cariController.js:186:            tip: "GIRIS",
+  src\controllers\cariController.js:187:            tutar,
+> src\controllers\cariController.js:188:            aciklama: body.aciklama || "Müşteri tahsila
+tı",
+  src\controllers\cariController.js:189:            kaynak: "TAHSILAT",
+> src\controllers\cariController.js:190:            kaynakId: cariHareket._id,
+  src\controllers\cariController.js:191:            kullaniciId:
+  src\controllers\cariController.js:192:                req.kullanici?._id ||
+  src\controllers\cariController.js:193:                req.user?._id ||
+  src\controllers\cariController.js:194:                null
+  src\controllers\cariController.js:195:        });
+  src\controllers\cariController.js:197:        return res.status(201).json({
+  src\controllers\cariController.js:198:            basarili: true,
+> src\controllers\cariController.js:199:            mesaj: "Tahsilat kaydedildi.",
+  src\controllers\cariController.js:200:            musteriBakiye: musteri.bakiye,
+  src\controllers\cariController.js:201:            hesap,
+> src\controllers\cariController.js:202:            cariHareket,
+> src\controllers\cariController.js:203:            paraHareket
+  src\controllers\cariController.js:204:        });
+  src\controllers\cariController.js:205:    } catch (error) {
+  src\controllers\cariController.js:206:        next(error);
+  src\controllers\cariController.js:207:    }
+  src\controllers\cariController.js:208:}
+  src\controllers\cariController.js:209:
+> src\controllers\cariController.js:210:async function tedarikciOdeme(req, res, next) {
+  src\controllers\cariController.js:211:    try {
+  src\controllers\cariController.js:212:        const tId = tenantId(req);
+  src\controllers\cariController.js:213:        const body = req.body || {};
+  src\controllers\cariController.js:214:        const tutar = Number(body.tutar || 0);
+  src\controllers\cariController.js:215:
+  src\controllers\cariController.js:273:        await hesap.save();
+  src\controllers\cariController.js:274:
+> src\controllers\cariController.js:275:        const cariHareket = await CariHareket.create({
+  src\controllers\cariController.js:276:            tenantId: tId,
+  src\controllers\cariController.js:277:            tarafTipi: "TEDARIKCI",
+  src\controllers\cariController.js:278:            tarafId: tedarikci._id,
+  src\controllers\cariController.js:279:            tip: "ODEME",
+  src\controllers\cariController.js:280:            tutar,
+  src\controllers\cariController.js:287:        });
+  src\controllers\cariController.js:288:
+> src\controllers\cariController.js:289:        const paraHareket = await ParaHareket.create({
+  src\controllers\cariController.js:290:            tenantId: tId,
+  src\controllers\cariController.js:291:            hesapTipi: body.hesapTipi,
+  src\controllers\cariController.js:292:            hesapId: hesap._id,
+  src\controllers\cariController.js:293:            tip: "CIKIS",
+  src\controllers\cariController.js:294:            tutar,
+  src\controllers\cariController.js:295:            aciklama: body.aciklama || "Tedarikçi ödeme
+si",
+  src\controllers\cariController.js:296:            kaynak: "ODEME",
+> src\controllers\cariController.js:297:            kaynakId: cariHareket._id,
+  src\controllers\cariController.js:298:            kullaniciId:
+  src\controllers\cariController.js:299:                req.kullanici?._id ||
+  src\controllers\cariController.js:300:                req.user?._id ||
+  src\controllers\cariController.js:301:                null
+  src\controllers\cariController.js:302:        });
+  src\controllers\cariController.js:307:            tedarikciBakiye: tedarikci.bakiye,
+  src\controllers\cariController.js:308:            hesap,
+> src\controllers\cariController.js:309:            cariHareket,
+> src\controllers\cariController.js:310:            paraHareket
+  src\controllers\cariController.js:311:        });
+  src\controllers\cariController.js:312:    } catch (error) {
+  src\controllers\cariController.js:313:        next(error);
+  src\controllers\cariController.js:314:    }
+  src\controllers\cariController.js:315:}
+  src\controllers\cariController.js:316:
+> src\controllers\cariController.js:317:module.exports = {
+> src\controllers\cariController.js:318:    ozet,
+> src\controllers\cariController.js:319:    hareketler,
+> src\controllers\cariController.js:320:    musteriTahsilat,
+  src\controllers\cariController.js:321:    tedarikciOdeme
+  src\controllers\cariController.js:322:};
+
+
+
+
+==================================================
+ 10 - SATIS ROUTE
+==================================================
+const express = require("express");
+
+const kimlikKontrol = require("../middleware/kimlikKontrol");
+const tenantKontrol = require("../middleware/tenantKontrol");
+const controller = require("../controllers/satisController");
+
+const router = express.Router();
+
+router.use(kimlikKontrol);
+router.use(tenantKontrol);
+
+router.get("/", controller.listele);
+router.get("/:id", controller.detay);
+router.post("/", controller.olustur);
+
+module.exports = router;
+
+
+==================================================
+ 11 - FRONTEND MUSTERI FONKSIYONLARI
+==================================================
+
+  public\erp\erp.js:442:
+  public\erp\erp.js:443:                        <td>
+  public\erp\erp.js:444:                            ${escapeHtml(
+> public\erp\erp.js:445:                                item.musteriId?.unvan ||
+> public\erp\erp.js:446:                                item.musteriId?.adSoyad ||
+  public\erp\erp.js:447:                                "-"
+  public\erp\erp.js:448:                            )}
+  public\erp\erp.js:449:                        </td>
+  public\erp\erp.js:450:
+  public\erp\erp.js:451:                        <td>
+  public\erp\erp.js:452:                            <strong>
+  public\erp\erp.js:453:                                ${para(
+  public\erp\erp.js:454:                                    item.genelToplam
+  public\erp\erp.js:1404:            columns: [
+  public\erp\erp.js:1405:                { label: "Belge", value: "belgeNo" },
+  public\erp\erp.js:1406:                { label: "Tarih", value: r => r.tarih ? new Date(r.tar
+ih).toLocaleDateString("tr-TR") : "-" },
+> public\erp\erp.js:1407:                { label: "Müşteri", value: r => r.musteriId?.unvan || 
+"-" },
+  public\erp\erp.js:1408:                { label: "Ödeme", value: r => r.odemeTipi || "-" },
+  public\erp\erp.js:1409:                { label: "Genel Toplam", value: r => para(r.genelTopla
+m) }
+  public\erp\erp.js:1410:            ]
+  public\erp\erp.js:1411:        }
+  public\erp\erp.js:1412:    };
+  public\erp\erp.js:1413:
+  public\erp\erp.js:1414:    async function basitSayfa(page) {
+  public\erp\erp.js:1415:        const cfg = configs[page];
+  public\erp\erp.js:1488:        }
+  public\erp\erp.js:1489:
+  public\erp\erp.js:1490:        const adimlar =
+> public\erp\erp.js:1491:            form.querySelectorAll("[data-musteri-adim]");
+  public\erp\erp.js:1492:
+  public\erp\erp.js:1493:        adimlar.forEach(el => {
+  public\erp\erp.js:1494:            el.style.display =
+  public\erp\erp.js:1495:                String(el.dataset.musteriAdim) ===
+  public\erp\erp.js:1496:                String(adim)
+  public\erp\erp.js:1497:                    ? ""
+  public\erp\erp.js:1498:                    : "none";
+  public\erp\erp.js:1499:        });
+  public\erp\erp.js:1500:
+  public\erp\erp.js:1501:        form.querySelectorAll(
+> public\erp\erp.js:1502:            "[data-musteri-step]"
+  public\erp\erp.js:1503:        ).forEach(btn => {
+  public\erp\erp.js:1504:            btn.classList.toggle(
+  public\erp\erp.js:1505:                "active",
+  public\erp\erp.js:1506:                Number(btn.dataset.musteriStep) === adim
+  public\erp\erp.js:1507:            );
+  public\erp\erp.js:1508:        });
+  public\erp\erp.js:1509:
+  public\erp\erp.js:1510:        const geri =
+  public\erp\erp.js:1534:        musteriFormAdim = adim;
+  public\erp\erp.js:1535:    }
+  public\erp\erp.js:1536:
+> public\erp\erp.js:1537:    function yeniMusteriPaneli() {
+  public\erp\erp.js:1538:
+  public\erp\erp.js:1539:        musteriPanelKapat();
+  public\erp\erp.js:1540:
+  public\erp\erp.js:1541:        const overlay = document.createElement("div");
+  public\erp\erp.js:1542:
+  public\erp\erp.js:1543:        overlay.id = "musteriFormOverlay";
+  public\erp\erp.js:1544:        overlay.className = "erp-modal-overlay";
+  public\erp\erp.js:1545:
+  public\erp\erp.js:1905:        );
+  public\erp\erp.js:1906:    }
+  public\erp\erp.js:1907:
+> public\erp\erp.js:1908:    async function musteriAnaSayfaAc(id) {
+  public\erp\erp.js:1909:
+  public\erp\erp.js:1910:        setTitle("Müşteri");
+  public\erp\erp.js:1911:
+  public\erp\erp.js:1912:        loading();
+  public\erp\erp.js:1913:
+  public\erp\erp.js:1914:        try {
+  public\erp\erp.js:1915:
+  public\erp\erp.js:1916:            const [musteriData, hareketData, satisData] =
+  public\erp\erp.js:1948:            const satislar =
+  public\erp\erp.js:1949:                tumSatislar.filter(s => {
+  public\erp\erp.js:1950:
+> public\erp\erp.js:1951:                    const musteriId =
+> public\erp\erp.js:1952:                        s.musteriId?._id ||
+> public\erp\erp.js:1953:                        s.musteriId ||
+  public\erp\erp.js:1954:                        s.musteri?._id ||
+  public\erp\erp.js:1955:                        s.musteri;
+  public\erp\erp.js:1956:
+> public\erp\erp.js:1957:                    return String(musteriId || "") === String(id);
+  public\erp\erp.js:1958:                });
+  public\erp\erp.js:1959:
+  public\erp\erp.js:1960:            const ad =
+  public\erp\erp.js:1961:                musteri.unvan ||
+  public\erp\erp.js:1962:                musteri.adSoyad ||
+  public\erp\erp.js:1963:                "Müşteri";
+  public\erp\erp.js:1964:
+  public\erp\erp.js:1965:            const bakiye =
+  public\erp\erp.js:2669:                    async () => {
+  public\erp\erp.js:2670:
+  public\erp\erp.js:2671:                        if (
+> public\erp\erp.js:2672:                            typeof cariTahsilatFormu ===
+  public\erp\erp.js:2673:                            "function"
+  public\erp\erp.js:2674:                        ) {
+> public\erp\erp.js:2675:                            await cariTahsilatFormu(id);
+  public\erp\erp.js:2676:                            return;
+  public\erp\erp.js:2677:                        }
+  public\erp\erp.js:2678:
+  public\erp\erp.js:2679:                        alert(
+  public\erp\erp.js:2680:                            "Tahsilat ekranı bağlantısı bulunamadı."
+  public\erp\erp.js:2681:                        );
+  public\erp\erp.js:2682:                    }
+  public\erp\erp.js:2683:                );
+  public\erp\erp.js:2690:                    () => {
+  public\erp\erp.js:2691:
+  public\erp\erp.js:2692:                        sessionStorage.setItem(
+> public\erp\erp.js:2693:                            "erpSeciliMusteriId",
+  public\erp\erp.js:2694:                            id
+  public\erp\erp.js:2695:                        );
+  public\erp\erp.js:2696:
+  public\erp\erp.js:2697:                        sayfaYukle("satis");
+  public\erp\erp.js:2698:                    }
+  public\erp\erp.js:2699:                );
+  public\erp\erp.js:2700:
+  public\erp\erp.js:2701:
+  public\erp\erp.js:2706:                    () => {
+  public\erp\erp.js:2707:
+  public\erp\erp.js:2708:                        sessionStorage.setItem(
+> public\erp\erp.js:2709:                            "erpSeciliMusteriId",
+  public\erp\erp.js:2710:                            id
+  public\erp\erp.js:2711:                        );
+  public\erp\erp.js:2712:
+  public\erp\erp.js:2713:                        sayfaYukle("teklifler");
+  public\erp\erp.js:2714:                    }
+  public\erp\erp.js:2715:                );
+  public\erp\erp.js:2716:
+  public\erp\erp.js:2717:
+  public\erp\erp.js:2784:        }
+  public\erp\erp.js:2785:    }
+  public\erp\erp.js:2786:
+> public\erp\erp.js:2787:    async function musterilerYukle() {
+  public\erp\erp.js:2788:
+  public\erp\erp.js:2789:        setTitle("Müşteriler");
+  public\erp\erp.js:2790:        loading();
+  public\erp\erp.js:2791:
+  public\erp\erp.js:2792:        try {
+  public\erp\erp.js:2793:
+  public\erp\erp.js:2794:            const [cariData, musteriData] =
+  public\erp\erp.js:2795:                await Promise.all([
+  public\erp\erp.js:3023:                                                <button
+  public\erp\erp.js:3024:                                                    type="button"
+  public\erp\erp.js:3025:                                                    class="erp-primary
+-button"
+> public\erp\erp.js:3026:                                                    data-musteri-detay
+="${item._id}"
+  public\erp\erp.js:3027:                                                >
+  public\erp\erp.js:3028:                                                    Müşteri
+  public\erp\erp.js:3029:                                                </button>
+  public\erp\erp.js:3030:
+  public\erp\erp.js:3031:                                                <button
+  public\erp\erp.js:3032:                                                    type="button"
+  public\erp\erp.js:3033:                                                    class="erp-small-b
+utton"
+> public\erp\erp.js:3034:                                                    data-musteri-ekstr
+e="${item._id}"
+  public\erp\erp.js:3035:                                                >
+  public\erp\erp.js:3036:                                                    Ekstre
+  public\erp\erp.js:3037:                                                </button>
+  public\erp\erp.js:3038:
+  public\erp\erp.js:3039:                                                <button
+  public\erp\erp.js:3040:                                                    type="button"
+  public\erp\erp.js:3041:                                                    class="erp-small-b
+utton"
+> public\erp\erp.js:3042:                                                    data-musteri-tahsi
+lat="${item._id}"
+  public\erp\erp.js:3043:                                                >
+  public\erp\erp.js:3044:                                                    Tahsilat
+  public\erp\erp.js:3045:                                                </button>
+  public\erp\erp.js:3046:
+  public\erp\erp.js:3047:                                            </div>
+  public\erp\erp.js:3048:
+  public\erp\erp.js:3049:                                        </td>
+  public\erp\erp.js:3050:
+  public\erp\erp.js:3073:
+  public\erp\erp.js:3074:                    const detay =
+  public\erp\erp.js:3075:                        event.target.closest(
+> public\erp\erp.js:3076:                            "[data-musteri-detay]"
+  public\erp\erp.js:3077:                        );
+  public\erp\erp.js:3078:
+  public\erp\erp.js:3079:                    if (detay) {
+  public\erp\erp.js:3080:
+  public\erp\erp.js:3081:                        await musteriAnaSayfaAc(
+  public\erp\erp.js:3082:                            detay.dataset.musteriDetay
+  public\erp\erp.js:3083:                        );
+  public\erp\erp.js:3084:
+  public\erp\erp.js:3087:
+  public\erp\erp.js:3088:                    const ekstre =
+  public\erp\erp.js:3089:                        event.target.closest(
+> public\erp\erp.js:3090:                            "[data-musteri-ekstre]"
+  public\erp\erp.js:3091:                        );
+  public\erp\erp.js:3092:
+  public\erp\erp.js:3093:                    if (ekstre) {
+  public\erp\erp.js:3094:
+  public\erp\erp.js:3095:                        await cariEkstreAc(
+  public\erp\erp.js:3096:                            "musteri",
+  public\erp\erp.js:3097:                            ekstre.dataset.musteriEkstre
+  public\erp\erp.js:3098:                        );
+  public\erp\erp.js:3102:
+  public\erp\erp.js:3103:                    const tahsilat =
+  public\erp\erp.js:3104:                        event.target.closest(
+> public\erp\erp.js:3105:                            "[data-musteri-tahsilat]"
+  public\erp\erp.js:3106:                        );
+  public\erp\erp.js:3107:
+  public\erp\erp.js:3108:                    if (tahsilat) {
+  public\erp\erp.js:3109:
+  public\erp\erp.js:3110:                        if (
+> public\erp\erp.js:3111:                            typeof cariTahsilatFormu ===
+  public\erp\erp.js:3112:                            "function"
+  public\erp\erp.js:3113:                        ) {
+  public\erp\erp.js:3114:
+> public\erp\erp.js:3115:                            await cariTahsilatFormu(
+  public\erp\erp.js:3116:                                tahsilat.dataset.musteriTahsilat
+  public\erp\erp.js:3117:                            );
+  public\erp\erp.js:3118:
+  public\erp\erp.js:3119:                        } else {
+  public\erp\erp.js:3120:
+  public\erp\erp.js:3121:                            alert(
+  public\erp\erp.js:3122:                                "Tahsilat fonksiyonu henüz bağlı değil
+."
+  public\erp\erp.js:3123:                            );
+  public\erp\erp.js:3315:        }
+  public\erp\erp.js:3316:    }
+  public\erp\erp.js:3317:
+> public\erp\erp.js:3318:    async function cariEkstreAc(tip, id) {
+  public\erp\erp.js:3319:        try {
+  public\erp\erp.js:3320:            const tarafTipi = tip === "musteri" ? "MUSTERI" : "TEDARIK
+CI";
+  public\erp\erp.js:3321:
+  public\erp\erp.js:3322:            const [hareketData, firmaData] = await Promise.all([
+  public\erp\erp.js:3323:                api(`/api/tenant/cari/hareketler?tarafTipi=${encodeURI
+Component(tarafTipi)}&tarafId=${encodeURIComponent(id)}`),
+  public\erp\erp.js:3324:                api("/api/tenant/firma")
+  public\erp\erp.js:3325:            ]);
+  public\erp\erp.js:3326:
+
+
+
+
+==================================================
+ 12 - MEVCUT MUSTERI FRONTEND BLOKU
+==================================================
+    function yeniMusteriPaneli() {
+
+        musteriPanelKapat();
+
+        const overlay = document.createElement("div");
+
+        overlay.id = "musteriFormOverlay";
+        overlay.className = "erp-modal-overlay";
+
+        overlay.innerHTML = `
+            <div
+                class="erp-modal"
+                style="
+                    max-width:980px;
+                    width:96%;
+                "
+            >
+
+                <div class="erp-modal-header">
+
+                    <div>
+                        <h2>Yeni Müşteri</h2>
+                        <p>
+                            Müşteri kartı bilgilerini girin.
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        class="erp-modal-close"
+                        id="musteriFormKapat"
+                    >
+                        ×
+                    </button>
+
+                </div>
+
+                <form id="musteriForm">
+
+                    <div class="dashboard-panel">
+
+                        <div class="panel-heading">
+                            <div>
+                                <h3>Temel Bilgiler</h3>
+                                <p>
+                                    Müşterinin temel kart bilgileri.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="erp-form-grid">
+
+                            <label>
+                                Müşteri Kodu
+                                <input
+                                    name="kod"
+                                    required
+                                    maxlength="50"
+                                    placeholder="Örn. M0003"
+                                >
+                            </label>
+
+                            <label>
+                                Müşteri Adı
+                                <input
+                                    name="adSoyad"
+                                    maxlength="150"
+                                    placeholder="Ad Soyad"
+                                >
+                            </label>
+
+                            <label>
+                                Ünvan
+                                <input
+                                    name="unvan"
+                                    maxlength="200"
+                                    placeholder="Firma / Ünvan"
+                                >
+                            </label>
+
+                            <label>
+                                Yetkili
+                                <input
+                                    name="yetkili"
+                                    maxlength="150"
+                                    placeholder="Yetkili kişi"
+                                >
+                            </label>
+
+                        </div>
+
+                    </div>
+
+                    <div class="dashboard-panel">
+
+                        <div class="panel-heading">
+                            <div>
+                                <h3>letişim</h3>
+                                <p>
+                                    Telefon, WhatsApp ve e-posta bilgileri.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="erp-form-grid">
+
+                            <label>
+                                Telefon
+                                <input
+                                    name="telefon"
+                                    type="tel"
+                                    placeholder="Telefon"
+                                >
+                            </label>
+
+                            <label>
+                                WhatsApp
+                                <input
+                                    name="whatsapp"
+                                    type="tel"
+                                    placeholder="WhatsApp"
+                                >
+                            </label>
+
+                            <label class="full">
+                                E-posta
+                                <input
+                                    name="email"
+                                    type="email"
+                                    placeholder="ornek@firma.com"
+                                >
+                            </label>
+
+                        </div>
+
+                    </div>
+
+                    <div class="dashboard-panel">
+
+                        <div class="panel-heading">
+                            <div>
+                                <h3>Vergi Bilgileri</h3>
+                                <p>
+                                    Vergi bilgilerini girin.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="erp-form-grid">
+
+                            <label>
+                                Vergi Dairesi
+                                <input
+                                    name="vergiDairesi"
+                                    placeholder="Vergi dairesi"
+                                >
+                            </label>
+
+                            <label>
+                                Vergi Numarası
+                                <input
+                                    name="vergiNo"
+                                    placeholder="Vergi numarası"
+                                >
+                            </label>
+
+                        </div>
+
+                    </div>
+
+                    <div class="dashboard-panel">
+
+                        <div class="panel-heading">
+                            <div>
+                                <h3>Adres</h3>
+                                <p>
+                                    Müşteri adres bilgileri.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="erp-form-grid">
+
+                            <label class="full">
+                                Adres
+                                <textarea
+                                    name="adres"
+                                    rows="3"
+                                    placeholder="Açık adres"
+                                ></textarea>
+                            </label>
+
+                            <label>
+                                l
+                                <input
+                                    name="il"
+                                    placeholder="l"
+                                >
+                            </label>
+
+                            <label>
+                                lçe
+                                <input
+                                    name="ilce"
+                                    placeholder="lçe"
+                                >
+                            </label>
+
+                            <label>
+                                Posta Kodu
+                                <input
+                                    name="postaKodu"
+                                    placeholder="Posta kodu"
+                                >
+                            </label>
+
+                        </div>
+
+                    </div>
+
+                    <div class="dashboard-panel">
+
+                        <div class="panel-heading">
+                            <div>
+                                <h3>Ticari Bilgiler</h3>
+                                <p>
+                                    Vade ve risk bilgileri.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="erp-form-grid">
+
+                            <label>
+                                Vade (Gün)
+                                <input
+                                    name="vadeGun"
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    value="0"
+                                >
+                            </label>
+
+                            <label>
+                                Limit
+                                <input
+                                    name="limit"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value="0"
+                                >
+                            </label>
+
+                            <label>
+                                Risk Limiti
+                                <input
+                                    name="riskLimiti"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value="0"
+                                >
+                            </label>
+
+                            <label class="full">
+                                Notlar
+                                <textarea
+                                    name="notlar"
+                                    rows="4"
+                                    placeholder="Müşteri hakkında notlar"
+                                ></textarea>
+                            </label>
+
+                        </div>
+
+                    </div>
+
+                    <div
+                        id="musteriFormMesaj"
+                        style="margin-top:15px;"
+                    ></div>
+
+                    <div class="erp-modal-footer">
+
+                        <button
+                            type="button"
+                            id="musteriFormKapatAlt"
+                            class="erp-small-button secondary"
+                        >
+                            Vazgeç
+                        </button>
+
+                        <button
+                            type="submit"
+                            id="musteriKaydet"
+                            class="erp-primary-button"
+                        >
+                            Kaydet
+                        </button>
+
+                    </div>
+
+                </form>
+
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        const form =
+            document.getElementById("musteriForm");
+
+        const kapat = () => {
+            overlay.remove();
+        };
+
+        document
+            .getElementById("musteriFormKapat")
+            ?.addEventListener(
+                "click",
+                kapat
+            );
+
+        document
+            .getElementById("musteriFormKapatAlt")
+            ?.addEventListener(
+                "click",
+                kapat
+            );
+
+        form.addEventListener(
+            "submit",
+            async event => {
+
+                event.preventDefault();
+
+                const veri =
+                    musteriFormVerisi(form);
+
+                const mesaj =
+                    document.getElementById(
+                        "musteriFormMesaj"
+                    );
+
+                mesaj.innerHTML = `
+                    <div class="dashboard-panel">
+                        <strong>
+                            Müşteri bilgileri hazır.
+                        </strong>
+                        <p>
+                            Kayıt API'si doğrulandığında
+                            Kaydet işlemi doğrudan bağlanacak.
+                        </p>
+                    </div>
+                `;
+
+                console.log(
+                    "MÜŞTER KARTI:",
+                    veri
+                );
+            }
+        );
+    }
+    function musteriFormRenderAdimGecerli() {
+        musteriPanelRenderAdim(
+            musteriFormAdim || 1
+        );
+    }
+
+    async function musteriAnaSayfaAc(id) {
+
+        setTitle("Müşteri");
+
+        loading();
+
+        try {
+
+            const [musteriData, hareketData, satisData] =
+                await Promise.all([
+                    api("/api/tenant/musteriler"),
+                    api(
+                        `/api/tenant/cari/hareketler?tarafTipi=MUSTERI&tarafId=${encodeURIComponent(id)}`
+                    ),
+                    api("/api/tenant/satis")
+                ]);
+
+            const musteriler =
+                musteriData.musteriler || [];
+
+            const musteri =
+                musteriler.find(
+                    x => String(x._id) === String(id)
+                );
+
+            if (!musteri) {
+                throw new Error("Müşteri bulunamadı.");
+            }
+
+            const hareketler =
+                hareketData.hareketler ||
+                hareketData.cariHareketler ||
+                hareketData.kayitlar ||
+                [];
+
+            const tumSatislar =
+                satisData.satislar ||
+                satisData.kayitlar ||
+                [];
+
+            const satislar =
+                tumSatislar.filter(s => {
+
+                    const musteriId =
+                        s.musteriId?._id ||
+                        s.musteriId ||
+                        s.musteri?._id ||
+                        s.musteri;
+
+                    return String(musteriId || "") === String(id);
+                });
+
+            const ad =
+                musteri.unvan ||
+                musteri.adSoyad ||
+                "Müşteri";
+
+            const bakiye =
+                Number(musteri.bakiye || 0);
+
+            const riskLimiti =
+                Number(
+                    musteri.riskLimiti ||
+                    musteri.limit ||
+                    0
+                );
+
+            const kullanilanRisk =
+                Math.max(0, bakiye);
+
+            const kalanLimit =
+                riskLimiti > 0
+                    ? Math.max(
+                        0,
+                        riskLimiti - kullanilanRisk
+                    )
+                    : 0;
+
+            const toplamSatis =
+                satislar.reduce(
+                    (toplam, s) =>
+                        toplam +
+                        Number(
+                            s.genelToplam ||
+                            s.toplam ||
+                            s.tutar ||
+                            0
+                        ),
+                    0
+                );
+
+            const simdi = new Date();
+
+            const buAySatis =
+                satislar
+                    .filter(s => {
+
+                        const tarih =
+                            new Date(
+                                s.tarih ||
+                                s.createdAt ||
+                                0
+                            );
+
+                        return (
+                            tarih.getMonth() ===
+                                simdi.getMonth() &&
+                            tarih.getFullYear() ===
+                                simdi.getFullYear()
+                        );
+                    })
+                    .reduce(
+                        (toplam, s) =>
+                            toplam +
+                            Number(
+                                s.genelToplam ||
+                                s.toplam ||
+                                s.tutar ||
+                                0
+                            ),
+                        0
+                    );
+
+            const sonHareketler =
+                hareketler
+                    .slice()
+                    .sort(
+                        (a, b) =>
+                            new Date(
+                                b.tarih ||
+                                b.createdAt ||
+                                0
+                            ) -
+                            new Date(
+                                a.tarih ||
+                                a.createdAt ||
+                                0
+                            )
+                    )
+                    .slice(0, 10);
+
+            const telefon =
+                musteri.whatsapp ||
+                musteri.telefon ||
+                "";
+
+            const ilkHarf =
+                ad
+                    .trim()
+                    .charAt(0)
+                    .toUpperCase();
+
+            content.innerHTML = `
+
+                <div style="
+                    display:flex;
+                    justify-content:space-between;
+                    align-items:center;
+                    gap:20px;
+                    margin-bottom:18px;
+                ">
+
+                    <button
+                        type="button"
+                        class="erp-small-button"
+                        id="musteriGeriDon"
+                    >
+                        ← Müşteriler
+                    </button>
+
+                    <button
+                        type="button"
+                        class="erp-small-button"
+                        id="musteriKartDuzenle"
+                    >
+                        Müşteri Kartı
+                    </button>
+
+                </div>
+
+
+                <div class="dashboard-panel">
+
+                    <div style="
+                        display:grid;
+                        grid-template-columns:
+                            minmax(250px,1.2fr)
+                            minmax(300px,2fr);
+                        gap:28px;
+                        align-items:center;
+                    ">
+
+                        <div style="
+                            display:flex;
+                            gap:18px;
+                            align-items:center;
+                        ">
+
+                            <div style="
+                                width:92px;
+                                height:92px;
+                                min-width:92px;
+                                border-radius:14px;
+                                background:#eef2f7;
+                                display:flex;
+                                align-items:center;
+                                justify-content:center;
+                                overflow:hidden;
+                                font-size:36px;
+                                font-weight:800;
+                            ">
+
+                                ${
+                                    musteri.fotograf ||
+                                    musteri.resim
+                                        ? `
+                                            <img
+                                                src="${escapeHtml(
+                                                    musteri.fotograf ||
+                                                    musteri.resim
+                                                )}"
+                                                alt=""
+                                                style="
+                                                    width:100%;
+                                                    height:100%;
+                                                    object-fit:cover;
+                                                "
+                                            >
+                                        `
+                                        : escapeHtml(ilkHarf)
+                                }
+
+                            </div>
+
+                            <div>
+
+                                <div style="
+                                    color:#64748b;
+                                    font-size:12px;
+                                    margin-bottom:4px;
+                                ">
+                                    ${escapeHtml(
+                                        musteri.kod || "-"
+                                    )}
+                                </div>
+
+                                <h2 style="
+                                    margin:0 0 7px;
+                                    font-size:22px;
+                                ">
+                                    ${escapeHtml(ad)}
+                                </h2>
+
+                                <div style="
+                                    color:#64748b;
+                                    font-size:13px;
+                                    line-height:1.8;
+                                ">
+
+                                    ${
+                                        telefon
+                                            ? escapeHtml(telefon)
+                                            : "-"
+                                    }
+
+                                    <br>
+
+                                    ${
+                                        musteri.email
+                                            ? escapeHtml(
+                                                musteri.email
+                                              )
+                                            : "-"
+                                    }
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        <div
+                            class="dashboard-grid"
+                            style="
+                                grid-template-columns:
+                                repeat(3,minmax(0,1fr));
+                            "
+                        >
+
+                            <div class="dashboard-card">
+
+                                <div class="dashboard-card-title">
+                                    Güncel Bakiye
+                                </div>
+
+                                <div class="dashboard-card-value">
+                                    ${para(bakiye)}
+                                </div>
+
+                                <div class="dashboard-card-info">
+                                    Cari hesap
+                                </div>
+
+                            </div>
+
+
+                            <div class="dashboard-card">
+
+                                <div class="dashboard-card-title">
+                                    Bu Ay Satış
+                                </div>
+
+                                <div class="dashboard-card-value">
+                                    ${para(buAySatis)}
+                                </div>
+
+                                <div class="dashboard-card-info">
+                                    ${satislar.length} satış kaydı
+                                </div>
+
+                            </div>
+
+
+                            <div class="dashboard-card positive">
+
+                                <div class="dashboard-card-title">
+                                    Toplam Satış
+                                </div>
+
+                                <div class="dashboard-card-value">
+                                    ${para(toplamSatis)}
+                                </div>
+
+                                <div class="dashboard-card-info">
+                                    Müşteri cirosu
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="dashboard-panel">
+
+                    <div class="panel-heading">
+
+                        <div>
+                            <h2>Hızlı şlemler</h2>
+                            <p>
+                                Müşteriye ait işlemleri
+                                tek ekrandan yönetin.
+                            </p>
+                        </div>
+
+                    </div>
+
+
+                    <div style="
+                        display:grid;
+                        grid-template-columns:
+                            repeat(6,minmax(120px,1fr));
+                        gap:10px;
+                    ">
+
+                        <button
+                            type="button"
+                            class="erp-primary-button"
+                            id="musteriSatisYap"
+                        >
+                            Satış Yap
+                        </button>
+
+                        <button
+                            type="button"
+                            class="erp-small-button"
+                            id="musteriTahsilatYap"
+                        >
+                            Tahsilat
+                        </button>
+
+                        <button
+                            type="button"
+                            class="erp-small-button"
+                            id="musteriEkstreGor"
+                        >
+                            Ekstre Gör
+                        </button>
+
+                        <button
+                            type="button"
+                            class="erp-small-button"
+                            id="musteriTeklif"
+                        >
+                            Teklif
+                        </button>
+
+                        <button
+                            type="button"
+                            class="erp-small-button"
+                            id="musteriWhatsapp"
+                        >
+                            WhatsApp
+                        </button>
+
+                        <button
+                            type="button"
+                            class="erp-small-button"
+                            id="musteriKart"
+                        >
+                            Düzenle
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    class="dashboard-grid"
+                    style="
+                        grid-template-columns:
+                        repeat(4,minmax(0,1fr));
+                    "
+                >
+
+                    <div class="dashboard-card">
+
+                        <div class="dashboard-card-title">
+                            Risk Limiti
+                        </div>
+
+                        <div class="dashboard-card-value">
+                            ${para(riskLimiti)}
+                        </div>
+
+                        <div class="dashboard-card-info">
+                            Tanımlı limit
+                        </div>
+
+                    </div>
+
+
+                    <div class="dashboard-card">
+
+                        <div class="dashboard-card-title">
+                            Kullanılan Risk
+                        </div>
+
+                        <div class="dashboard-card-value">
+                            ${para(kullanilanRisk)}
+                        </div>
+
+                        <div class="dashboard-card-info">
+                            Açık bakiye
+                        </div>
+
+                    </div>
+
+
+                    <div class="dashboard-card positive">
+
+                        <div class="dashboard-card-title">
+                            Kullanılabilir Limit
+                        </div>
+
+                        <div class="dashboard-card-value">
+                            ${para(kalanLimit)}
+                        </div>
+
+                        <div class="dashboard-card-info">
+                            Kalan limit
+                        </div>
+
+                    </div>
+
+
+                    <div class="dashboard-card">
+
+                        <div class="dashboard-card-title">
+                            Vade
+                        </div>
+
+                        <div class="dashboard-card-value">
+                            ${
+                                Number(
+                                    musteri.vadeGun || 0
+                                )
+                            } gün
+                        </div>
+
+                        <div class="dashboard-card-info">
+                            Açık hesap vadesi
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div style="
+                    display:grid;
+                    grid-template-columns:
+                        minmax(0,2fr)
+                        minmax(280px,1fr);
+                    gap:18px;
+                    margin-top:18px;
+                ">
+
+                    <div class="dashboard-panel">
+
+                        <div class="panel-heading">
+
+                            <div>
+                                <h2>Son Hareketler</h2>
+                                <p>
+                                    Müşterinin son cari hareketleri
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                class="erp-small-button"
+                                id="tumEkstre"
+                            >
+                                Tüm Ekstre
+                            </button>
+
+                        </div>
+
+
+                        <div class="table-scroll">
+
+                            <table>
+
+                                <thead>
+                                    <tr>
+                                        <th>Tarih</th>
+                                        <th>şlem</th>
+                                        <th>Açıklama</th>
+                                        <th>Tutar</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+
+                                    ${
+                                        sonHareketler.length
+                                            ? sonHareketler
+                                                .map(h => `
+
+                                                    <tr>
+
+                                                        <td>
+                                                            ${
+                                                                h.tarih ||
+                                                                h.createdAt
+                                                                    ? new Date(
+                                                                        h.tarih ||
+                                                                        h.createdAt
+                                                                    ).toLocaleDateString(
+                                                                        "tr-TR"
+                                                                    )
+                                                                    : "-"
+                                                            }
+                                                        </td>
+
+                                                        <td>
+                                                            ${escapeHtml(
+                                                                h.tip ||
+                                                                h.islemTipi ||
+                                                                "-"
+                                                            )}
+                                                        </td>
+
+                                                        <td>
+                                                            ${escapeHtml(
+                                                                h.aciklama ||
+                                                                h.belgeNo ||
+                                                                "-"
+                                                            )}
+                                                        </td>
+
+                                                        <td>
+                                                            <strong>
+                                                                ${para(
+                                                                    Number(
+                                                                        h.tutar ||
+                                                                        h.genelToplam ||
+                                                                        0
+                                                                    )
+                                                                )}
+                                                            </strong>
+                                                        </td>
+
+                                                    </tr>
+
+                                                `)
+                                                .join("")
+                                            : `
+                                                <tr>
+                                                    <td
+                                                        colspan="4"
+                                                        style="
+                                                            text-align:center;
+                                                            padding:28px;
+                                                        "
+                                                    >
+                                                        Cari hareket bulunamadı.
+                                                    </td>
+                                                </tr>
+                                            `
+                                    }
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="dashboard-panel">
+
+                        <div class="panel-heading">
+
+                            <div>
+                                <h2>Müşteri Bilgileri</h2>
+                                <p>Kart özeti</p>
+                            </div>
+
+                        </div>
+
+
+                        <div style="
+                            display:grid;
+                            gap:15px;
+                            font-size:13px;
+                        ">
+
+                            <div>
+                                <div style="color:#64748b;">
+                                    Yetkili
+                                </div>
+
+                                <strong>
+                                    ${escapeHtml(
+                                        musteri.yetkili || "-"
+                                    )}
+                                </strong>
+                            </div>
+
+
+                            <div>
+                                <div style="color:#64748b;">
+                                    Telefon
+                                </div>
+
+                                <strong>
+                                    ${escapeHtml(
+                                        telefon || "-"
+                                    )}
+                                </strong>
+                            </div>
+
+
+                            <div>
+                                <div style="color:#64748b;">
+                                    Vergi Dairesi
+                                </div>
+
+                                <strong>
+                                    ${escapeHtml(
+                                        musteri.vergiDairesi ||
+                                        "-"
+                                    )}
+                                </strong>
+                            </div>
+
+
+                            <div>
+                                <div style="color:#64748b;">
+                                    Vergi / TC No
+                                </div>
+
+                                <strong>
+                                    ${escapeHtml(
+                                        musteri.vergiNo ||
+                                        "-"
+                                    )}
+                                </strong>
+                            </div>
+
+
+                            <div>
+                                <div style="color:#64748b;">
+                                    Adres
+                                </div>
+
+                                <strong>
+                                    ${escapeHtml(
+                                        [
+                                            musteri.adres,
+                                            musteri.ilce,
+                                            musteri.il
+                                        ]
+                                            .filter(Boolean)
+                                            .join(" / ") ||
+                                        "-"
+                                    )}
+                                </strong>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+            `;
+
+
+            document
+                .getElementById("musteriGeriDon")
+                ?.addEventListener(
+                    "click",
+                    () => musterilerYukle()
+                );
+
+
+            const ekstreAc = () =>
+                cariEkstreAc(
+                    "musteri",
+                    id
+                );
+
+
+            document
+                .getElementById("musteriEkstreGor")
+                ?.addEventListener(
+                    "click",
+                    ekstreAc
+                );
+
+
+            document
+                .getElementById("tumEkstre")
+                ?.addEventListener(
+                    "click",
+                    ekstreAc
+                );
+
+
+            document
+                .getElementById("musteriTahsilatYap")
+                ?.addEventListener(
+                    "click",
+                    async () => {
+
+                        if (
+                            typeof cariTahsilatFormu ===
+                            "function"
+                        ) {
+                            await cariTahsilatFormu(id);
+                            return;
+                        }
+
+                        alert(
+                            "Tahsilat ekranı bağlantısı bulunamadı."
+                        );
+                    }
+                );
+
+
+            document
+                .getElementById("musteriSatisYap")
+                ?.addEventListener(
+                    "click",
+                    () => {
+
+                        sessionStorage.setItem(
+                            "erpSeciliMusteriId",
+                            id
+                        );
+
+                        sayfaYukle("satis");
+                    }
+                );
+
+
+            document
+                .getElementById("musteriTeklif")
+                ?.addEventListener(
+                    "click",
+                    () => {
+
+                        sessionStorage.setItem(
+                            "erpSeciliMusteriId",
+                            id
+                        );
+
+                        sayfaYukle("teklifler");
+                    }
+                );
+
+
+            document
+                .getElementById("musteriWhatsapp")
+                ?.addEventListener(
+                    "click",
+                    () => {
+
+                        const tel =
+                            String(telefon || "")
+                                .replace(/\D/g, "");
+
+                        if (!tel) {
+                            alert(
+                                "WhatsApp numarası kayıtlı değil."
+                            );
+                            return;
+                        }
+
+                        const numara =
+                            tel.startsWith("0")
+                                ? "90" +
+                                  tel.substring(1)
+                                : tel;
+
+                        window.open(
+                            `https://wa.me/${numara}`,
+                            "_blank",
+                            "noopener"
+                        );
+                    }
+                );
+
+
+            const kartAc = () => {
+
+                if (
+                    typeof musteriKartAc ===
+                    "function"
+                ) {
+                    musteriKartAc(id);
+                    return;
+                }
+
+                alert(
+                    "Sekmeli müşteri kartını sıradaki adımda bağlayacağız."
+                );
+            };
+
+
+            document
+                .getElementById("musteriKart")
+                ?.addEventListener(
+                    "click",
+                    kartAc
+                );
+
+
+            document
+                .getElementById("musteriKartDuzenle")
+                ?.addEventListener(
+                    "click",
+                    kartAc
+                );
+
+        } catch (error) {
+
+            errorBox(error);
+        }
+    }
+
+    async function musterilerYukle() {
+
+        setTitle("Müşteriler");
+        loading();
+
+        try {
+
+            const [cariData, musteriData] =
+                await Promise.all([
+                    api("/api/tenant/cari/ozet"),
+                    api("/api/tenant/musteriler")
+                ]);
+
+            const musteriler =
+                musteriData.musteriler || [];
+
+            content.innerHTML = `
+                <div class="dashboard-panel">
+
+                    <div class="panel-heading">
+
+                        <div>
+                            <h2>Müşteriler</h2>
+                            <p>
+                                Müşterilerinizi, bakiyelerini ve
+                                cari işlemlerini yönetin.
+                            </p>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="erp-primary-button"
+                            id="yeniMusteriBtn"
+                        >
+                            + Yeni Müşteri
+                        </button>
+
+                    </div>
+
+                    <div
+                        class="dashboard-grid"
+                        style="
+                            grid-template-columns:
+                            repeat(3,minmax(0,1fr));
+                            margin-bottom:20px;
+                        "
+                    >
+
+                        <div class="dashboard-card">
+
+                            <div class="dashboard-card-title">
+                                Müşteri Alacağı
+                            </div>
+
+                            <div class="dashboard-card-value">
+                                ${para(
+                                    cariData.musteriAlacak || 0
+                                )}
+                            </div>
+
+                            <div class="dashboard-card-info">
+                                Tahsil edilecek toplam
+                            </div>
+
+                        </div>
+
+                        <div class="dashboard-card">
+
+                            <div class="dashboard-card-title">
+                                Müşteri Sayısı
+                            </div>
+
+                            <div class="dashboard-card-value">
+                                ${musteriler.length}
+                            </div>
+
+                            <div class="dashboard-card-info">
+                                Kayıtlı müşteri
+                            </div>
+
+                        </div>
+
+                        <div class="dashboard-card positive">
+
+                            <div class="dashboard-card-title">
+                                Net Cari
+                            </div>
+
+                            <div class="dashboard-card-value">
+                                ${para(
+                                    cariData.netCari || 0
+                                )}
+                            </div>
+
+                            <div class="dashboard-card-info">
+                                Alacak - borç
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <div class="musteri-toolbar">
+
+                        <input
+                            id="musteriArama"
+                            class="erp-input"
+                            type="text"
+                            placeholder="Kod, ünvan, yetkili veya telefon ara..."
+                        >
+
+                    </div>
+
+                    <div id="musteriListe">
+                        Yükleniyor...
+                    </div>
+
+                </div>
+            `;
+
+            const arama =
+                document.getElementById(
+                    "musteriArama"
+                );
+
+            const listeEl =
+                document.getElementById(
+                    "musteriListe"
+                );
+
+            const render = () => {
+
+                const q =
+                    arama.value
+                        .trim()
+                        .toLocaleLowerCase("tr-TR");
+
+                const filtreli =
+                    musteriler.filter(item => {
+
+                        const metin = [
+                            item.kod,
+                            item.unvan,
+                            item.adSoyad,
+                            item.yetkili,
+                            item.telefon,
+                            item.whatsapp
+                        ]
+                            .filter(Boolean)
+                            .join(" ")
+                            .toLocaleLowerCase("tr-TR");
+
+                        return !q || metin.includes(q);
+                    });
+
+                if (!filtreli.length) {
+
+                    listeEl.innerHTML = `
+                        <div class="empty-state">
+                            Müşteri bulunamadı.
+                        </div>
+                    `;
+
+                    return;
+                }
+
+                listeEl.innerHTML = `
+                    <div class="table-scroll">
+
+                        <table>
+
+                            <thead>
+
+                                <tr>
+                                    <th>Kod</th>
+                                    <th>Ünvan</th>
+                                    <th>Yetkili</th>
+                                    <th>Telefon</th>
+                                    <th>Bakiye</th>
+                                    <th>şlem</th>
+                                </tr>
+
+                            </thead>
+
+                            <tbody>
+
+                                ${filtreli.map(item => `
+
+                                    <tr>
+
+                                        <td>
+                                            <strong>
+                                                ${escapeHtml(
+                                                    item.kod || "-"
+                                                )}
+                                            </strong>
+                                        </td>
+
+                                        <td>
+                                            ${escapeHtml(
+                                                item.unvan ||
+                                                item.adSoyad ||
+                                                "-"
+                                            )}
+                                        </td>
+
+                                        <td>
+                                            ${escapeHtml(
+                                                item.yetkili || "-"
+                                            )}
+                                        </td>
+
+                                        <td>
+                                            ${escapeHtml(
+                                                item.whatsapp ||
+                                                item.telefon ||
+                                                "-"
+                                            )}
+                                        </td>
+
+                                        <td>
+                                            <strong>
+                                                ${para(
+                                                    Number(
+                                                        item.bakiye || 0
+                                                    )
+                                                )}
+                                            </strong>
+                                        </td>
+
+                                        <td>
+
+                                            <div
+                                                class="row-actions"
+                                            >
+
+                                                <button
+                                                    type="button"
+                                                    class="erp-primary-button"
+                                                    data-musteri-detay="${item._id}"
+                                                >
+                                                    Müşteri
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    class="erp-small-button"
+                                                    data-musteri-ekstre="${item._id}"
+                                                >
+                                                    Ekstre
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    class="erp-small-button"
+                                                    data-musteri-tahsilat="${item._id}"
+                                                >
+                                                    Tahsilat
+                                                </button>
+
+                                            </div>
+
+                                        </td>
+
+                                    </tr>
+
+                                `).join("")}
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+                `;
+            };
+
+            arama.addEventListener(
+                "input",
+                render
+            );
+
+            render();
+
+            listeEl.addEventListener(
+                "click",
+                async event => {
+
+                    const detay =
+                        event.target.closest(
+                            "[data-musteri-detay]"
+                        );
+
+                    if (detay) {
+
+                        await musteriAnaSayfaAc(
+                            detay.dataset.musteriDetay
+                        );
+
+                        return;
+                    }
+
+                    const ekstre =
+                        event.target.closest(
+                            "[data-musteri-ekstre]"
+                        );
+
+                    if (ekstre) {
+
+                        await cariEkstreAc(
+                            "musteri",
+                            ekstre.dataset.musteriEkstre
+                        );
+
+                        return;
+                    }
+
+                    const tahsilat =
+                        event.target.closest(
+                            "[data-musteri-tahsilat]"
+                        );
+
+                    if (tahsilat) {
+
+                        if (
+                            typeof cariTahsilatFormu ===
+                            "function"
+                        ) {
+
+                            await cariTahsilatFormu(
+                                tahsilat.dataset.musteriTahsilat
+                            );
+
+                        } else {
+
+                            alert(
+                                "Tahsilat fonksiyonu henüz bağlı değil."
+                            );
+                        }
+                    }
+                }
+            );
+
+            document
+                .getElementById("yeniMusteriBtn")
+                ?.addEventListener(
+                    "click",
+                    () => {
+                        yeniMusteriPaneli();
+                    }
+                );
+
+            return;
+
+        } catch (error) {
+
+            errorBox(error);
+        }
+    }
+
+
+
+==================================================
+ 13 - MUSTERI CSS
+==================================================
+
+  public\erp\erp.css:53:
+> public\erp\erp.css:54:nav button {
+  public\erp\erp.css:55:    border: 0;
+  public\erp\erp.css:56:    background: transparent;
+  public\erp\erp.css:57:    color: #dbe4f0;
+  public\erp\erp.css:58:    text-align: left;
+  public\erp\erp.css:63:
+> public\erp\erp.css:64:nav button:hover,
+> public\erp\erp.css:65:nav button:focus {
+  public\erp\erp.css:66:    background: #1f2937;
+  public\erp\erp.css:67:}
+  public\erp\erp.css:68:
+  public\erp\erp.css:69:.logout {
+  public\erp\erp.css:107:
+> public\erp\erp.css:108:.dashboard-loading {
+  public\erp\erp.css:109:    background: white;
+  public\erp\erp.css:110:    border: 1px solid #e5e7eb;
+  public\erp\erp.css:111:    border-radius: 14px;
+  public\erp\erp.css:112:    padding: 35px;
+  public\erp\erp.css:235:
+> public\erp\erp.css:236:.dashboard-grid {
+  public\erp\erp.css:237:    display: grid;
+  public\erp\erp.css:238:    grid-template-columns: repeat(5, minmax(0, 1fr));
+  public\erp\erp.css:239:    gap: 15px;
+  public\erp\erp.css:240:    margin-bottom: 18px;
+  public\erp\erp.css:242:
+> public\erp\erp.css:243:.dashboard-card {
+  public\erp\erp.css:244:    background: white;
+  public\erp\erp.css:245:    border: 1px solid #e5e7eb;
+  public\erp\erp.css:246:    border-radius: 14px;
+  public\erp\erp.css:247:    padding: 18px;
+  public\erp\erp.css:250:
+> public\erp\erp.css:251:.dashboard-card.positive {
+  public\erp\erp.css:252:    border-top: 3px solid #16a34a;
+  public\erp\erp.css:253:}
+  public\erp\erp.css:254:
+> public\erp\erp.css:255:.dashboard-card.warning {
+  public\erp\erp.css:256:    border-top: 3px solid #f59e0b;
+  public\erp\erp.css:257:}
+  public\erp\erp.css:258:
+> public\erp\erp.css:259:.dashboard-card-title {
+  public\erp\erp.css:260:    color: #64748b;
+  public\erp\erp.css:261:    font-size: 13px;
+  public\erp\erp.css:262:}
+  public\erp\erp.css:263:
+> public\erp\erp.css:264:.dashboard-card-value {
+  public\erp\erp.css:265:    font-size: 23px;
+  public\erp\erp.css:266:    font-weight: 800;
+  public\erp\erp.css:267:    margin: 12px 0 8px;
+  public\erp\erp.css:268:}
+  public\erp\erp.css:269:
+> public\erp\erp.css:270:.dashboard-card-info {
+  public\erp\erp.css:271:    color: #94a3b8;
+  public\erp\erp.css:272:    font-size: 12px;
+  public\erp\erp.css:273:}
+  public\erp\erp.css:274:
+> public\erp\erp.css:275:.dashboard-two-column {
+  public\erp\erp.css:276:    display: grid;
+  public\erp\erp.css:277:    grid-template-columns: 1.2fr 1fr;
+  public\erp\erp.css:278:    gap: 18px;
+  public\erp\erp.css:279:    margin-top: 20px;
+  public\erp\erp.css:281:
+> public\erp\erp.css:282:.dashboard-panel {
+  public\erp\erp.css:283:    background: white;
+  public\erp\erp.css:284:    border: 1px solid #e5e7eb;
+  public\erp\erp.css:285:    border-radius: 14px;
+  public\erp\erp.css:286:    padding: 20px;
+  public\erp\erp.css:289:
+> public\erp\erp.css:290:.panel-heading {
+  public\erp\erp.css:291:    display: flex;
+  public\erp\erp.css:292:    justify-content: space-between;
+  public\erp\erp.css:293:    gap: 20px;
+  public\erp\erp.css:294:    margin-bottom: 14px;
+  public\erp\erp.css:296:
+> public\erp\erp.css:297:.panel-heading h2,
+> public\erp\erp.css:298:.panel-heading h3,
+> public\erp\erp.css:299:.dashboard-panel h2,
+> public\erp\erp.css:300:.dashboard-panel h3 {
+  public\erp\erp.css:301:    margin: 0;
+  public\erp\erp.css:302:}
+  public\erp\erp.css:303:
+> public\erp\erp.css:304:.panel-heading p {
+  public\erp\erp.css:305:    margin: 5px 0 0;
+  public\erp\erp.css:306:    color: #64748b;
+  public\erp\erp.css:307:    font-size: 13px;
+  public\erp\erp.css:308:}
+  public\erp\erp.css:362:
+> public\erp\erp.css:363:.critical-panel {
+  public\erp\erp.css:364:    margin-top: 18px;
+  public\erp\erp.css:365:}
+  public\erp\erp.css:366:
+  public\erp\erp.css:367:.critical-list {
+  public\erp\erp.css:422:
+> public\erp\erp.css:423:.promo-button {
+  public\erp\erp.css:424:    display: inline-block;
+  public\erp\erp.css:425:    margin-top: 10px;
+  public\erp\erp.css:426:    padding: 11px 14px;
+  public\erp\erp.css:427:    background: #2563eb;
+  public\erp\erp.css:433:
+> public\erp\erp.css:434:.table-scroll {
+  public\erp\erp.css:435:    overflow-x: auto;
+  public\erp\erp.css:436:}
+  public\erp\erp.css:437:
+> public\erp\erp.css:438:table {
+  public\erp\erp.css:439:    width: 100%;
+  public\erp\erp.css:440:    border-collapse: collapse;
+  public\erp\erp.css:441:    background: white;
+  public\erp\erp.css:442:}
+  public\erp\erp.css:522:
+> public\erp\erp.css:523:.login-card button {
+  public\erp\erp.css:524:    width: 100%;
+  public\erp\erp.css:525:    margin-top: 18px;
+  public\erp\erp.css:526:    padding: 12px;
+  public\erp\erp.css:527:    border: 0;
+  public\erp\erp.css:542:@media (max-width: 1200px) {
+> public\erp\erp.css:543:    .dashboard-grid {
+  public\erp\erp.css:544:        grid-template-columns: repeat(3, minmax(0, 1fr));
+  public\erp\erp.css:545:    }
+  public\erp\erp.css:546:}
+  public\erp\erp.css:547:
+  public\erp\erp.css:566:
+> public\erp\erp.css:567:    .dashboard-two-column {
+  public\erp\erp.css:568:        grid-template-columns: 1fr;
+  public\erp\erp.css:569:    }
+  public\erp\erp.css:570:
+  public\erp\erp.css:571:    .welcome-banner,
+  public\erp\erp.css:586:@media (max-width: 650px) {
+> public\erp\erp.css:587:    .dashboard-grid,
+  public\erp\erp.css:588:    .currency-grid {
+  public\erp\erp.css:589:        grid-template-columns: 1fr;
+  public\erp\erp.css:590:    }
+  public\erp\erp.css:591:
+  public\erp\erp.css:596:/* ==========================================================
+> public\erp\erp.css:597:   MUSTERI FORM / MODAL
+  public\erp\erp.css:598:   ========================================================== */
+  public\erp\erp.css:599:
+> public\erp\erp.css:600:.musteri-toolbar {
+  public\erp\erp.css:601:    display: flex;
+  public\erp\erp.css:602:    align-items: center;
+  public\erp\erp.css:603:    gap: 12px;
+  public\erp\erp.css:604:    margin: 18px 0;
+  public\erp\erp.css:623:
+> public\erp\erp.css:624:.erp-primary-button {
+  public\erp\erp.css:625:    border: 0;
+  public\erp\erp.css:626:    background: #2563eb;
+  public\erp\erp.css:627:    color: #ffffff;
+  public\erp\erp.css:628:    min-height: 42px;
+  public\erp\erp.css:635:
+> public\erp\erp.css:636:.erp-primary-button:hover {
+  public\erp\erp.css:637:    background: #1d4ed8;
+  public\erp\erp.css:638:}
+  public\erp\erp.css:639:
+> public\erp\erp.css:640:.erp-small-button {
+  public\erp\erp.css:641:    border: 1px solid #2563eb;
+  public\erp\erp.css:642:    background: #ffffff;
+  public\erp\erp.css:643:    color: #2563eb;
+  public\erp\erp.css:644:    min-height: 36px;
+  public\erp\erp.css:650:
+> public\erp\erp.css:651:.erp-small-button:hover {
+  public\erp\erp.css:652:    background: #eff6ff;
+  public\erp\erp.css:653:}
+  public\erp\erp.css:654:
+> public\erp\erp.css:655:.erp-small-button.secondary {
+  public\erp\erp.css:656:    border-color: #cbd5e1;
+  public\erp\erp.css:657:    color: #475569;
+  public\erp\erp.css:658:    background: #ffffff;
+  public\erp\erp.css:659:}
+  public\erp\erp.css:660:
+> public\erp\erp.css:661:.erp-small-button.secondary:hover {
+  public\erp\erp.css:662:    background: #f8fafc;
+  public\erp\erp.css:663:}
+  public\erp\erp.css:664:
+  public\erp\erp.css:665:.row-actions {
+  public\erp\erp.css:692:
+> public\erp\erp.css:693:/* MODAL */
+  public\erp\erp.css:694:
+> public\erp\erp.css:695:.erp-modal-overlay {
+  public\erp\erp.css:696:    position: fixed;
+  public\erp\erp.css:697:    inset: 0;
+  public\erp\erp.css:698:    z-index: 9999;
+  public\erp\erp.css:699:    background: rgba(15, 23, 42, 0.58);
+  public\erp\erp.css:705:
+> public\erp\erp.css:706:.erp-modal {
+  public\erp\erp.css:707:    width: min(980px, 100%);
+  public\erp\erp.css:708:    max-height: 92vh;
+  public\erp\erp.css:709:    overflow: hidden;
+  public\erp\erp.css:710:    background: #ffffff;
+  public\erp\erp.css:716:
+> public\erp\erp.css:717:.erp-modal-header {
+  public\erp\erp.css:718:    flex: 0 0 auto;
+  public\erp\erp.css:719:    display: flex;
+  public\erp\erp.css:720:    align-items: center;
+  public\erp\erp.css:721:    justify-content: space-between;
+  public\erp\erp.css:727:
+> public\erp\erp.css:728:.erp-modal-header h2 {
+  public\erp\erp.css:729:    margin: 0;
+  public\erp\erp.css:730:    font-size: 22px;
+  public\erp\erp.css:731:    color: #111827;
+  public\erp\erp.css:732:}
+  public\erp\erp.css:733:
+> public\erp\erp.css:734:.erp-modal-header p {
+  public\erp\erp.css:735:    margin: 5px 0 0;
+  public\erp\erp.css:736:    color: #64748b;
+  public\erp\erp.css:737:    font-size: 13px;
+  public\erp\erp.css:738:}
+  public\erp\erp.css:739:
+> public\erp\erp.css:740:.erp-modal-close {
+  public\erp\erp.css:741:    width: 38px;
+  public\erp\erp.css:742:    height: 38px;
+  public\erp\erp.css:743:    border: 0;
+  public\erp\erp.css:744:    border-radius: 9px;
+  public\erp\erp.css:751:
+> public\erp\erp.css:752:.erp-modal-close:hover {
+  public\erp\erp.css:753:    background: #e2e8f0;
+  public\erp\erp.css:754:}
+  public\erp\erp.css:755:
+> public\erp\erp.css:756:#musteriForm {
+  public\erp\erp.css:757:    display: flex;
+  public\erp\erp.css:758:    flex-direction: column;
+  public\erp\erp.css:759:    min-height: 0;
+  public\erp\erp.css:760:    overflow: hidden;
+  public\erp\erp.css:814:
+> public\erp\erp.css:815:.erp-modal-footer {
+  public\erp\erp.css:816:    flex: 0 0 auto;
+  public\erp\erp.css:817:    display: flex;
+  public\erp\erp.css:818:    justify-content: flex-end;
+  public\erp\erp.css:819:    align-items: center;
+  public\erp\erp.css:825:
+> public\erp\erp.css:826:.erp-modal-footer .erp-small-button {
+  public\erp\erp.css:827:    min-width: 100px;
+  public\erp\erp.css:828:}
+  public\erp\erp.css:829:
+> public\erp\erp.css:830:.erp-modal-footer .erp-primary-button {
+  public\erp\erp.css:831:    min-width: 120px;
+  public\erp\erp.css:832:}
+  public\erp\erp.css:833:
+> public\erp\erp.css:834:#musteriFormMesaj {
+  public\erp\erp.css:835:    flex: 0 0 auto;
+  public\erp\erp.css:836:    padding: 0 24px 16px;
+  public\erp\erp.css:837:}
+  public\erp\erp.css:838:
+> public\erp\erp.css:839:.dashboard-panel {
+  public\erp\erp.css:840:    overflow: hidden;
+  public\erp\erp.css:841:}
+  public\erp\erp.css:842:
+  public\erp\erp.css:843:@media (max-width: 760px) {
+  public\erp\erp.css:844:
+> public\erp\erp.css:845:    .erp-modal-overlay {
+  public\erp\erp.css:846:        padding: 10px;
+  public\erp\erp.css:847:        align-items: stretch;
+  public\erp\erp.css:848:    }
+  public\erp\erp.css:849:
+> public\erp\erp.css:850:    .erp-modal {
+  public\erp\erp.css:851:        max-height: 100%;
+  public\erp\erp.css:852:        height: 100%;
+  public\erp\erp.css:853:        border-radius: 14px;
+  public\erp\erp.css:854:    }
+  public\erp\erp.css:864:
+> public\erp\erp.css:865:    .erp-modal-header {
+  public\erp\erp.css:866:        padding: 18px;
+  public\erp\erp.css:867:    }
+  public\erp\erp.css:868:
+> public\erp\erp.css:869:    .erp-modal-footer {
+  public\erp\erp.css:870:        padding: 14px 18px;
+  public\erp\erp.css:871:    }
+  public\erp\erp.css:872:
+> public\erp\erp.css:873:    .musteri-toolbar {
+  public\erp\erp.css:874:        flex-direction: column;
+  public\erp\erp.css:875:        align-items: stretch;
+  public\erp\erp.css:876:    }
+  public\erp\erp.css:877:
+  public\erp\erp.css:882:/* ==========================================================
+> public\erp\erp.css:883:   TEDARKÇ / MÜŞTER MODAL DÜZELTME
+  public\erp\erp.css:884:   ========================================================== */
+  public\erp\erp.css:885:
+> public\erp\erp.css:886:.erp-modal-overlay {
+  public\erp\erp.css:887:    position: fixed;
+  public\erp\erp.css:888:    inset: 0;
+  public\erp\erp.css:889:    z-index: 9999;
+  public\erp\erp.css:890:    background: rgba(15, 23, 42, 0.60);
+  public\erp\erp.css:897:
+> public\erp\erp.css:898:.erp-modal {
+  public\erp\erp.css:899:    width: min(1000px, 100%);
+  public\erp\erp.css:900:    max-height: calc(100vh - 40px);
+  public\erp\erp.css:901:    background: #ffffff;
+  public\erp\erp.css:902:    border-radius: 18px;
+  public\erp\erp.css:908:
+> public\erp\erp.css:909:.erp-modal-header {
+  public\erp\erp.css:910:    flex: 0 0 auto;
+  public\erp\erp.css:911:    padding: 20px 24px;
+  public\erp\erp.css:912:    border-bottom: 1px solid #e5e7eb;
+  public\erp\erp.css:913:    display: flex;
+  public\erp\erp.css:919:
+> public\erp\erp.css:920:.erp-modal-header h2 {
+  public\erp\erp.css:921:    margin: 0;
+  public\erp\erp.css:922:    color: #111827;
+  public\erp\erp.css:923:    font-size: 22px;
+  public\erp\erp.css:924:}
+  public\erp\erp.css:925:
+> public\erp\erp.css:926:.erp-modal-header p {
+  public\erp\erp.css:927:    margin: 6px 0 0;
+  public\erp\erp.css:928:    color: #64748b;
+  public\erp\erp.css:929:    font-size: 13px;
+  public\erp\erp.css:930:}
+  public\erp\erp.css:931:
+> public\erp\erp.css:932:.erp-modal-close {
+  public\erp\erp.css:933:    width: 38px;
+  public\erp\erp.css:934:    height: 38px;
+  public\erp\erp.css:935:    flex: 0 0 38px;
+  public\erp\erp.css:936:    border: 0;
+  public\erp\erp.css:943:
+> public\erp\erp.css:944:.erp-modal-close:hover {
+  public\erp\erp.css:945:    background: #e2e8f0;
+  public\erp\erp.css:946:}
+  public\erp\erp.css:947:
+> public\erp\erp.css:948:.erp-modal form {
+  public\erp\erp.css:949:    min-height: 0;
+  public\erp\erp.css:950:    display: flex;
+  public\erp\erp.css:951:    flex-direction: column;
+  public\erp\erp.css:952:}
+  public\erp\erp.css:1010:
+> public\erp\erp.css:1011:.erp-modal-footer {
+  public\erp\erp.css:1012:    flex: 0 0 auto;
+  public\erp\erp.css:1013:    min-height: 72px;
+  public\erp\erp.css:1014:    padding: 14px 24px;
+  public\erp\erp.css:1015:    border-top: 1px solid #e5e7eb;
+  public\erp\erp.css:1022:
+> public\erp\erp.css:1023:.erp-modal-footer-left,
+> public\erp\erp.css:1024:.erp-modal-footer-right {
+  public\erp\erp.css:1025:    display: flex;
+  public\erp\erp.css:1026:    align-items: center;
+  public\erp\erp.css:1027:    gap: 10px;
+  public\erp\erp.css:1028:}
+  public\erp\erp.css:1029:
+> public\erp\erp.css:1030:.erp-modal-footer .erp-small-button,
+> public\erp\erp.css:1031:.erp-modal-footer .erp-primary-button {
+  public\erp\erp.css:1032:    min-height: 40px;
+  public\erp\erp.css:1033:}
+  public\erp\erp.css:1034:
+> public\erp\erp.css:1035:.erp-primary-button {
+  public\erp\erp.css:1036:    border: 0;
+  public\erp\erp.css:1037:    background: #2563eb;
+  public\erp\erp.css:1038:    color: #ffffff;
+  public\erp\erp.css:1039:    padding: 0 16px;
+  public\erp\erp.css:1045:
+> public\erp\erp.css:1046:.erp-primary-button:hover {
+  public\erp\erp.css:1047:    background: #1d4ed8;
+  public\erp\erp.css:1048:}
+  public\erp\erp.css:1049:
+> public\erp\erp.css:1050:.erp-small-button {
+  public\erp\erp.css:1051:    border: 1px solid #2563eb;
+  public\erp\erp.css:1052:    background: #ffffff;
+  public\erp\erp.css:1053:    color: #2563eb;
+  public\erp\erp.css:1054:    padding: 0 13px;
+  public\erp\erp.css:1060:
+> public\erp\erp.css:1061:.erp-small-button:hover {
+  public\erp\erp.css:1062:    background: #eff6ff;
+  public\erp\erp.css:1063:}
+  public\erp\erp.css:1064:
+> public\erp\erp.css:1065:.erp-small-button.secondary {
+  public\erp\erp.css:1066:    border-color: #cbd5e1;
+  public\erp\erp.css:1067:    color: #475569;
+  public\erp\erp.css:1068:    background: #ffffff;
+  public\erp\erp.css:1069:}
+  public\erp\erp.css:1070:
+> public\erp\erp.css:1071:.erp-small-button.secondary:hover {
+  public\erp\erp.css:1072:    background: #f8fafc;
+  public\erp\erp.css:1073:}
+  public\erp\erp.css:1074:
+> public\erp\erp.css:1075:#musteriFormMesaj,
+  public\erp\erp.css:1076:#tedarikciFormMesaj {
+  public\erp\erp.css:1077:    flex: 0 0 auto;
+  public\erp\erp.css:1078:    padding: 0 24px 12px;
+  public\erp\erp.css:1079:}
+  public\erp\erp.css:1082:
+> public\erp\erp.css:1083:    .erp-modal-overlay {
+  public\erp\erp.css:1084:        padding: 8px;
+  public\erp\erp.css:1085:        align-items: stretch;
+  public\erp\erp.css:1086:    }
+  public\erp\erp.css:1087:
+> public\erp\erp.css:1088:    .erp-modal {
+  public\erp\erp.css:1089:        max-height: 100%;
+  public\erp\erp.css:1090:        height: 100%;
+  public\erp\erp.css:1091:        border-radius: 14px;
+  public\erp\erp.css:1092:    }
+  public\erp\erp.css:1102:
+> public\erp\erp.css:1103:    .erp-modal-header {
+  public\erp\erp.css:1104:        padding: 16px 18px;
+  public\erp\erp.css:1105:    }
+  public\erp\erp.css:1106:
+> public\erp\erp.css:1107:    .erp-modal-footer {
+  public\erp\erp.css:1108:        padding: 12px 18px;
+  public\erp\erp.css:1109:        flex-wrap: wrap;
+  public\erp\erp.css:1110:    }
+  public\erp\erp.css:1111:
+> public\erp\erp.css:1112:    .erp-modal-footer-left,
+> public\erp\erp.css:1113:    .erp-modal-footer-right {
+  public\erp\erp.css:1114:        flex-wrap: wrap;
+  public\erp\erp.css:1115:    }
+  public\erp\erp.css:1116:}
+  public\erp\erp.css:1117:/* ==========================================================
+  public\erp\erp.css:1240:
+> public\erp\erp.css:1241:.invoice-table-wrap {
+  public\erp\erp.css:1242:    width: 100%;
+  public\erp\erp.css:1243:    overflow-x: auto;
+  public\erp\erp.css:1244:}
+  public\erp\erp.css:1245:
+> public\erp\erp.css:1246:.invoice-table {
+  public\erp\erp.css:1247:    width: 100%;
+  public\erp\erp.css:1248:    border-collapse: collapse;
+  public\erp\erp.css:1249:}
+  public\erp\erp.css:1250:
+> public\erp\erp.css:1251:.invoice-table th,
+> public\erp\erp.css:1252:.invoice-table td {
+  public\erp\erp.css:1253:    padding: 10px 8px;
+  public\erp\erp.css:1254:    border-bottom: 1px solid #e5e7eb;
+  public\erp\erp.css:1255:    text-align: left;
+  public\erp\erp.css:1256:    vertical-align: middle;
+  public\erp\erp.css:1258:
+> public\erp\erp.css:1259:.invoice-table th {
+  public\erp\erp.css:1260:    background: #f8fafc;
+  public\erp\erp.css:1261:    color: #475569;
+  public\erp\erp.css:1262:    font-size: 11px;
+  public\erp\erp.css:1263:    text-transform: uppercase;
+  public\erp\erp.css:1265:
+> public\erp\erp.css:1266:.invoice-table td {
+  public\erp\erp.css:1267:    font-size: 12px;
+  public\erp\erp.css:1268:}
+  public\erp\erp.css:1269:
+> public\erp\erp.css:1270:.invoice-table td small {
+  public\erp\erp.css:1271:    display: block;
+  public\erp\erp.css:1272:    color: #64748b;
+  public\erp\erp.css:1273:    margin-top: 3px;
+  public\erp\erp.css:1274:    font-size: 10px;
+
+
+
+
+==================================================
+ 14 - XLSX DURUMU
+==================================================
+bahadir-erp-v2@1.0.0 C:\Users\Win10\OneDrive\Desktop\bahad─▒r\BAHADIR-ERP-V2
+ÔööÔöÇÔöÇ xlsx@0.18.5
+
+
+
+==================================================
+ 15 - EXCEL KOD IZLERI
+==================================================
+
+
+==================================================
+ 16 - DOSYA YUKLEME ALTYAPISI
+==================================================
+
+
+==================================================
+ 17 - UYGULAMA ROUTE BAGLANTILARI
+==================================================
+
+  src\uygulama.js:20:
+  src\uygulama.js:21:const publicKlasoru = path.join(__dirname, "..", "public");
+> src\uygulama.js:22:uygulama.use(express.static(publicKlasoru));
+  src\uygulama.js:23:
+  src\uygulama.js:24:uygulama.get("/", (req, res) => {
+  src\uygulama.js:25:    res.json({
+  src\uygulama.js:34:uygulama.get("/api/saglik", saglikRotasi);
+  src\uygulama.js:35:const tenantRotasi = require("./routes/tenantRotasi");
+> src\uygulama.js:36:uygulama.use("/api/tenant", tenantRotasi);
+  src\uygulama.js:37:
+> src\uygulama.js:38:const musteriRotasi = require("./routes/musteriRotasi");
+> src\uygulama.js:39:uygulama.use("/api/tenant/musteriler", musteriRotasi);
+  src\uygulama.js:40:
+  src\uygulama.js:41:const tedarikciRotasi = require("./routes/tedarikciRotasi");
+> src\uygulama.js:42:uygulama.use("/api/tenant/tedarikciler", tedarikciRotasi);
+  src\uygulama.js:43:
+  src\uygulama.js:44:const urunRotasi = require("./routes/urunRotasi");
+  src\uygulama.js:45:const stokRotasi = require("./routes/stokRotasi");
+  src\uygulama.js:46:
+> src\uygulama.js:47:uygulama.use("/api/tenant/urunler", urunRotasi);
+> src\uygulama.js:48:uygulama.use("/api/tenant/stok", stokRotasi);
+  src\uygulama.js:49:
+  src\uygulama.js:50:const alisRotasi = require("./routes/alisRotasi");
+> src\uygulama.js:51:uygulama.use("/api/tenant/alis", alisRotasi);
+  src\uygulama.js:52:
+> src\uygulama.js:53:const satisRotasi = require("./routes/satisRotasi");
+> src\uygulama.js:54:uygulama.use("/api/tenant/satis", satisRotasi);
+  src\uygulama.js:55:
+> src\uygulama.js:56:const cariRotasi = require("./routes/cariRotasi");
+> src\uygulama.js:57:uygulama.use("/api/tenant/cari", cariRotasi);
+  src\uygulama.js:58:
+  src\uygulama.js:59:const teklifRotasi = require("./routes/teklifRotasi");
+  src\uygulama.js:60:const siparisRotasi = require("./routes/siparisRotasi");
+  src\uygulama.js:61:
+> src\uygulama.js:62:uygulama.use("/api/tenant/teklifler", teklifRotasi);
+> src\uygulama.js:63:uygulama.use("/api/tenant/siparisler", siparisRotasi);
+  src\uygulama.js:64:
+  src\uygulama.js:65:const personelRotasi = require("./routes/personelRotasi");
+  src\uygulama.js:66:const raporRotasi = require("./routes/raporRotasi");
+  src\uygulama.js:67:
+> src\uygulama.js:68:uygulama.use("/api/tenant/personeller", personelRotasi);
+> src\uygulama.js:69:uygulama.use("/api/tenant/raporlar", raporRotasi);
+  src\uygulama.js:70:
+  src\uygulama.js:71:const eticaretRotasi = require("./routes/eticaretRotasi");
+  src\uygulama.js:72:const whatsappRotasi = require("./routes/whatsappRotasi");
+  src\uygulama.js:73:
+> src\uygulama.js:74:uygulama.use("/api/tenant/eticaret", eticaretRotasi);
+> src\uygulama.js:75:uygulama.use("/api/tenant/whatsapp", whatsappRotasi);
+  src\uygulama.js:76:
+  src\uygulama.js:77:const finansRotasi = require("./routes/finansRotasi");
+> src\uygulama.js:78:uygulama.use("/api/tenant/finans", finansRotasi);
+  src\uygulama.js:79:
+  src\uygulama.js:80:const masrafRotasi = require("./routes/masrafRotasi");
+> src\uygulama.js:81:uygulama.use("/api/tenant/masraflar", masrafRotasi);
+  src\uygulama.js:82:
+  src\uygulama.js:83:const piyasaRotasi =
+  src\uygulama.js:84:    require("./routes/piyasaRotasi");
+  src\uygulama.js:85:
+  src\uygulama.js:86:uygulama.use(
+> src\uygulama.js:87:    "/api/tenant/piyasa",
+  src\uygulama.js:88:    piyasaRotasi
+  src\uygulama.js:89:);
+  src\uygulama.js:90:
+
+
+
+
+==================================================
+ 18 - SYNTAX TESTLERI
+==================================================
+TEST: .\public\erp\erp.js
+
+SONUC: OK
+
+TEST: .\src\controllers\musteriController.js
+
+SONUC: OK
+
+TEST: .\src\routes\musteriRotasi.js
+
+SONUC: OK
+
+TEST: .\src\uygulama.js
+
+SONUC: OK
+
+
+==================================================
+ 19 - MUSTERI V2 ONCESI SNAPSHOT
+==================================================
+SNAPSHOT TARH: 20260827-003645
+
+==================================================
+ 20 - SONUC
+==================================================
+RAPOR TAMAMLANDI.
+HICBIR UYGULAMA KODU DEGISTIRILMEDI.
+MUSTERI V2 ONCESI SNAPSHOTLAR ALINDI.

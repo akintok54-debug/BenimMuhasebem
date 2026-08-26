@@ -1,0 +1,389 @@
+﻿<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>BenimMuhasebe | Süper Admin</title>
+
+    <link rel="stylesheet" href="/css/admin.css">
+</head>
+
+<body>
+
+<div class="app">
+
+    <aside class="sidebar">
+
+        <div class="brand">
+            <div class="brand-logo">BM</div>
+
+            <div>
+                <div class="brand-name">BenimMuhasebe</div>
+                <div class="brand-subtitle">Platform Yönetimi</div>
+            </div>
+        </div>
+
+        <nav class="menu">
+
+            <div class="menu-title">ANA YÖNETM</div>
+
+            <a class="menu-item active" href="#">
+                <span>▦</span>
+                <span>Dashboard</span>
+            </a>
+
+            <a class="menu-item" href="#">
+                <span>◉</span>
+                <span>Kiracılar</span>
+            </a>
+
+            <a class="menu-item" href="#">
+                <span>♙</span>
+                <span>Kullanıcılar</span>
+            </a>
+
+            <div class="menu-title">PLATFORM</div>
+
+            <a class="menu-item" href="#">
+                <span>◇</span>
+                <span>Planlar & Lisanslar</span>
+            </a>
+
+            <a class="menu-item" href="#">
+                <span>⊞</span>
+                <span>Modüller</span>
+            </a>
+
+            <a class="menu-item" href="#">
+                <span>◌</span>
+                <span>AI Merkezi</span>
+            </a>
+
+            <div class="menu-title">GÜVENLK</div>
+
+            <a class="menu-item" href="#">
+                <span>◈</span>
+                <span>Audit Log</span>
+            </a>
+
+            <a class="menu-item" href="#">
+                <span>⚙</span>
+                <span>Sistem</span>
+            </a>
+
+        </nav>
+
+        <div class="sidebar-bottom">
+
+            <div class="system-status">
+                <span class="status-dot"></span>
+
+                <div>
+                    <strong>Sistem Aktif</strong>
+                    <small>Platform çalışıyor</small>
+                </div>
+            </div>
+
+            <div class="admin-profile">
+                <div class="avatar">SA</div>
+
+                <div>
+                    <strong>Süper Admin</strong>
+                    <small>Platform Owner</small>
+                </div>
+            </div>
+
+        </div>
+
+    </aside>
+
+
+    <main class="main">
+
+        <header class="topbar">
+
+            <div>
+                <div class="page-title">Dashboard</div>
+                <div class="breadcrumb">
+                    BenimMuhasebe / Platform Yönetimi
+                </div>
+            </div>
+
+            <div class="top-actions">
+
+                <div class="search">
+                    <span>⌕</span>
+                    <input
+                        type="text"
+                        placeholder="Kiracı, kullanıcı veya işlem ara..."
+                    >
+                </div>
+
+                <button class="icon-button">◔</button>
+
+                <button class="notification">
+                    ♢
+                    <span></span>
+                </button>
+
+                <div class="top-avatar">SA</div>
+
+            </div>
+
+        </header>
+
+
+        <section class="content">
+
+            <div class="welcome">
+
+                <div>
+                    <h1>Hoş geldin, Süper Admin 👋</h1>
+
+                    <p>
+                        BenimMuhasebe platformunun genel durumunu buradan
+                        kontrol edebilirsin.
+                    </p>
+                </div>
+
+                <button class="primary-button">
+                    + Yeni Kiracı
+                </button>
+
+            </div>
+
+
+            <div class="stats-grid">
+
+                <div class="stat-card">
+
+                    <div class="stat-icon blue">◎</div>
+
+                    <div class="stat-content">
+                        <span>Toplam Kiracı</span>
+                        <strong id="toplamKiraci">-</strong>
+                        <small>Platformdaki tüm kiracılar</small>
+                    </div>
+
+                </div>
+
+
+                <div class="stat-card">
+
+                    <div class="stat-icon green">✓</div>
+
+                    <div class="stat-content">
+                        <span>Aktif Kiracı</span>
+                        <strong id="aktifKiraci">-</strong>
+                        <small class="positive">● Sistem aktif</small>
+                    </div>
+
+                </div>
+
+
+                <div class="stat-card">
+
+                    <div class="stat-icon orange">◷</div>
+
+                    <div class="stat-content">
+                        <span>Deneme</span>
+                        <strong id="denemeKiraci">-</strong>
+                        <small>Deneme sürecindeki hesaplar</small>
+                    </div>
+
+                </div>
+
+
+                <div class="stat-card">
+
+                    <div class="stat-icon red">!</div>
+
+                    <div class="stat-content">
+                        <span>Askıda</span>
+                        <strong id="askidaKiraci">-</strong>
+                        <small>Kontrol gerektiren hesaplar</small>
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="dashboard-grid">
+
+                <div class="panel large">
+
+                    <div class="panel-header">
+
+                        <div>
+                            <h2>Son Kiracılar</h2>
+                            <p>Platforma eklenen son müşteriler</p>
+                        </div>
+
+                        <button class="secondary-button">
+                            Tümünü Gör
+                        </button>
+
+                    </div>
+
+                    <div class="table-wrapper">
+
+                        <table>
+
+                            <thead>
+                                <tr>
+                                    <th>Kiracı</th>
+                                    <th>Plan</th>
+                                    <th>Durum</th>
+                                    <th>Modüller</th>
+                                    <th>Tarih</th>
+                                </tr>
+                            </thead>
+
+                            <tbody id="tenantTable">
+
+                                <tr>
+                                    <td colspan="5" class="empty">
+                                        Veriler yükleniyor...
+                                    </td>
+                                </tr>
+
+                            </tbody>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+
+                <div class="panel">
+
+                    <div class="panel-header">
+                        <div>
+                            <h2>Sistem Durumu</h2>
+                            <p>Platform sağlık özeti</p>
+                        </div>
+                    </div>
+
+                    <div class="health-list">
+
+                        <div class="health-row">
+                            <div>
+                                <strong>API</strong>
+                                <small>Backend servisleri</small>
+                            </div>
+
+                            <span class="health-ok">Çalışıyor</span>
+                        </div>
+
+
+                        <div class="health-row">
+                            <div>
+                                <strong>MongoDB</strong>
+                                <small>Veritabanı</small>
+                            </div>
+
+                            <span class="health-ok">Bağlı</span>
+                        </div>
+
+
+                        <div class="health-row">
+                            <div>
+                                <strong>AI Servisi</strong>
+                                <small>Yapay zeka altyapısı</small>
+                            </div>
+
+                            <span class="health-warning">Hazırlanıyor</span>
+                        </div>
+
+
+                        <div class="health-row">
+                            <div>
+                                <strong>Domain</strong>
+                                <small>benimmuhasebe.com</small>
+                            </div>
+
+                            <span class="health-ok">Hazır</span>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="dashboard-grid bottom-grid">
+
+                <div class="panel">
+
+                    <div class="panel-header">
+                        <div>
+                            <h2>Plan Dağılımı</h2>
+                            <p>Kiracıların planlara göre dağılımı</p>
+                        </div>
+                    </div>
+
+                    <div id="planList" class="plan-list">
+                        <div class="empty">
+                            Veriler yükleniyor...
+                        </div>
+                    </div>
+
+                </div>
+
+
+                <div class="panel">
+
+                    <div class="panel-header">
+                        <div>
+                            <h2>Son Aktiviteler</h2>
+                            <p>Platform üzerindeki son işlemler</p>
+                        </div>
+                    </div>
+
+                    <div id="activityList" class="activity-list">
+                        <div class="empty">
+                            Veriler yükleniyor...
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="ai-banner">
+
+                <div class="ai-icon">✦</div>
+
+                <div class="ai-text">
+
+                    <h2>BenimMuhasebe AI Merkezi</h2>
+
+                    <p>
+                        Kiracıların kullanımını analiz et,
+                        sorunları tespit et ve yöneticilere
+                        akıllı destek sağla.
+                    </p>
+
+                </div>
+
+                <button class="ai-button">
+                    AI Merkezini Aç →
+                </button>
+
+            </div>
+
+        </section>
+
+    </main>
+
+</div>
+
+<script src="/js/admin.js"></script>
+
+</body>
+</html>

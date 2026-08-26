@@ -1,0 +1,62 @@
+﻿<!doctype html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BenimMuhasebe ERP - Giriş</title>
+    <link rel="stylesheet" href="/erp/login.css">
+</head>
+<body>
+
+<div class="login-shell">
+
+    <div class="login-card">
+
+        <div class="brand">
+            <strong>BenimMuhasebe</strong>
+            <span>ERP</span>
+        </div>
+
+        <h1>Giriş Yap</h1>
+
+        <p>
+            Firmanıza ait ERP hesabıyla giriş yapın.
+        </p>
+
+        <form id="loginForm">
+
+            <label>
+                E-posta
+                <input
+                    id="email"
+                    type="email"
+                    autocomplete="username"
+                    required
+                >
+            </label>
+
+            <label>
+                Şifre
+                <input
+                    id="sifre"
+                    type="password"
+                    autocomplete="current-password"
+                    required
+                >
+            </label>
+
+            <div id="mesaj"></div>
+
+            <button id="girisBtn" type="submit">
+                Giriş Yap
+            </button>
+
+        </form>
+
+    </div>
+
+</div>
+
+<script src="/erp/login.js"></script>
+</body>
+</html>

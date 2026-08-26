@@ -1,0 +1,804 @@
+﻿(() => {
+    "use strict";
+
+    const content = document.getElementById("content");
+    const pageTitle = document.getElementById("pageTitle");
+
+    function token() {
+        return (
+            localStorage.getItem("tenantToken") ||
+            localStorage.getItem("token") ||
+            localStorage.getItem("accessToken") ||
+            ""
+        );
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+    }
+
+    function para(value) {
+        return new Intl.NumberFormat("tr-TR", {
+            style: "currency",
+            currency: "TRY",
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(Number(value || 0));
+    }
+
+    async function api(url, options = {}) {
+        const headers = {
+            Accept: "application/json",
+            ...(options.headers || {})
+        };
+
+        if (options.body && !headers["Content-Type"]) {
+            headers["Content-Type"] = "application/json";
+        }
+
+        const t = token();
+        if (t) {
+            headers.Authorization = t.startsWith("Bearer ")
+                ? t
+                : `Bearer ${t}`;
+        }
+
+        const response = await fetch(url, {
+            ...options,
+            headers,
+            credentials: "include"
+        });
+
+        const text = await response.text();
+        let data = null;
+
+        try {
+            data = text ? JSON.parse(text) : {};
+        } catch {
+            data = { message: text };
+        }
+
+        if (!response.ok) {
+            throw new Error(
+                data?.mesaj ||
+                data?.message ||
+                `API hatası: ${response.status}`
+            );
+        }
+
+        return data;
+    }
+
+    function loading(text = "Yükleniyor...") {
+        content.innerHTML = `
+            <div class="dashboard-loading">
+                ${escapeHtml(text)}
+            </div>
+        `;
+    }
+
+    function errorBox(error) {
+        content.innerHTML = `
+            <div class="error">
+                <strong>Veri alınamadı.</strong>
+                <div style="margin-top:8px">
+                    ${escapeHtml(error?.message || "Bilinmeyen hata")}
+                </div>
+            </div>
+        `;
+    }
+
+    function setTitle(title) {
+        if (pageTitle) pageTitle.textContent = title;
+    }
+
+    function card(title, value, info = "") {
+        return `
+            <div class="dashboard-card">
+                <div class="dashboard-card-title">${escapeHtml(title)}</div>
+                <div class="dashboard-card-value">${value}</div>
+                <div class="dashboard-card-info">${escapeHtml(info)}</div>
+            </div>
+        `;
+    }
+
+    function table(title, rows, columns) {
+        const list = Array.isArray(rows) ? rows : [];
+
+        if (!list.length) {
+            return `
+                <div class="dashboard-panel">
+                    <h2>${escapeHtml(title)}</h2>
+                    <div class="empty-state">Henüz kayıt yok.</div>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="dashboard-panel">
+                <div class="panel-heading">
+                    <div>
+                        <h2>${escapeHtml(title)}</h2>
+                        <p>${list.length} kayıt</p>
+                    </div>
+                </div>
+                <div class="table-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                ${columns.map(c => `<th>${escapeHtml(c.label)}</th>`).join("")}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${list.map(row => `
+                                <tr>
+                                    ${columns.map(c => `
+                                        <td>${escapeHtml(
+                                            typeof c.value === "function"
+                                                ? c.value(row)
+                                                : row[c.value] ?? "-"
+                                        )}</td>
+                                    `).join("")}
+                                </tr>
+                            `).join("")}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    }
+
+    async function dashboardYukle() {
+        setTitle("Ana Sayfa");
+        loading();
+
+        try {
+            const cari = await api("/api/tenant/cari/ozet");
+
+            const musteriAlacak = Number(cari.musteriAlacak || 0);
+            const tedarikciBorc = Number(cari.tedarikciBorc || 0);
+            const netCari = Number(cari.netCari || 0);
+
+            const tenantInfo = document.getElementById("tenantInfo");
+            if (tenantInfo) {
+                tenantInfo.textContent = "Tenant bağlantısı aktif";
+            }
+
+            content.innerHTML = `
+                <div class="welcome-banner">
+                    <div>
+                        <div class="eyebrow">BENMMUHASEBE ERP</div>
+                        <h2>Ana Sayfa</h2>
+                        <p>şletmenizin güncel finansal özeti</p>
+                    </div>
+
+                    <div class="welcome-actions">
+                        <div class="live-time">
+                            ${new Date().toLocaleString("tr-TR")}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+
+                    <div class="dashboard-card">
+                        <div class="dashboard-card-title">
+                            Müşteri Alacağı
+                        </div>
+
+                        <div class="dashboard-card-value">
+                            ${para(musteriAlacak)}
+                        </div>
+
+                        <div class="dashboard-card-info">
+                            Tahsil edilmemiş
+                        </div>
+                    </div>
+
+                    <div class="dashboard-card">
+                        <div class="dashboard-card-title">
+                            Tedarikçi Borcu
+                        </div>
+
+                        <div class="dashboard-card-value">
+                            ${para(tedarikciBorc)}
+                        </div>
+
+                        <div class="dashboard-card-info">
+                            Ödenmemiş
+                        </div>
+                    </div>
+
+                    <div class="dashboard-card positive">
+                        <div class="dashboard-card-title">
+                            Net Cari
+                        </div>
+
+                        <div class="dashboard-card-value">
+                            ${para(netCari)}
+                        </div>
+
+                        <div class="dashboard-card-info">
+                            Müşteri alacağı - tedarikçi borcu
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="dashboard-grid">
+
+                    <div class="dashboard-panel">
+                        <div class="panel-heading">
+                            <div>
+                                <h2>Finansal Durum</h2>
+                                <p>Güncel cari görünüm</p>
+                            </div>
+                        </div>
+
+                        <div class="dashboard-card-info">
+                            Müşterilerden tahsil edilecek toplam:
+                            <strong>${para(musteriAlacak)}</strong>
+                        </div>
+
+                        <div class="dashboard-card-info">
+                            Tedarikçilere ödenecek toplam:
+                            <strong>${para(tedarikciBorc)}</strong>
+                        </div>
+
+                        <div class="dashboard-card-info">
+                            Net cari durum:
+                            <strong>${para(netCari)}</strong>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-panel">
+                        <div class="panel-heading">
+                            <div>
+                                <h2>Sistem</h2>
+                                <p>ERP çalışma durumu</p>
+                            </div>
+                        </div>
+
+                        <div class="dashboard-card-info">
+                            ERP çekirdeği:
+                            <strong>ÇALIŞIYOR</strong>
+                        </div>
+
+                        <div class="dashboard-card-info">
+                            Tenant bağlantısı:
+                            <strong>AKTF</strong>
+                        </div>
+
+                        <div class="dashboard-card-info">
+                            Son yenileme:
+                            <strong>${new Date().toLocaleString("tr-TR")}</strong>
+                        </div>
+                    </div>
+
+                </div>
+            `;
+        } catch (error) {
+            const tenantInfo = document.getElementById("tenantInfo");
+
+            if (tenantInfo) {
+                tenantInfo.textContent = "Bağlantı hatası";
+            }
+
+            errorBox(error);
+        }
+    }
+
+    const configs = {
+        musteriler: {
+            title: "Müşteriler",
+            url: "/api/tenant/musteriler",
+            key: "musteriler",
+            columns: [
+                { label: "Kod", value: "kod" },
+                { label: "Ünvan", value: r => r.unvan || r.adSoyad || "-" },
+                { label: "Yetkili", value: "yetkili" },
+                { label: "Telefon", value: r => r.whatsapp || r.telefon || "-" },
+                { label: "Bakiye", value: r => para(r.bakiye) }
+            ]
+        },
+        tedarikciler: {
+            title: "Tedarikçiler",
+            url: "/api/tenant/tedarikciler",
+            key: "tedarikciler",
+            columns: [
+                { label: "Kod", value: "kod" },
+                { label: "Ünvan", value: r => r.unvan || r.adSoyad || "-" },
+                { label: "Yetkili", value: "yetkili" },
+                { label: "Telefon", value: r => r.whatsapp || r.telefon || "-" },
+                { label: "Bakiye", value: r => para(r.bakiye) }
+            ]
+        },
+        urunler: {
+            title: "Ürünler",
+            url: "/api/tenant/urunler",
+            key: "urunler",
+            columns: [
+                { label: "Kod", value: "kod" },
+                { label: "Barkod", value: "barkod" },
+                { label: "Ürün", value: "ad" },
+                { label: "Birim", value: "birim" },
+                { label: "Alış", value: r => para(r.alisFiyati) },
+                { label: "Satış", value: r => para(r.satisFiyati) }
+            ]
+        },
+        stok: {
+            title: "Stok",
+            url: "/api/tenant/stok",
+            key: "stoklar",
+            columns: [
+                { label: "Ürün", value: r => r.urunId?.kod || "-" },
+                { label: "Ürün Adı", value: r => r.urunId?.ad || "-" },
+                { label: "Depo", value: r => r.depoId?.ad || "-" },
+                { label: "Miktar", value: "miktar" },
+                { label: "Maliyet", value: r => para(r.maliyet) }
+            ]
+        },
+        alis: {
+            title: "Alış",
+            url: "/api/tenant/alis",
+            key: "alislar",
+            columns: [
+                { label: "Belge", value: "belgeNo" },
+                { label: "Tarih", value: r => r.tarih ? new Date(r.tarih).toLocaleDateString("tr-TR") : "-" },
+                { label: "Tedarikçi", value: r => r.tedarikciId?.unvan || "-" },
+                { label: "Depo", value: r => r.depoId?.ad || "-" },
+                { label: "Genel Toplam", value: r => para(r.genelToplam) }
+            ]
+        },
+        satis: {
+            title: "Satış",
+            url: "/api/tenant/satis",
+            key: "satislar",
+            columns: [
+                { label: "Belge", value: "belgeNo" },
+                { label: "Tarih", value: r => r.tarih ? new Date(r.tarih).toLocaleDateString("tr-TR") : "-" },
+                { label: "Müşteri", value: r => r.musteriId?.unvan || "-" },
+                { label: "Ödeme", value: r => r.odemeTipi || "-" },
+                { label: "Genel Toplam", value: r => para(r.genelToplam) }
+            ]
+        }
+    };
+
+    async function basitSayfa(page) {
+        const cfg = configs[page];
+
+        if (!cfg) {
+            setTitle(page);
+            content.innerHTML = `
+                <div class="dashboard-panel">
+                    <h2>${escapeHtml(page)}</h2>
+                    <div class="empty-state">
+                        Bu modül için arayüz yeniden kuruluyor.
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        setTitle(cfg.title);
+        loading();
+
+        try {
+            const data = await api(cfg.url);
+
+            content.innerHTML = table(
+                cfg.title,
+                data[cfg.key] || [],
+                cfg.columns
+            );
+        } catch (error) {
+            errorBox(error);
+        }
+    }
+
+    async function cariYukle() {
+        setTitle("Cari");
+        loading();
+
+        try {
+            const [ozetData, musteriData, tedarikciData] =
+                await Promise.all([
+                    api("/api/tenant/cari/ozet"),
+                    api("/api/tenant/musteriler"),
+                    api("/api/tenant/tedarikciler")
+                ]);
+
+            const musteriler = musteriData.musteriler || [];
+            const tedarikciler = tedarikciData.tedarikciler || [];
+
+            content.innerHTML = `
+                <div class="dashboard-panel">
+                    <div class="dashboard-grid"
+                         style="grid-template-columns:repeat(3,minmax(0,1fr));">
+                        <div class="dashboard-card">
+                            <div class="dashboard-card-title">Müşteri Alacağı</div>
+                            <div id="cariMusteriAlacak" class="dashboard-card-value">
+                                ${para(ozetData.musteriAlacak)}
+                            </div>
+                            <div class="dashboard-card-info">Tahsil edilmemiş</div>
+                        </div>
+
+                        <div class="dashboard-card">
+                            <div class="dashboard-card-title">Tedarikçi Borcu</div>
+                            <div id="cariTedarikciBorc" class="dashboard-card-value">
+                                ${para(ozetData.tedarikciBorc)}
+                            </div>
+                            <div class="dashboard-card-info">Ödenmemiş</div>
+                        </div>
+
+                        <div class="dashboard-card positive">
+                            <div class="dashboard-card-title">Net Cari</div>
+                            <div id="cariNet" class="dashboard-card-value">
+                                ${para(ozetData.netCari)}
+                            </div>
+                            <div class="dashboard-card-info">
+                                Müşteri alacağı - tedarikçi borcu
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="cari-tabs" style="display:flex;gap:8px;margin-bottom:15px;">
+                        <button type="button" class="erp-small-button cari-tab active" data-cari-tab="musteri">
+                            Müşteriler
+                        </button>
+                        <button type="button" class="erp-small-button cari-tab" data-cari-tab="tedarikci">
+                            Tedarikçiler
+                        </button>
+                    </div>
+
+                    <input id="cariArama"
+                           class="erp-input"
+                           placeholder="Kod veya ünvan ara...">
+
+                    <div id="cariListe" style="margin-top:15px;"></div>
+                </div>
+            `;
+
+            let aktif = "musteri";
+            const arama = document.getElementById("cariArama");
+
+            const render = () => {
+                const q = arama.value.trim().toLocaleLowerCase("tr-TR");
+                const list = (aktif === "musteri" ? musteriler : tedarikciler)
+                    .filter(x => {
+                        const text = [
+                            x.kod,
+                            x.unvan,
+                            x.adSoyad,
+                            x.yetkili
+                        ].filter(Boolean).join(" ")
+                         .toLocaleLowerCase("tr-TR");
+                        return !q || text.includes(q);
+                    });
+
+                document.getElementById("cariListe").innerHTML = `
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Kod</th>
+                                    <th>Ünvan</th>
+                                    <th>Telefon</th>
+                                    <th>Bakiye</th>
+                                    <th>İşlem</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${list.length ? list.map(item => `
+                                    <tr>
+                                        <td><strong>${escapeHtml(item.kod || "-")}</strong></td>
+                                        <td>${escapeHtml(item.unvan || item.adSoyad || "-")}</td>
+                                        <td>${escapeHtml(item.whatsapp || item.telefon || "-")}</td>
+                                        <td><strong>${para(item.bakiye)}</strong></td>
+                                        <td>
+                                            <div class="row-actions">
+                                                <button type="button"
+                                                        class="erp-small-button"
+                                                        data-cari-ekstre="${item._id}"
+                                                        data-cari-tip="${aktif}">
+                                                    Ekstre
+                                                </button>
+                                                ${aktif === "musteri"
+                                                    ? `<button type="button"
+                                                               class="erp-small-button"
+                                                               data-cari-tahsilat="${item._id}">
+                                                           Tahsilat
+                                                       </button>`
+                                                    : `<button type="button"
+                                                               class="erp-small-button"
+                                                               data-cari-odeme="${item._id}">
+                                                           Ödeme
+                                                       </button>`}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join("") : `
+                                    <tr>
+                                        <td colspan="5">Kayıt bulunamadı.</td>
+                                    </tr>
+                                `}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            };
+
+            document.querySelectorAll("[data-cari-tab]").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    aktif = btn.dataset.cariTab;
+                    document.querySelectorAll("[data-cari-tab]")
+                        .forEach(x => x.classList.remove("active"));
+                    btn.classList.add("active");
+                    arama.value = "";
+                    render();
+                });
+            });
+
+            arama.addEventListener("input", render);
+            render();
+        } catch (error) {
+            errorBox(error);
+        }
+    }
+
+    async function cariEkstreAc(tip, id) {
+        try {
+            const tarafTipi = tip === "musteri" ? "MUSTERI" : "TEDARIKCI";
+
+            const [hareketData, firmaData] = await Promise.all([
+                api(`/api/tenant/cari/hareketler?tarafTipi=${encodeURIComponent(tarafTipi)}&tarafId=${encodeURIComponent(id)}`),
+                api("/api/tenant/firma")
+            ]);
+
+            const tarafData = tip === "musteri"
+                ? await api("/api/tenant/musteriler")
+                : await api("/api/tenant/tedarikciler");
+
+            const taraf = (tip === "musteri"
+                ? tarafData.musteriler
+                : tarafData.tedarikciler
+            ).find(x => String(x._id) === String(id));
+
+            const firma = firmaData.firmaBilgileri || {};
+            const hareketler = hareketData.hareketler || [];
+
+            const rows = hareketler.map(h => ({
+                ...h,
+                tarihText: h.tarih ? new Date(h.tarih).toLocaleDateString("tr-TR") : "-",
+                borc: h.tip === "BORC" ? Number(h.tutar || 0) : 0,
+                alacak: ["TAHSILAT", "ODEME", "ALACAK"].includes(h.tip)
+                    ? Number(h.tutar || 0)
+                    : 0
+            }));
+
+            const overlay = document.createElement("div");
+            overlay.className = "erp-modal-overlay";
+
+            overlay.innerHTML = `
+                <div class="invoice-preview-shell">
+                    <div class="invoice-toolbar">
+                        <div>
+                            <strong>Cari Ekstre</strong>
+                            <span>${escapeHtml(taraf?.unvan || taraf?.adSoyad || "-")}</span>
+                        </div>
+
+                        <div class="invoice-toolbar-actions">
+                            <button id="cariYazdir" class="erp-primary-button">
+                                Yazdır / PDF
+                            </button>
+                            <button id="cariKapat" class="erp-small-button">
+                                Kapat
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="cariEkstreSayfa" class="invoice-page">
+                        <div class="invoice-header">
+                            <div>
+                                <div class="invoice-brand">
+                                    ${escapeHtml(firma.unvan || "Firma")}
+                                </div>
+                                <div class="invoice-subtitle">Cari Hesap Ekstresi</div>
+                                <div class="invoice-subtitle">
+                                    ${escapeHtml(firma.adres || "")}
+                                </div>
+                            </div>
+
+                            <div class="invoice-meta">
+                                <div>
+                                    <span>Tarih</span>
+                                    <strong>${new Date().toLocaleDateString("tr-TR")}</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="invoice-parties">
+                            <div class="invoice-party">
+                                <span>${tip === "musteri" ? "MÜŞTERİ" : "TEDARİKÇİ"}</span>
+                                <strong>${escapeHtml(taraf?.unvan || taraf?.adSoyad || "-")}</strong>
+                                <small>Kod: ${escapeHtml(taraf?.kod || "-")}</small>
+                                <small>Tel: ${escapeHtml(taraf?.whatsapp || taraf?.telefon || "-")}</small>
+                            </div>
+
+                            <div class="invoice-party">
+                                <span>GÜNCEL BAKİYE</span>
+                                <strong>${para(taraf?.bakiye)}</strong>
+                            </div>
+                        </div>
+
+                        <div class="invoice-table-wrap">
+                            <table class="invoice-table">
+                                <thead>
+                                    <tr>
+                                        <th>Tarih</th>
+                                        <th>Tür</th>
+                                        <th>Açıklama</th>
+                                        <th>Borç</th>
+                                        <th>Alacak</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${rows.length ? rows.map(row => `
+                                        <tr>
+                                            <td>${escapeHtml(row.tarihText)}</td>
+                                            <td>${escapeHtml(row.tip || "-")}</td>
+                                            <td>${escapeHtml(row.aciklama || "-")}</td>
+                                            <td>${row.borc ? para(row.borc) : "-"}</td>
+                                            <td>${row.alacak ? para(row.alacak) : "-"}</td>
+                                        </tr>
+                                    `).join("") : `
+                                        <tr>
+                                            <td colspan="5" style="text-align:center">
+                                                Henüz cari hareket bulunmuyor.
+                                            </td>
+                                        </tr>
+                                    `}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="invoice-bottom">
+                            <div class="invoice-notes">
+                                <strong>Normal Ekstre</strong>
+                                <p>Cari hesaba ait hareketlerin tarih ve bakiye bazında özeti.</p>
+                                <strong>Detaylı Ekstre</strong>
+                                <p>Belge ve ürün detayları ayrıca raporlanabilir.</p>
+                            </div>
+
+                            <div class="invoice-totals">
+                                <div>
+                                    <span>Güncel Bakiye</span>
+                                    <strong>${para(taraf?.bakiye)}</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(overlay);
+
+            document.getElementById("cariKapat").onclick = () => overlay.remove();
+            document.getElementById("cariYazdir").onclick = () => {
+                const page = document.getElementById("cariEkstreSayfa");
+                const old = document.body.innerHTML;
+                document.body.innerHTML = page.outerHTML;
+                window.print();
+                document.body.innerHTML = old;
+                window.location.reload();
+            };
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+
+    let sayfaYuklemeNo = 0;
+
+    async function sayfaYukle(page) {
+        const buYukleme = ++sayfaYuklemeNo;
+        if (page === "dashboard" || page === "anaSayfa" || !page) {
+            if (buYukleme !== sayfaYuklemeNo) return;
+            await dashboardYukle();
+            return;
+        }
+
+        if (page === "cari" || page === "cariler") {
+            if (buYukleme !== sayfaYuklemeNo) return;
+            await cariYukle();
+            return;
+        }
+
+        if (configs[page]) {
+            if (buYukleme !== sayfaYuklemeNo) return;
+            await basitSayfa(page);
+            return;
+        }
+
+        if (page === "finans" || page === "kasa" || page === "banka") {
+            setTitle("Kasa / Banka");
+            loading();
+            try {
+                const d = await api("/api/tenant/finans/ozet");
+                if (buYukleme !== sayfaYuklemeNo) return;
+                content.innerHTML = `
+                    <div class="dashboard-grid">
+                        ${card("Kasa", para(d.kasaToplam), "Aktif kasa bakiyesi")}
+                        ${card("Banka", para(d.bankaToplam), "Aktif banka bakiyesi")}
+                        ${card("Toplam Nakit", para(d.toplamNakit), "Kasa + banka")}
+                    </div>
+                `;
+            } catch (error) {
+                errorBox(error);
+            }
+            return;
+        }
+
+        setTitle(page);
+        content.innerHTML = `
+            <div class="dashboard-panel">
+                <h2>${escapeHtml(page)}</h2>
+                <div class="empty-state">Bu ekran kurtarma sürümünde hazırlanıyor.</div>
+            </div>
+        `;
+    }
+
+    function anaSayfa() {
+        sayfaYukle("dashboard");
+    }
+
+    function modul(name) {
+        const map = {
+            musteriler: "musteriler",
+            tedarikciler: "tedarikciler",
+            urunler: "urunler",
+            stok: "stok",
+            alis: "alis",
+            satis: "satis",
+            cariler: "cari",
+            cari: "cari",
+            finans: "finans"
+        };
+        sayfaYukle(map[name] || name);
+    }
+
+    document.addEventListener("click", event => {
+        const ekstre = event.target.closest("[data-cari-ekstre]");
+        if (ekstre) {
+            cariEkstreAc(ekstre.dataset.cariTip, ekstre.dataset.cariEkstre);
+        }
+    });
+
+    // Mevcut menü yapılarıyla uyumlu global fonksiyonlar.
+    window.sayfaYukle = sayfaYukle;
+    window.anaSayfa = anaSayfa;
+    window.modul = modul;
+    window.cariYukle = cariYukle;
+    window.cariEkstreAc = cariEkstreAc;
+
+    // Menü butonlarında data-page kullanılıyorsa otomatik bağla.
+    document.querySelectorAll("[data-page]").forEach(button => {
+        button.addEventListener("click", () => {
+            sayfaYukle(button.dataset.page);
+        });
+    });
+
+    // Başlangıç.
+    anaSayfa();
+})();
+
+
+
+
+
+
+

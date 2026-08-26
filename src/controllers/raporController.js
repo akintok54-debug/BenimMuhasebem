@@ -1,0 +1,283 @@
+﻿const mongoose = require("mongoose");
+
+const Satis = require("../models/Satis");
+const Alis = require("../models/Alis");
+const Stok = require("../models/Stok");
+const CariHareket = require("../models/CariHareket");
+const Personel = require("../models/Personel");
+
+function tenantId(req) {
+    return new mongoose.Types.ObjectId(String(req.tenantId));
+}
+
+function tarihFiltresi(req) {
+    const filter = {};
+
+    if (req.query.baslangic) {
+        const baslangic = new Date(req.query.baslangic);
+
+        if (!Number.isNaN(baslangic.getTime())) {
+            filter.$gte = baslangic;
+        }
+    }
+
+    if (req.query.bitis) {
+        const bitis = new Date(req.query.bitis);
+
+        if (!Number.isNaN(bitis.getTime())) {
+            bitis.setHours(23, 59, 59, 999);
+            filter.$lte = bitis;
+        }
+    }
+
+    return Object.keys(filter).length
+        ? filter
+        : null;
+}
+
+async function genel(req, res, next) {
+    try {
+        const tId = tenantId(req);
+        const tarih = tarihFiltresi(req);
+
+        const satisFilter = { tenantId: tId };
+        const alisFilter = { tenantId: tId };
+        const cariFilter = { tenantId: tId };
+
+        if (tarih) {
+            satisFilter.tarih = tarih;
+            alisFilter.tarih = tarih;
+            cariFilter.tarih = tarih;
+        }
+
+        const [
+            satislar,
+            alislar,
+            stoklar,
+            cariHareketler,
+            personelSayisi
+        ] = await Promise.all([
+            Satis.find(satisFilter).select("araToplam toplamKdv genelToplam").lean(),
+            Alis.find(alisFilter).select("araToplam toplamKdv genelToplam").lean(),
+            Stok.find({ tenantId: tId }).select("miktar maliyet urunId depoId").lean(),
+            CariHareket.find(cariFilter).select("tarafTipi tip tutar").lean(),
+            Personel.countDocuments({ tenantId: tId, aktif: true })
+        ]);
+
+        const satisToplam = satislar.reduce(
+            (toplam, item) => toplam + Number(item.genelToplam || 0),
+            0
+        );
+
+        const alisToplam = alislar.reduce(
+            (toplam, item) => toplam + Number(item.genelToplam || 0),
+            0
+        );
+
+        const stokAdedi = stoklar.reduce(
+            (toplam, item) => toplam + Number(item.miktar || 0),
+            0
+        );
+
+        const stokMaliyeti = stoklar.reduce(
+            (toplam, item) =>
+                toplam +
+                Number(item.miktar || 0) *
+                Number(item.maliyet || 0),
+            0
+        );
+
+        const tahsilat = cariHareketler
+            .filter(x => x.tip === "TAHSILAT")
+            .reduce(
+                (toplam, item) => toplam + Number(item.tutar || 0),
+                0
+            );
+
+        const odeme = cariHareketler
+            .filter(x => x.tip === "ODEME")
+            .reduce(
+                (toplam, item) => toplam + Number(item.tutar || 0),
+                0
+            );
+
+        res.json({
+            basarili: true,
+            rapor: {
+                satis: {
+                    belgeSayisi: satislar.length,
+                    toplam: satisToplam
+                },
+
+                alis: {
+                    belgeSayisi: alislar.length,
+                    toplam: alisToplam
+                },
+
+                stok: {
+                    satirSayisi: stoklar.length,
+                    toplamAdet: stokAdedi,
+                    toplamMaliyet: stokMaliyeti
+                },
+
+                cari: {
+                    tahsilat,
+                    odeme,
+                    netNakitHareketi: tahsilat - odeme
+                },
+
+                personel: {
+                    aktif: personelSayisi
+                }
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+async function satis(req, res, next) {
+    try {
+        const tId = tenantId(req);
+
+        const filtre = { tenantId: tId };
+        const tarih = tarihFiltresi(req);
+
+        if (tarih) {
+            filtre.tarih = tarih;
+        }
+
+        const satislar = await Satis.find(filtre)
+            .populate("musteriId", "kod unvan adSoyad")
+            .sort({ tarih: -1 })
+            .lean();
+
+        res.json({
+            basarili: true,
+            toplam: satislar.length,
+            satislar
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+async function alis(req, res, next) {
+    try {
+        const tId = tenantId(req);
+
+        const filtre = { tenantId: tId };
+        const tarih = tarihFiltresi(req);
+
+        if (tarih) {
+            filtre.tarih = tarih;
+        }
+
+        const alislar = await Alis.find(filtre)
+            .populate("tedarikciId", "kod unvan adSoyad")
+            .sort({ tarih: -1 })
+            .lean();
+
+        res.json({
+            basarili: true,
+            toplam: alislar.length,
+            alislar
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+async function stok(req, res, next) {
+    try {
+        const stoklar = await Stok.find({
+            tenantId: tenantId(req)
+        })
+            .populate("urunId", "kod ad minimumStok kritikStok")
+            .populate("depoId", "kod ad")
+            .sort({ updatedAt: -1 })
+            .lean();
+
+        const kritik = stoklar.filter(item => {
+            const miktar = Number(item.miktar || 0);
+            const kritikStok =
+                Number(item.urunId?.kritikStok || 0);
+
+            return miktar <= kritikStok;
+        });
+
+        res.json({
+            basarili: true,
+            toplam: stoklar.length,
+            kritikStokSayisi: kritik.length,
+            stoklar,
+            kritikStoklar: kritik
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+async function cari(req, res, next) {
+    try {
+        const filtre = {
+            tenantId: tenantId(req)
+        };
+
+        if (req.query.tarafTipi) {
+            filtre.tarafTipi = req.query.tarafTipi;
+        }
+
+        if (req.query.tarafId) {
+            filtre.tarafId = req.query.tarafId;
+        }
+
+        const hareketler = await CariHareket.find(filtre)
+            .sort({ tarih: -1, createdAt: -1 })
+            .lean();
+
+        res.json({
+            basarili: true,
+            toplam: hareketler.length,
+            hareketler
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+async function personel(req, res, next) {
+    try {
+        const personeller = await Personel.find({
+            tenantId: tenantId(req)
+        })
+            .sort({ adSoyad: 1 })
+            .lean();
+
+        const toplamMaas = personeller
+            .filter(x => x.aktif)
+            .reduce(
+                (toplam, item) => toplam + Number(item.maas || 0),
+                0
+            );
+
+        res.json({
+            basarili: true,
+            toplam: personeller.length,
+            aktif: personeller.filter(x => x.aktif).length,
+            toplamAylikMaas: toplamMaas,
+            personeller
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+module.exports = {
+    genel,
+    satis,
+    alis,
+    stok,
+    cari,
+    personel
+};

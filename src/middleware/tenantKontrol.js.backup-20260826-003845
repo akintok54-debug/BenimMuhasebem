@@ -1,0 +1,37 @@
+﻿function tenantKontrol(req, res, next) {
+    try {
+        const kullanici = req.kullanici || req.user;
+
+        if (!kullanici) {
+            return res.status(401).json({
+                basarili: false,
+                mesaj: "Kimlik doğrulaması gerekli."
+            });
+        }
+
+        const rol = kullanici.rol || kullanici.role;
+
+        if (rol === "SUPER_ADMIN") {
+            return next();
+        }
+
+        if (!kullanici.tenantId) {
+            return res.status(403).json({
+                basarili: false,
+                mesaj: "Kullanıcı bir kiracıya bağlı değil."
+            });
+        }
+
+        req.tenantId = String(kullanici.tenantId);
+
+        next();
+
+    } catch (error) {
+        return res.status(403).json({
+            basarili: false,
+            mesaj: "Tenant erişimi doğrulanamadı."
+        });
+    }
+}
+
+module.exports = tenantKontrol;

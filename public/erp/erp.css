@@ -1,0 +1,1378 @@
+﻿/* ANA ERP */
+:root {
+    font-family: Arial, Helvetica, sans-serif;
+    color: #172033;
+    background: #f5f7fb;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #f5f7fb;
+}
+
+#app {
+    display: flex;
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: 250px;
+    background: #111827;
+    color: white;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.brand {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 25px;
+}
+
+.brand strong {
+    font-size: 20px;
+}
+
+.brand span {
+    color: #94a3b8;
+    font-size: 13px;
+}
+
+nav {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+nav button {
+    border: 0;
+    background: transparent;
+    color: #dbe4f0;
+    text-align: left;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+nav button:hover,
+nav button:focus {
+    background: #1f2937;
+}
+
+.logout {
+    margin-top: auto;
+    border: 0;
+    background: #1f2937;
+    color: #fca5a5;
+    text-align: left;
+    padding: 11px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.main {
+    flex: 1;
+    min-width: 0;
+}
+
+.topbar {
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 18px 28px;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+.topbar h1 {
+    margin: 0 0 5px;
+    font-size: 25px;
+}
+
+.topbar span {
+    color: #64748b;
+    font-size: 13px;
+}
+
+#content {
+    padding: 28px;
+}
+
+.dashboard-loading {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 35px;
+    text-align: center;
+    color: #64748b;
+}
+
+.welcome-banner {
+    background: linear-gradient(135deg, #111827, #1e293b);
+    color: white;
+    border-radius: 18px;
+    padding: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 22px;
+}
+
+.welcome-banner h2 {
+    margin: 6px 0 8px;
+    font-size: 28px;
+}
+
+.welcome-banner p {
+    margin: 0;
+    color: #cbd5e1;
+}
+
+.eyebrow {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1.2px;
+    color: #93c5fd;
+}
+
+.welcome-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+}
+
+.live-time {
+    color: #cbd5e1;
+    font-size: 12px;
+}
+
+.brand-link {
+    color: white;
+    text-decoration: none;
+    background: rgba(255,255,255,.1);
+    border: 1px solid rgba(255,255,255,.15);
+    padding: 12px 15px;
+    border-radius: 10px;
+    white-space: nowrap;
+}
+
+.market-section {
+    margin-bottom: 12px;
+}
+
+.section-heading {
+    margin: 24px 0 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+}
+
+.section-heading h2 {
+    margin: 0;
+    font-size: 21px;
+}
+
+.section-heading p {
+    margin: 4px 0 0;
+    color: #64748b;
+    font-size: 13px;
+}
+
+.market-source {
+    font-size: 12px;
+    color: #64748b;
+    background: white;
+    border: 1px solid #e5e7eb;
+    padding: 7px 10px;
+    border-radius: 8px;
+}
+
+.currency-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+}
+
+.currency-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 18px;
+}
+
+.currency-code {
+    font-size: 20px;
+    font-weight: 800;
+    margin-bottom: 15px;
+}
+
+.currency-values {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.currency-values small {
+    display: block;
+    color: #64748b;
+    font-size: 12px;
+    margin-bottom: 4px;
+}
+
+.currency-values strong {
+    font-size: 17px;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 15px;
+    margin-bottom: 18px;
+}
+
+.dashboard-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 18px;
+    min-height: 130px;
+}
+
+.dashboard-card.positive {
+    border-top: 3px solid #16a34a;
+}
+
+.dashboard-card.warning {
+    border-top: 3px solid #f59e0b;
+}
+
+.dashboard-card-title {
+    color: #64748b;
+    font-size: 13px;
+}
+
+.dashboard-card-value {
+    font-size: 23px;
+    font-weight: 800;
+    margin: 12px 0 8px;
+}
+
+.dashboard-card-info {
+    color: #94a3b8;
+    font-size: 12px;
+}
+
+.dashboard-two-column {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 18px;
+    margin-top: 20px;
+}
+
+.dashboard-panel {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 20px;
+    min-width: 0;
+}
+
+.panel-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 14px;
+}
+
+.panel-heading h2,
+.panel-heading h3,
+.dashboard-panel h2,
+.dashboard-panel h3 {
+    margin: 0;
+}
+
+.panel-heading p {
+    margin: 5px 0 0;
+    color: #64748b;
+    font-size: 13px;
+}
+
+.activity-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.activity-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 13px 0;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.activity-row:last-child {
+    border-bottom: 0;
+}
+
+.activity-row div {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.activity-row span,
+.activity-row small {
+    color: #64748b;
+    font-size: 12px;
+}
+
+.activity-row b {
+    white-space: nowrap;
+}
+
+.priority-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.priority-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 14px 0;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.priority-row:last-child {
+    border-bottom: 0;
+}
+
+.priority-row span {
+    color: #64748b;
+}
+
+.critical-panel {
+    margin-top: 18px;
+}
+
+.critical-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.critical-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    padding: 13px;
+    background: #fffaf0;
+    border: 1px solid #fde68a;
+    border-radius: 10px;
+}
+
+.critical-row div {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.critical-row span {
+    color: #92400e;
+    font-size: 12px;
+}
+
+.guide-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.guide-item {
+    padding: 13px;
+    border-radius: 10px;
+    background: #f8fafc;
+}
+
+.guide-item b {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.guide-item span {
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.promo-text {
+    color: #475569;
+    line-height: 1.6;
+}
+
+.promo-button {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 11px 14px;
+    background: #2563eb;
+    color: white;
+    text-decoration: none;
+    border-radius: 9px;
+    font-weight: 700;
+}
+
+.table-scroll {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+}
+
+th,
+td {
+    padding: 12px;
+    border-bottom: 1px solid #e5e7eb;
+    text-align: left;
+    white-space: nowrap;
+}
+
+th {
+    color: #64748b;
+    font-size: 12px;
+}
+
+.empty-state {
+    color: #64748b;
+    padding: 20px 0;
+}
+
+.category-list {
+    margin-top: 15px;
+}
+
+.category-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.error {
+    color: #991b1b;
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    padding: 16px;
+    border-radius: 10px;
+}
+
+.login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f5f7fb;
+    padding: 20px;
+}
+
+.login-card {
+    width: 100%;
+    max-width: 420px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    padding: 30px;
+    border-radius: 16px;
+}
+
+.login-brand {
+    font-size: 28px;
+    font-weight: 800;
+}
+
+.login-subtitle {
+    color: #64748b;
+    margin: 5px 0 25px;
+}
+
+.login-card label {
+    display: block;
+    margin: 12px 0 6px;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.login-card input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #dbe1ea;
+    border-radius: 9px;
+}
+
+.login-card button {
+    width: 100%;
+    margin-top: 18px;
+    padding: 12px;
+    border: 0;
+    border-radius: 9px;
+    background: #111827;
+    color: white;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.login-error {
+    color: #b91c1c;
+    margin-top: 12px;
+    min-height: 20px;
+    font-size: 13px;
+}
+
+@media (max-width: 1200px) {
+    .dashboard-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 900px) {
+    #app {
+        display: block;
+    }
+
+    .sidebar {
+        width: 100%;
+        min-height: auto;
+    }
+
+    nav {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .logout {
+        margin-top: 15px;
+    }
+
+    .dashboard-two-column {
+        grid-template-columns: 1fr;
+    }
+
+    .welcome-banner,
+    .benimmuhasebe-promo {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .welcome-actions {
+        align-items: flex-start;
+    }
+
+    .critical-list {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 650px) {
+    .dashboard-grid,
+    .currency-grid {
+        grid-template-columns: 1fr;
+    }
+
+    #content {
+        padding: 16px;
+    }
+}
+/* ==========================================================
+   MUSTERI FORM / MODAL
+   ========================================================== */
+
+.musteri-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 18px 0;
+}
+
+.erp-input {
+    width: 100%;
+    max-width: 520px;
+    height: 44px;
+    padding: 0 14px;
+    border: 1px solid #d7dee9;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #172033;
+    outline: none;
+}
+
+.erp-input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.erp-primary-button {
+    border: 0;
+    background: #2563eb;
+    color: #ffffff;
+    min-height: 42px;
+    padding: 0 16px;
+    border-radius: 9px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.erp-primary-button:hover {
+    background: #1d4ed8;
+}
+
+.erp-small-button {
+    border: 1px solid #2563eb;
+    background: #ffffff;
+    color: #2563eb;
+    min-height: 36px;
+    padding: 0 11px;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.erp-small-button:hover {
+    background: #eff6ff;
+}
+
+.erp-small-button.secondary {
+    border-color: #cbd5e1;
+    color: #475569;
+    background: #ffffff;
+}
+
+.erp-small-button.secondary:hover {
+    background: #f8fafc;
+}
+
+.row-actions {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+}
+
+.durum-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 70px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.durum-badge.aktif {
+    color: #166534;
+    background: #dcfce7;
+}
+
+.durum-badge.pasif {
+    color: #991b1b;
+    background: #fee2e2;
+}
+
+/* MODAL */
+
+.erp-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(15, 23, 42, 0.58);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.erp-modal {
+    width: min(980px, 100%);
+    max-height: 92vh;
+    overflow: hidden;
+    background: #ffffff;
+    border-radius: 18px;
+    box-shadow: 0 25px 70px rgba(15, 23, 42, 0.25);
+    display: flex;
+    flex-direction: column;
+}
+
+.erp-modal-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 22px 24px;
+    border-bottom: 1px solid #e5e7eb;
+    background: #ffffff;
+}
+
+.erp-modal-header h2 {
+    margin: 0;
+    font-size: 22px;
+    color: #111827;
+}
+
+.erp-modal-header p {
+    margin: 5px 0 0;
+    color: #64748b;
+    font-size: 13px;
+}
+
+.erp-modal-close {
+    width: 38px;
+    height: 38px;
+    border: 0;
+    border-radius: 9px;
+    background: #f1f5f9;
+    color: #334155;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.erp-modal-close:hover {
+    background: #e2e8f0;
+}
+
+#musteriForm {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.erp-form-grid {
+    padding: 24px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    overflow-y: auto;
+}
+
+.erp-form-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.erp-form-grid label.full {
+    grid-column: 1 / -1;
+}
+
+.erp-form-grid input,
+.erp-form-grid textarea,
+.erp-form-grid select {
+    width: 100%;
+    border: 1px solid #d7dee9;
+    border-radius: 9px;
+    background: #ffffff;
+    color: #172033;
+    font: inherit;
+    font-weight: 400;
+    outline: none;
+}
+
+.erp-form-grid input {
+    height: 42px;
+    padding: 0 12px;
+}
+
+.erp-form-grid textarea {
+    min-height: 95px;
+    padding: 11px 12px;
+    resize: vertical;
+}
+
+.erp-form-grid input:focus,
+.erp-form-grid textarea:focus,
+.erp-form-grid select:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.10);
+}
+
+.erp-modal-footer {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 24px;
+    border-top: 1px solid #e5e7eb;
+    background: #f8fafc;
+}
+
+.erp-modal-footer .erp-small-button {
+    min-width: 100px;
+}
+
+.erp-modal-footer .erp-primary-button {
+    min-width: 120px;
+}
+
+#musteriFormMesaj {
+    flex: 0 0 auto;
+    padding: 0 24px 16px;
+}
+
+.dashboard-panel {
+    overflow: hidden;
+}
+
+@media (max-width: 760px) {
+
+    .erp-modal-overlay {
+        padding: 10px;
+        align-items: stretch;
+    }
+
+    .erp-modal {
+        max-height: 100%;
+        height: 100%;
+        border-radius: 14px;
+    }
+
+    .erp-form-grid {
+        grid-template-columns: 1fr;
+        padding: 18px;
+    }
+
+    .erp-form-grid label.full {
+        grid-column: auto;
+    }
+
+    .erp-modal-header {
+        padding: 18px;
+    }
+
+    .erp-modal-footer {
+        padding: 14px 18px;
+    }
+
+    .musteri-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .erp-input {
+        max-width: none;
+    }
+}
+/* ==========================================================
+   TEDARKÇ / MÜŞTER MODAL DÜZELTME
+   ========================================================== */
+
+.erp-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(15, 23, 42, 0.60);
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: auto;
+}
+
+.erp-modal {
+    width: min(1000px, 100%);
+    max-height: calc(100vh - 40px);
+    background: #ffffff;
+    border-radius: 18px;
+    box-shadow: 0 25px 80px rgba(15, 23, 42, 0.30);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.erp-modal-header {
+    flex: 0 0 auto;
+    padding: 20px 24px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    background: #ffffff;
+}
+
+.erp-modal-header h2 {
+    margin: 0;
+    color: #111827;
+    font-size: 22px;
+}
+
+.erp-modal-header p {
+    margin: 6px 0 0;
+    color: #64748b;
+    font-size: 13px;
+}
+
+.erp-modal-close {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    border: 0;
+    border-radius: 9px;
+    background: #f1f5f9;
+    color: #334155;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.erp-modal-close:hover {
+    background: #e2e8f0;
+}
+
+.erp-modal form {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.erp-form-grid {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 24px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    background: #ffffff;
+}
+
+.erp-form-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    min-width: 0;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.erp-form-grid label.full {
+    grid-column: 1 / -1;
+}
+
+.erp-form-grid input,
+.erp-form-grid textarea,
+.erp-form-grid select {
+    width: 100%;
+    max-width: 100%;
+    border: 1px solid #d7dee9;
+    border-radius: 9px;
+    background: #ffffff;
+    color: #172033;
+    font: inherit;
+    font-weight: 400;
+    outline: none;
+}
+
+.erp-form-grid input {
+    height: 42px;
+    padding: 0 12px;
+}
+
+.erp-form-grid textarea {
+    min-height: 96px;
+    padding: 11px 12px;
+    resize: vertical;
+}
+
+.erp-form-grid input:focus,
+.erp-form-grid textarea:focus,
+.erp-form-grid select:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.10);
+}
+
+.erp-modal-footer {
+    flex: 0 0 auto;
+    min-height: 72px;
+    padding: 14px 24px;
+    border-top: 1px solid #e5e7eb;
+    background: #f8fafc;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.erp-modal-footer-left,
+.erp-modal-footer-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.erp-modal-footer .erp-small-button,
+.erp-modal-footer .erp-primary-button {
+    min-height: 40px;
+}
+
+.erp-primary-button {
+    border: 0;
+    background: #2563eb;
+    color: #ffffff;
+    padding: 0 16px;
+    border-radius: 9px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.erp-primary-button:hover {
+    background: #1d4ed8;
+}
+
+.erp-small-button {
+    border: 1px solid #2563eb;
+    background: #ffffff;
+    color: #2563eb;
+    padding: 0 13px;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.erp-small-button:hover {
+    background: #eff6ff;
+}
+
+.erp-small-button.secondary {
+    border-color: #cbd5e1;
+    color: #475569;
+    background: #ffffff;
+}
+
+.erp-small-button.secondary:hover {
+    background: #f8fafc;
+}
+
+#musteriFormMesaj,
+#tedarikciFormMesaj {
+    flex: 0 0 auto;
+    padding: 0 24px 12px;
+}
+
+@media (max-width: 760px) {
+
+    .erp-modal-overlay {
+        padding: 8px;
+        align-items: stretch;
+    }
+
+    .erp-modal {
+        max-height: 100%;
+        height: 100%;
+        border-radius: 14px;
+    }
+
+    .erp-form-grid {
+        grid-template-columns: 1fr;
+        padding: 18px;
+    }
+
+    .erp-form-grid label.full {
+        grid-column: auto;
+    }
+
+    .erp-modal-header {
+        padding: 16px 18px;
+    }
+
+    .erp-modal-footer {
+        padding: 12px 18px;
+        flex-wrap: wrap;
+    }
+
+    .erp-modal-footer-left,
+    .erp-modal-footer-right {
+        flex-wrap: wrap;
+    }
+}
+/* ==========================================================
+   FATURA / ALIŞ ÖN ZLEME
+   ========================================================== */
+
+.invoice-preview-shell {
+    width: min(1180px, 100%);
+    max-height: calc(100vh - 30px);
+    overflow: auto;
+    background: #e5e7eb;
+    border-radius: 16px;
+    box-shadow: 0 25px 80px rgba(15,23,42,.30);
+}
+
+.invoice-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    padding: 14px 18px;
+    background: #111827;
+    color: #ffffff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+}
+
+.invoice-toolbar > div:first-child {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.invoice-toolbar span {
+    color: #cbd5e1;
+    font-size: 12px;
+}
+
+.invoice-toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.invoice-page {
+    width: min(210mm, 100%);
+    min-height: 297mm;
+    margin: 20px auto;
+    padding: 16mm;
+    background: #ffffff;
+    color: #111827;
+    box-shadow: 0 8px 30px rgba(15,23,42,.12);
+}
+
+.invoice-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 30px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #111827;
+}
+
+.invoice-brand {
+    font-size: 26px;
+    font-weight: 900;
+}
+
+.invoice-subtitle {
+    margin-top: 5px;
+    color: #64748b;
+    font-size: 14px;
+}
+
+.invoice-meta {
+    min-width: 200px;
+}
+
+.invoice-meta > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
+    padding: 4px 0;
+}
+
+.invoice-meta span {
+    color: #64748b;
+    font-size: 12px;
+}
+
+.invoice-meta strong {
+    font-size: 13px;
+}
+
+.invoice-parties {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin: 22px 0;
+}
+
+.invoice-party {
+    padding: 16px;
+    border: 1px solid #dbe1ea;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.invoice-party > span {
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .5px;
+}
+
+.invoice-party > strong {
+    font-size: 15px;
+}
+
+.invoice-party > small {
+    color: #64748b;
+    font-size: 11px;
+}
+
+.invoice-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.invoice-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.invoice-table th,
+.invoice-table td {
+    padding: 10px 8px;
+    border-bottom: 1px solid #e5e7eb;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.invoice-table th {
+    background: #f8fafc;
+    color: #475569;
+    font-size: 11px;
+    text-transform: uppercase;
+}
+
+.invoice-table td {
+    font-size: 12px;
+}
+
+.invoice-table td small {
+    display: block;
+    color: #64748b;
+    margin-top: 3px;
+    font-size: 10px;
+}
+
+.invoice-bottom {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 30px;
+    margin-top: 25px;
+}
+
+.invoice-notes {
+    color: #475569;
+    font-size: 12px;
+}
+
+.invoice-notes p {
+    line-height: 1.6;
+}
+
+.invoice-totals {
+    border-top: 1px solid #dbe1ea;
+}
+
+.invoice-totals > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 9px 0;
+    border-bottom: 1px solid #eef2f7;
+    font-size: 12px;
+}
+
+.invoice-total-main {
+    margin-top: 4px;
+    padding: 14px 0 !important;
+    font-size: 14px !important;
+    border-top: 2px solid #111827;
+}
+
+.invoice-footer {
+    margin-top: 45px;
+    padding-top: 12px;
+    border-top: 1px solid #dbe1ea;
+    display: flex;
+    justify-content: space-between;
+    color: #94a3b8;
+    font-size: 10px;
+}
+
+@media print {
+
+    @page {
+        size: A4;
+        margin: 10mm;
+    }
+
+    body {
+        background: #ffffff !important;
+    }
+
+    .invoice-preview-shell {
+        width: 100% !important;
+        max-height: none !important;
+        overflow: visible !important;
+        box-shadow: none !important;
+        background: #ffffff !important;
+        border-radius: 0 !important;
+    }
+
+    .invoice-toolbar {
+        display: none !important;
+    }
+
+    .invoice-page {
+        width: 100% !important;
+        min-height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+    }
+}
+
+@media (max-width: 760px) {
+
+    .invoice-header {
+        flex-direction: column;
+    }
+
+    .invoice-parties {
+        grid-template-columns: 1fr;
+    }
+
+    .invoice-bottom {
+        grid-template-columns: 1fr;
+    }
+
+    .invoice-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .invoice-toolbar-actions {
+        justify-content: flex-end;
+    }
+}

@@ -1,0 +1,134 @@
+﻿<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BenimMuhasebe — Süper Admin</title>
+    <link rel="stylesheet" href="/admin/admin.css">
+</head>
+
+<body>
+
+<div class="app">
+
+    <aside class="sidebar">
+
+        <div class="brand">
+            <div class="brand-logo">BM</div>
+            <div>
+                <strong>BenimMuhasebe</strong>
+                <span>Platform Yönetimi</span>
+            </div>
+        </div>
+
+        <div class="admin-badge">
+            <span class="status-dot"></span>
+            SÜPER ADMN
+        </div>
+
+        <nav>
+
+            <div class="nav-title">YÖNETM</div>
+
+            <button class="nav-item active" data-page="dashboard">
+                <span>▦</span>
+                Dashboard
+            </button>
+
+            <button class="nav-item" data-page="tenants">
+                <span>▣</span>
+                Kiracılar
+            </button>
+
+            <button class="nav-item" data-page="subscriptions">
+                <span>◆</span>
+                Abonelikler
+            </button>
+
+            <button class="nav-item" data-page="modules">
+                <span>◈</span>
+                Modüller
+            </button>
+
+            <button class="nav-item" data-page="users">
+                <span>♙</span>
+                Kullanıcılar
+            </button>
+
+            <div class="nav-title">SSTEM</div>
+
+            <button class="nav-item" data-page="ai">
+                <span>✦</span>
+                AI Merkezi
+            </button>
+
+            <button class="nav-item" data-page="audit">
+                <span>◷</span>
+                Audit Kayıtları
+            </button>
+
+            <button class="nav-item" data-page="system">
+                <span>⚙</span>
+                Sistem
+            </button>
+
+        </nav>
+
+        <div class="sidebar-bottom">
+            <div class="system-online">
+                <span></span>
+                Sistem çevrimiçi
+            </div>
+
+            <div class="domain">
+                benimmuhasebe.com
+            </div>
+        </div>
+
+    </aside>
+
+    <main class="main">
+
+        <header class="topbar">
+
+            <div>
+                <div class="breadcrumb">Platform / Yönetim</div>
+                <h1 id="pageTitle">Sistem Dashboard</h1>
+            </div>
+
+            <div class="top-actions">
+
+                <button class="icon-button" title="Yenile" onclick="panelYenile()">
+                    ↻
+                </button>
+
+                <div class="admin-profile">
+                    <div class="avatar">SA</div>
+                    <div>
+                        <strong>Süper Admin</strong>
+                        <span>Platform yöneticisi</span>
+                    </div>
+                </div>
+
+            </div>
+
+        </header>
+
+        <section id="content">
+
+            <div class="loading">
+                <div class="spinner"></div>
+                <span>Panel yükleniyor...</span>
+            </div>
+
+        </section>
+
+    </main>
+
+</div>
+
+<script src="/admin/admin.js"></script>
+
+</body>
+</html>
+

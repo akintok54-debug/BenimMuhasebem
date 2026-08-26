@@ -1,0 +1,34 @@
+﻿<div class="erp-modal-footer">
+
+                    <button
+                        type="button"
+                        id="musteriGeri"
+                        class="erp-small-button secondary"
+                    >
+                        ← Geri
+                    </button>
+
+                    <button
+                        type="button"
+                        id="musteriIptal"
+                        class="erp-small-button secondary"
+                    >
+                        Vazgeç
+                    </button>
+
+                    <button
+                        type="submit"
+                        class="erp-primary-button"
+                    >
+                        Kaydet
+                    </button>
+
+                    <button
+                        type="button"
+                        id="musteriIleri"
+                        class="erp-primary-button"
+                    >
+                        leri →
+                    </button>
+
+                </div>

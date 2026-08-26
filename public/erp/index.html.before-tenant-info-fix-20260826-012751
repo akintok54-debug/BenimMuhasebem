@@ -1,0 +1,67 @@
+﻿<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BenimMuhasebe ERP</title>
+    <link rel="stylesheet" href="/erp/erp.css">
+</head>
+<body>
+
+<div id="app">
+
+    <aside class="sidebar">
+        <div class="brand">
+            <strong>BenimMuhasebe</strong>
+            <span>ERP</span>
+        </div>
+
+        <nav>
+            <button data-page="dashboard">Ana Sayfa</button>
+            <button data-page="musteriler">Müşteriler</button>
+            <button data-page="tedarikciler">Tedarikçiler</button>
+            <button data-page="urunler">Ürünler</button>
+            <button data-page="stok">Stok</button>
+            <button data-page="alis">Alış</button>
+            <button data-page="satis">Satış</button>
+            <button data-page="cari">Cari</button>
+            <button data-page="finans">Kasa / Banka</button>
+            <button data-page="masraflar">Masraflar</button>
+            <button data-page="teklifler">Teklifler</button>
+            <button data-page="siparisler">Siparişler</button>
+            <button data-page="personeller">Personel</button>
+            <button data-page="raporlar">Raporlar</button>
+            <button data-page="eticaret">E-Ticaret</button>
+            <button data-page="whatsapp">WhatsApp</button>
+        </nav>
+
+        <button id="logoutButton" class="logout">
+            Çıkış Yap
+        </button>
+    </aside>
+
+    <main class="main">
+        <header class="topbar">
+            <div>
+                <h1 id="pageTitle">Dashboard</h1>
+                <span id="tenantInfo">Yükleniyor...</span>
+            </div>
+        </header>
+
+        <section id="content"></section>
+    </main>
+
+</div>
+
+<script src="/erp/erp.js?v=20260826-008"></script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
