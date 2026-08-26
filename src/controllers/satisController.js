@@ -47,6 +47,7 @@ async function listele(req, res, next) {
         })
             .populate("musteriId", "kod unvan adSoyad")
             .populate("depoId", "kod ad")
+            .populate("kalemler.urunId", "kod ad birim")
             .sort({ tarih: -1, createdAt: -1 })
             .lean();
 
@@ -58,6 +59,17 @@ async function listele(req, res, next) {
     } catch (error) {
         next(error);
     }
+}
+
+async function iadeleriListele(req, res, next) {
+    try {
+        const iadeler = await SatisIade.find({ tenantId: tenantObjectId(req) })
+            .populate("musteriId", "kod unvan adSoyad email telefon whatsapp")
+            .populate("depoId", "kod ad")
+            .populate("kalemler.urunId", "kod ad birim")
+            .sort({ tarih: -1, createdAt: -1 }).lean();
+        res.json({ basarili: true, toplam: iadeler.length, iadeler });
+    } catch (error) { next(error); }
 }
 
 async function detay(req, res, next) {
@@ -506,6 +518,7 @@ module.exports = {
     listele,
     detay,
     olustur,
-    iadeAl
+    iadeAl,
+    iadeleriListele
 };
 

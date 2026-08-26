@@ -10,6 +10,7 @@ router.use(kimlikKontrol);
 router.use(tenantKontrol);
 
 router.get("/", controller.listele);
+router.get("/iade", controller.iadeleriListele);
 router.post("/iade", controller.iadeAl);
 router.get("/:id", controller.detay);
 router.post("/", controller.olustur);

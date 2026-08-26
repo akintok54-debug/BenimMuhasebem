@@ -2036,6 +2036,45 @@ async function dashboardYukle() {
         });
     }
 
+    function musteriBelgeMerkeziAc(tur, belge, musteri) {
+        const turler = {
+            SATIS: "Satış Faturası", TAHSILAT: "Tahsilat Makbuzu", SIPARIS: "Sipariş Makbuzu",
+            IADE: "Satış İade Belgesi", TESELLUM: "Açık Hesap Tesellüm Makbuzu"
+        };
+        const baslik = turler[tur] || "Müşteri Belgesi";
+        const no = belge.belgeNo || belge.siparisNo || belge.teklifNo || String(belge._id || "").slice(-8).toUpperCase();
+        const tarihText = new Date(belge.tarih || belge.createdAt || Date.now()).toLocaleDateString("tr-TR");
+        const kalemler = Array.isArray(belge.kalemler) ? belge.kalemler : [];
+        const toplam = Number(belge.genelToplam || belge.tutar || 0);
+        const satirlar = kalemler.length ? kalemler.map((x, i) => ({
+            sira: i + 1, kod: x.urunId?.kod || "-", urun: x.urunId?.ad || "Ürün",
+            miktar: Number(x.miktar || 0), birim: x.urunId?.birim || "ADET", fiyat: Number(x.birimFiyat || 0),
+            kdv: Number(x.kdv || 0), iskonto: Number(x.iskonto || 0), toplam: Number(x.toplam || 0)
+        })) : [{ sira: 1, kod: belge.kaynak || tur, urun: belge.aciklama || baslik, miktar: 1, birim: "İŞLEM", fiyat: toplam, kdv: 0, iskonto: 0, toplam }];
+        musteriModalKapat();
+        const overlay = document.createElement("div"); overlay.id = "musteriIslemOverlay"; overlay.className = "erp-modal-overlay";
+        overlay.innerHTML = `<div class="invoice-preview-shell"><div class="invoice-toolbar"><div><strong>${baslik}</strong><span>${escapeHtml(no)}</span></div><div class="invoice-toolbar-actions"><button id="belgePdf" class="erp-primary-button">PDF / Yazdır</button><button id="belgeExcel" class="erp-small-button">Excel İndir</button><button id="belgeEposta" class="erp-small-button">E-posta</button><button id="belgeWhatsapp" class="erp-small-button">WhatsApp</button><button class="erp-small-button erp-modal-close">Kapat</button></div></div><div id="musteriBelgeSayfa" class="invoice-page"><div class="invoice-header"><div><div class="invoice-brand">BENİMMUHASEBE</div><div class="invoice-subtitle">${baslik}</div></div><div class="invoice-meta"><div><span>Belge No</span><strong>${escapeHtml(no)}</strong></div><div><span>Tarih</span><strong>${tarihText}</strong></div></div></div><div class="invoice-parties"><div class="invoice-party"><span>MÜŞTERİ</span><strong>${escapeHtml(musteri.unvan || musteri.adSoyad || "-")}</strong><small>Kod: ${escapeHtml(musteri.kod || "-")}</small><small>Tel: ${escapeHtml(musteri.telefon || musteri.whatsapp || "-")}</small><small>E-posta: ${escapeHtml(musteri.email || "-")}</small></div><div class="invoice-party"><span>BELGE TOPLAMI</span><strong>${para(toplam)}</strong><small>${tur === "TESELLUM" ? "Açık hesap teslim belgesidir" : escapeHtml(belge.durum || belge.tip || "")}</small></div></div><div class="invoice-table-wrap"><table class="invoice-table"><thead><tr><th>#</th><th>Kod</th><th>Ürün / Açıklama</th><th>Miktar</th><th>Birim Fiyat</th><th>KDV</th><th>İskonto</th><th>Toplam</th></tr></thead><tbody>${satirlar.map(x => `<tr><td>${x.sira}</td><td>${escapeHtml(x.kod)}</td><td>${escapeHtml(x.urun)}</td><td>${x.miktar} ${escapeHtml(x.birim)}</td><td>${para(x.fiyat)}</td><td>%${x.kdv}</td><td>%${x.iskonto}</td><td><strong>${para(x.toplam)}</strong></td></tr>`).join("")}</tbody></table></div><div class="invoice-bottom"><div class="invoice-notes"><strong>Açıklama</strong><p>${escapeHtml(belge.notlar || belge.aciklama || "Belge elektronik ortamda hazırlanmıştır.")}</p>${tur === "TESELLUM" ? "<p>Teslim eden / Teslim alan imza alanı</p>" : ""}</div><div class="invoice-totals"><div><span>Genel Toplam</span><strong>${para(toplam)}</strong></div></div></div></div></div>`;
+        document.body.appendChild(overlay); overlay.querySelector(".erp-modal-close").addEventListener("click", musteriModalKapat);
+        const metin = `${baslik}\nBelge No: ${no}\nTarih: ${tarihText}\nTutar: ${para(toplam)}\nMüşteri: ${musteri.unvan || musteri.adSoyad || musteri.kod}`;
+        document.getElementById("belgePdf").addEventListener("click", () => {
+            const pencere = window.open("", "_blank"); if (!pencere) return alert("Yazdırma penceresi açılamadı.");
+            pencere.document.write(`<!doctype html><html><head><title>${escapeHtml(no)}</title><link rel="stylesheet" href="/erp/erp.css"></head><body>${document.getElementById("musteriBelgeSayfa").outerHTML}</body></html>`); pencere.document.close(); pencere.onload = () => { pencere.focus(); pencere.print(); };
+        });
+        document.getElementById("belgeExcel").addEventListener("click", () => {
+            if (!window.XLSX) return alert("Excel kitaplığı yüklenemedi.");
+            const ws = XLSX.utils.json_to_sheet(satirlar.map(x => ({ "Belge Türü": baslik, "Belge No": no, Tarih: tarihText, "Müşteri Kodu": musteri.kod, Müşteri: musteri.unvan || musteri.adSoyad, "Ürün Kodu": x.kod, "Ürün/Açıklama": x.urun, Miktar: x.miktar, Birim: x.birim, "Birim Fiyat": x.fiyat, "KDV %": x.kdv, "İskonto %": x.iskonto, Toplam: x.toplam })));
+            ws["!cols"] = [{wch:22},{wch:22},{wch:14},{wch:16},{wch:28},{wch:16},{wch:30},{wch:12},{wch:10},{wch:14},{wch:10},{wch:12},{wch:14}]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Belge"); XLSX.writeFile(wb, `${baslik.replaceAll(" ", "-")}-${no}.xlsx`);
+        });
+        document.getElementById("belgeEposta").addEventListener("click", () => {
+            if (!musteri.email) return alert("Müşterinin e-posta adresi yok.");
+            window.location.href = `mailto:${encodeURIComponent(musteri.email)}?subject=${encodeURIComponent(`${baslik} - ${no}`)}&body=${encodeURIComponent(`${metin}\n\nPDF veya Excel dosyasını bu e-postaya ekleyebilirsiniz.`)}`;
+        });
+        document.getElementById("belgeWhatsapp").addEventListener("click", () => {
+            let tel = String(musteri.whatsapp || musteri.telefon || "").replace(/\D/g, ""); if (!tel) return alert("Müşterinin WhatsApp numarası yok."); if (tel.startsWith("0")) tel = `90${tel.slice(1)}`;
+            window.open(`https://wa.me/${tel}?text=${encodeURIComponent(`${metin}\n\nPDF veya Excel belgesi ayrıca eklenebilir.`)}`, "_blank", "noopener");
+        });
+    }
+
     async function musteriAnaSayfaAc(id) {
 
         setTitle("Müşteri");
@@ -2057,14 +2096,16 @@ async function dashboardYukle() {
                 cariData,
                 satisData,
                 teklifData,
-                siparisData
+                siparisData,
+                iadeData
             ] = await Promise.all([
                 api(`/api/tenant/musteriler/${encodeURIComponent(id)}`),
                 api("/api/tenant/musteriler"),
                 guvenliApi(`/api/tenant/cari/hareketler?tarafTipi=MUSTERI&tarafId=${encodeURIComponent(id)}`),
                 guvenliApi("/api/tenant/satis"),
                 guvenliApi("/api/tenant/teklifler"),
-                guvenliApi("/api/tenant/siparisler")
+                guvenliApi("/api/tenant/siparisler"),
+                guvenliApi("/api/tenant/satis/iade")
             ]);
 
             const m =
@@ -2128,6 +2169,7 @@ async function dashboardYukle() {
 
             const siparisler =
                 tumSiparisler.filter(musteriEslesir);
+            const iadeler = (iadeData?.iadeler || []).filter(musteriEslesir);
 
             const ad =
                 m.unvan ||
@@ -2317,6 +2359,8 @@ async function dashboardYukle() {
                             class="erp-small-button">
                             Bilgiler / Düzenle
                         </button>
+
+                        <button data-mtab="belgeler" style="background:#0f766e;color:white;" class="erp-small-button">Belgeler / Dökümler</button>
 
                         <button id="musteriWhatsapp"
                             style="background:#22c55e;color:white;"
@@ -2687,6 +2731,18 @@ async function dashboardYukle() {
                     });
             };
 
+            const belgelerRender = () => {
+                const belgeler = [
+                    ...satislar.map(x => ({ tur: "SATIS", belge: x, etiket: "Satış Faturası", no: x.belgeNo })),
+                    ...satislar.filter(x => x.odemeDurumu === "ACIK" || Number(x.kalanTutar || 0) > 0).map(x => ({ tur: "TESELLUM", belge: x, etiket: "Açık Hesap Tesellüm", no: x.belgeNo })),
+                    ...siparisler.map(x => ({ tur: "SIPARIS", belge: x, etiket: "Sipariş Makbuzu", no: x.siparisNo })),
+                    ...iadeler.map(x => ({ tur: "IADE", belge: x, etiket: "İade Belgesi", no: x.belgeNo })),
+                    ...hareketler.filter(x => x.tip === "TAHSILAT").map(x => ({ tur: "TAHSILAT", belge: x, etiket: "Tahsilat Makbuzu", no: String(x._id || "").slice(-8).toUpperCase() }))
+                ];
+                panel.innerHTML = `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Belgeler ve Dökümler</h2><p>PDF, Excel, e-posta ve WhatsApp paylaşımı</p></div></div><div class="table-scroll"><table><thead><tr><th>Tarih</th><th>Belge Türü</th><th>Belge No</th><th>Tutar</th><th>İşlem</th></tr></thead><tbody>${belgeler.length ? belgeler.map((x,i) => `<tr><td>${tarih(x.belge)}</td><td>${escapeHtml(x.etiket)}</td><td><strong>${escapeHtml(x.no || "-")}</strong></td><td>${para(x.belge.genelToplam || x.belge.tutar)}</td><td><button class="erp-primary-button" data-belge-index="${i}">Belgeyi Aç</button></td></tr>`).join("") : `<tr><td colspan="5">Henüz belge bulunmuyor.</td></tr>`}</tbody></table></div><div class="dashboard-panel" style="margin-top:12px"><small>PDF / Yazdır, Excel İndir, E-posta ve WhatsApp seçenekleri belge açıldığında görünür.</small></div></div>`;
+                panel.querySelectorAll("[data-belge-index]").forEach(btn => btn.addEventListener("click", () => { const x = belgeler[Number(btn.dataset.belgeIndex)]; musteriBelgeMerkeziAc(x.tur, x.belge, m); }));
+            };
+
 
             document
                 .querySelectorAll("[data-mtab]")
@@ -2704,6 +2760,7 @@ async function dashboardYukle() {
                         if (tab === "teklif") teklifRender();
                         if (tab === "siparis") siparisRender();
                         if (tab === "bilgi") bilgiRender();
+                        if (tab === "belgeler") belgelerRender();
                     });
                 });
 

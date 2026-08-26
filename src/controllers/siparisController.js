@@ -20,6 +20,7 @@ async function listele(req, res, next) {
         })
             .populate("musteriId", "kod unvan adSoyad")
             .populate("depoId", "kod ad")
+            .populate("kalemler.urunId", "kod ad birim")
             .sort({ tarih: -1 })
             .lean();
 
