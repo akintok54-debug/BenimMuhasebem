@@ -34,6 +34,22 @@ async function listele(req, res, next) {
     }
 }
 
+async function detay(req, res, next) {
+    try { const siparis = await Siparis.findOne({ _id: req.params.id, tenantId: tenantId(req) }).populate("musteriId").populate("depoId").populate("kalemler.urunId").lean(); if (!siparis) return res.status(404).json({ basarili:false, mesaj:"Sipariş bulunamadı." }); res.json({ basarili:true, siparis }); } catch(error){ next(error); }
+}
+
+async function guncelle(req, res, next) {
+    try {
+        const tId=tenantId(req), body=req.body||{}; const siparis=await Siparis.findOne({_id:req.params.id,tenantId:tId});
+        if(!siparis) return res.status(404).json({basarili:false,mesaj:"Sipariş bulunamadı."});
+        if(siparis.satisId || siparis.durum==="TAMAMLANDI") return res.status(409).json({basarili:false,mesaj:"Satışa dönüşmüş sipariş değiştirilemez."});
+        if(!Array.isArray(body.kalemler)||!body.kalemler.length) return res.status(400).json({basarili:false,mesaj:"En az bir sipariş kalemi gerekir."});
+        const kalemler=[]; let araToplam=0,toplamKdv=0,genelToplam=0;
+        for(const item of body.kalemler){const urun=await Urun.findOne({_id:item.urunId,tenantId:tId});if(!urun)return res.status(404).json({basarili:false,mesaj:"Ürün bulunamadı."});const miktar=Number(item.miktar||0),birimFiyat=Number(item.birimFiyat??urun.satisFiyati),kdv=Number(item.kdv??urun.kdv),iskonto=Number(item.iskonto||0);if(miktar<=0)return res.status(400).json({basarili:false,mesaj:"Miktar geçersiz."});const brut=miktar*birimFiyat,kalemAra=brut-(brut*iskonto/100),kdvTutari=kalemAra*kdv/100;kalemler.push({urunId:urun._id,miktar,birimFiyat,kdv,iskonto,araToplam:kalemAra,kdvTutari,toplam:kalemAra+kdvTutari});araToplam+=kalemAra;toplamKdv+=kdvTutari;genelToplam+=kalemAra+kdvTutari;}
+        siparis.siparisNo=String(body.siparisNo||siparis.siparisNo).trim().toUpperCase();siparis.tarih=body.tarih||siparis.tarih;siparis.depoId=body.depoId||siparis.depoId;siparis.kalemler=kalemler;siparis.araToplam=araToplam;siparis.toplamKdv=toplamKdv;siparis.genelToplam=genelToplam;siparis.notlar=body.notlar??siparis.notlar;siparis.durum=body.durum||siparis.durum;await siparis.save();res.json({basarili:true,siparis});
+    }catch(error){next(error);}
+}
+
 async function olustur(req, res, next) {
     try {
         const tId = tenantId(req);
@@ -224,6 +240,8 @@ async function satisdonustur(req, res, next) {
 
 module.exports = {
     listele,
+    detay,
+    guncelle,
     olustur,
     satisdonustur
 };

@@ -37,6 +37,7 @@ async function listele(req, res, next) {
             tenantId: tenantId(req)
         })
             .populate("musteriId", "kod unvan adSoyad")
+            .populate("kalemler.urunId", "kod ad birim satisFiyati kdv")
             .sort({ tarih: -1 })
             .lean();
 
@@ -48,6 +49,33 @@ async function listele(req, res, next) {
     } catch (error) {
         next(error);
     }
+}
+
+async function detay(req, res, next) {
+    try {
+        const teklif = await Teklif.findOne({ _id: req.params.id, tenantId: tenantId(req) }).populate("musteriId").populate("kalemler.urunId").lean();
+        if (!teklif) return res.status(404).json({ basarili: false, mesaj: "Teklif bulunamadı." });
+        res.json({ basarili: true, teklif });
+    } catch (error) { next(error); }
+}
+
+async function guncelle(req, res, next) {
+    try {
+        const tId = tenantId(req), body = req.body || {};
+        const teklif = await Teklif.findOne({ _id: req.params.id, tenantId: tId });
+        if (!teklif) return res.status(404).json({ basarili: false, mesaj: "Teklif bulunamadı." });
+        if (await Siparis.exists({ tenantId: tId, teklifId: teklif._id })) return res.status(409).json({ basarili: false, mesaj: "Siparişe dönüşmüş teklif değiştirilemez." });
+        if (!Array.isArray(body.kalemler) || !body.kalemler.length) return res.status(400).json({ basarili: false, mesaj: "En az bir teklif kalemi gerekir." });
+        const kalemler = []; let araToplam = 0, toplamKdv = 0, genelToplam = 0;
+        for (const item of body.kalemler) {
+            const urun = await Urun.findOne({ _id: item.urunId, tenantId: tId }); if (!urun) return res.status(404).json({ basarili: false, mesaj: "Ürün bulunamadı." });
+            const h = hesapla({ miktar: item.miktar, birimFiyat: item.birimFiyat ?? urun.satisFiyati, kdv: item.kdv ?? urun.kdv, iskonto: item.iskonto });
+            if (h.miktar <= 0) return res.status(400).json({ basarili: false, mesaj: "Miktar geçersiz." });
+            kalemler.push({ urunId: urun._id, ...h }); araToplam += h.araToplam; toplamKdv += h.kdvTutari; genelToplam += h.toplam;
+        }
+        teklif.teklifNo = String(body.teklifNo || teklif.teklifNo).trim().toUpperCase(); teklif.tarih = body.tarih || teklif.tarih; teklif.gecerlilikTarihi = body.gecerlilikTarihi || null; teklif.kalemler = kalemler; teklif.araToplam = araToplam; teklif.toplamKdv = toplamKdv; teklif.genelToplam = genelToplam; teklif.notlar = body.notlar ?? teklif.notlar; teklif.durum = body.durum || teklif.durum; await teklif.save();
+        res.json({ basarili: true, teklif });
+    } catch (error) { next(error); }
 }
 
 async function olustur(req, res, next) {
@@ -241,6 +269,8 @@ async function sipariseDonustur(req, res, next) {
 
 module.exports = {
     listele,
+    detay,
+    guncelle,
     olustur,
     onayla,
     sipariseDonustur

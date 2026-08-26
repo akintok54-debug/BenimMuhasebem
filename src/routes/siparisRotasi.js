@@ -10,7 +10,9 @@ router.use(kimlikKontrol);
 router.use(tenantKontrol);
 
 router.get("/", controller.listele);
+router.get("/:id", controller.detay);
 router.post("/", controller.olustur);
+router.patch("/:id", controller.guncelle);
 router.post("/:id/satisa-donustur", controller.satisdonustur);
 
 module.exports = router;

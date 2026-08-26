@@ -13,6 +13,7 @@ router.get("/", controller.listele);
 router.get("/iade", controller.iadeleriListele);
 router.post("/iade", controller.iadeAl);
 router.get("/:id", controller.detay);
+router.patch("/:id", controller.guncelle);
 router.post("/", controller.olustur);
 
 module.exports = router;

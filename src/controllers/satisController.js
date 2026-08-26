@@ -514,11 +514,33 @@ async function iadeAl(req, res, next) {
     } catch (error) { next(error); }
 }
 
+async function guncelle(req, res, next) {
+    try {
+        const tenantId=tenantObjectId(req), body=req.body||{}; const satis=await Satis.findOne({_id:req.params.id,tenantId});
+        if(!satis)return res.status(404).json({basarili:false,mesaj:"Satış bulunamadı."});
+        if(Number(satis.odenenTutar||0)>0)return res.status(409).json({basarili:false,mesaj:"Ödeme alınmış satış doğrudan değiştirilemez; iade/düzeltme belgesi kullanın."});
+        if(!Array.isArray(body.kalemler)||!body.kalemler.length)return res.status(400).json({basarili:false,mesaj:"En az bir satış kalemi gerekir."});
+        const depoId=body.depoId||satis.depoId; if(String(depoId)!==String(satis.depoId))return res.status(409).json({basarili:false,mesaj:"Kayıtlı satışın deposu değiştirilemez."});
+        const yeniKalemler=[];let araToplam=0,toplamKdv=0,genelToplam=0;const ihtiyac=new Map();
+        for(const item of body.kalemler){const urun=await Urun.findOne({_id:item.urunId,tenantId});if(!urun)return res.status(404).json({basarili:false,mesaj:"Ürün bulunamadı."});const k=hesaplaKalem({urunId:urun._id,miktar:item.miktar,birimFiyat:item.birimFiyat??urun.satisFiyati,kdv:item.kdv??urun.kdv,iskonto:item.iskonto});if(k.miktar<=0)return res.status(400).json({basarili:false,mesaj:"Miktar geçersiz."});yeniKalemler.push(k);araToplam+=k.araToplam;toplamKdv+=k.kdvTutari;genelToplam+=k.toplam;ihtiyac.set(String(urun._id),(ihtiyac.get(String(urun._id))||0)+k.miktar);}
+        const eski=new Map();for(const k of satis.kalemler)eski.set(String(k.urunId),(eski.get(String(k.urunId))||0)+Number(k.miktar||0));
+        for(const [urunId,miktar] of ihtiyac){const stok=await Stok.findOne({tenantId,urunId,depoId});const kullanilabilir=Number(stok?.miktar||0)+Number(eski.get(urunId)||0);if(kullanilabilir<miktar)return res.status(409).json({basarili:false,mesaj:`Düzeltme için yetersiz stok: ${urunId}`});}
+        for(const [urunId,miktar] of eski){let stok=await Stok.findOne({tenantId,urunId,depoId});if(!stok)stok=new Stok({tenantId,urunId,depoId,miktar:0,maliyet:0});stok.miktar+=miktar;await stok.save();}
+        for(const [urunId,miktar] of ihtiyac){const stok=await Stok.findOne({tenantId,urunId,depoId});stok.miktar-=miktar;stok.sonHareketTarihi=new Date();await stok.save();}
+        const musteri=await Musteri.findOne({_id:satis.musteriId,tenantId});musteri.bakiye-=Number(satis.kalanTutar||satis.genelToplam||0);musteri.bakiye+=genelToplam;await musteri.save();
+        await CariHareket.findOneAndUpdate({tenantId,kaynak:"SATIS",kaynakId:satis._id,tarafTipi:"MUSTERI"},{tutar:genelToplam,aciklama:`Satış düzeltmesi ${body.belgeNo||satis.belgeNo}`,tarih:body.tarih||satis.tarih},{new:true});
+        const degisenUrunler=new Set([...eski.keys(),...ihtiyac.keys()]);
+        for(const urunId of degisenUrunler){const fark=Number(eski.get(urunId)||0)-Number(ihtiyac.get(urunId)||0);if(!fark)continue;await StokHareket.create({tenantId,urunId,depoId,tip:fark>0?"SAYIM_ARTI":"SAYIM_EKSI",miktar:Math.abs(fark),birimMaliyet:0,kaynak:"SATIS_DUZELTME",kaynakId:satis._id,aciklama:`Satış ${satis.belgeNo} kalem düzeltmesi`,kullaniciId:req.kullanici?._id||req.user?._id||null});}
+        satis.belgeNo=String(body.belgeNo||satis.belgeNo).trim().toUpperCase();satis.tarih=body.tarih||satis.tarih;satis.kalemler=yeniKalemler;satis.araToplam=araToplam;satis.toplamKdv=toplamKdv;satis.genelToplam=genelToplam;satis.kalanTutar=genelToplam;satis.notlar=body.notlar??satis.notlar;await satis.save();res.json({basarili:true,satis,musteriBakiye:musteri.bakiye});
+    }catch(error){next(error);}
+}
+
 module.exports = {
     listele,
     detay,
     olustur,
     iadeAl,
-    iadeleriListele
+    iadeleriListele,
+    guncelle
 };
 
