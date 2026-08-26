@@ -2,7 +2,8 @@
     margin: 0;
     min-height: 100vh;
     font-family: Arial, sans-serif;
-    background: #f1f5f9;
+    background: #07152f;
+    color: #0f172a;
 }
 
 .login-shell {
@@ -10,6 +11,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: clamp(36px, 7vw, 110px);
     padding: 24px;
 }
 
@@ -18,9 +20,9 @@
     max-width: 420px;
     background: #fff;
     border: 1px solid #e2e8f0;
-    border-radius: 18px;
-    padding: 32px;
-    box-shadow: 0 20px 60px rgba(15,23,42,.08);
+    border-radius: 24px;
+    padding: 38px;
+    box-shadow: 0 30px 90px rgba(0,0,0,.32);
 }
 
 .brand {
@@ -72,7 +74,7 @@ button {
     border: 0;
     border-radius: 10px;
     padding: 13px 16px;
-    background: #2563eb;
+    background: linear-gradient(135deg, #2563eb, #4f46e5);
     color: white;
     font-size: 15px;
     font-weight: 700;
@@ -87,4 +89,25 @@ button:disabled {
     margin-bottom: 15px;
     color: #dc2626;
     font-size: 14px;
+}
+
+.login-showcase { width: min(560px, 48vw); color: white; }
+.login-domain { color: #93c5fd; text-decoration: none; font-weight: 800; }
+.login-badge { display: inline-flex; margin-top: 70px; padding: 8px 12px; border-radius: 999px; background: rgba(59,130,246,.16); border: 1px solid rgba(147,197,253,.22); color: #bfdbfe; font-size: 12px; font-weight: 800; letter-spacing: 1.4px; }
+.login-showcase h2 { font-size: clamp(38px, 5vw, 66px); line-height: 1.04; margin: 22px 0; letter-spacing: -2px; }
+.login-showcase p { color: #cbd5e1; font-size: 18px; line-height: 1.7; max-width: 520px; }
+.login-features { display: grid; gap: 13px; color: #dbeafe; font-weight: 700; }
+.brand-mark { display:grid; place-items:center; width:42px; height:42px; border-radius:13px; background:linear-gradient(135deg,#2563eb,#7c3aed); color:#fff !important; font-weight:900; }
+button { transition: transform .18s ease, box-shadow .18s ease; }
+button:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(37,99,235,.24); }
+.login-security { margin-top: 22px; padding-top: 18px; border-top: 1px solid #e2e8f0; color: #64748b; text-align: center; font-size: 12px; }
+
+@media (max-width: 900px) {
+    .login-shell { flex-direction: column; align-items: stretch; }
+    .login-showcase { width: 100%; text-align: center; }
+    .login-showcase .login-badge { margin-top: 28px; }
+    .login-showcase h2 { font-size: 38px; }
+    .login-showcase p { margin-left:auto; margin-right:auto; }
+    .login-features { display:none; }
+    .login-card { margin: 0 auto; }
 }

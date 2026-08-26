@@ -12,6 +12,10 @@ const authRotasi = require("./modules/auth/routes/authRotasi");
 
 const uygulama = express();
 
+uygulama.get(["/", "/giris", "/login"], (req, res) => {
+    res.redirect(302, "/erp/login.html");
+});
+
 uygulama.use(helmet());
 uygulama.use(cors());
 uygulama.use(express.json({ limit: "10mb" }));
@@ -24,16 +28,6 @@ uygulama.use(
     "/vendor/xlsx",
     express.static(path.join(__dirname, "..", "node_modules", "xlsx", "dist"))
 );
-
-uygulama.get("/", (req, res) => {
-    res.json({
-        basarili: true,
-        sistem: "BAHADIR ERP V2",
-        platform: "BENIMMUHASEBE",
-        domain: "benimmuhasebe.com",
-        mesaj: "ERP + E-Ticaret API çalışıyor."
-    });
-});
 
 uygulama.get("/api/saglik", saglikRotasi);
 const tenantRotasi = require("./routes/tenantRotasi");

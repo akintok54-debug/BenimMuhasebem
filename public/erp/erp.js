@@ -868,6 +868,12 @@ async function dashboardYukle() {
 
                     <div class="welcome-actions">
 
+                        <div class="dashboard-hero-actions">
+                            <button class="dashboard-action dashboard-action-blue" data-dashboard-page="satis">+ Yeni Satış</button>
+                            <button class="dashboard-action dashboard-action-green" data-dashboard-page="musteriler">+ Yeni Müşteri</button>
+                            <button class="dashboard-action dashboard-action-purple" data-dashboard-page="teklifler">+ Yeni Teklif</button>
+                        </div>
+
                         <div class="live-time">
                             ${simdi.toLocaleString("tr-TR")}
                         </div>
@@ -886,6 +892,15 @@ async function dashboardYukle() {
 
                     </div>
 
+                </div>
+
+                <div class="dashboard-shortcuts" aria-label="Hızlı işlemler">
+                    <button class="dashboard-shortcut shortcut-blue" data-dashboard-page="satis"><span>₺</span><b>Satış Yap</b><small>Yeni satış belgesi oluştur</small></button>
+                    <button class="dashboard-shortcut shortcut-green" data-dashboard-page="musteriler"><span>◎</span><b>Müşteri Merkezi</b><small>Cari, tahsilat ve belgeler</small></button>
+                    <button class="dashboard-shortcut shortcut-purple" data-dashboard-page="siparisler"><span>▣</span><b>Sipariş Oluştur</b><small>Sipariş kalemlerini hazırla</small></button>
+                    <button class="dashboard-shortcut shortcut-orange" data-dashboard-page="alis"><span>↙</span><b>Alış / İade</b><small>Stok giriş işlemleri</small></button>
+                    <button class="dashboard-shortcut shortcut-cyan" data-dashboard-page="finans"><span>◈</span><b>Kasa / Banka</b><small>Nakit hareketlerini yönet</small></button>
+                    <button class="dashboard-shortcut shortcut-rose" data-dashboard-page="raporlar"><span>▥</span><b>Rapor Merkezi</b><small>İşletme sonuçlarını incele</small></button>
                 </div>
 
                 <!-- GÜNLÜK KUR -->
@@ -1320,6 +1335,21 @@ async function dashboardYukle() {
             `;
 
             dashboardKartlariniBagla();
+            document.querySelectorAll("[data-dashboard-page]").forEach(button => {
+                button.addEventListener("click", () => sayfaYukle(button.dataset.dashboardPage));
+            });
+            const hizliSayfalar = { "Müşteriler": "musteriler", "Stok": "stok", "Satış": "satis", "Masraflar": "masraflar", "Raporlar": "raporlar" };
+            document.querySelectorAll(".category-row").forEach(row => {
+                const sayfa = hizliSayfalar[row.querySelector("span")?.textContent.trim()];
+                if (!sayfa) return;
+                row.classList.add("dashboard-nav-row");
+                row.tabIndex = 0;
+                row.setAttribute("role", "button");
+                row.addEventListener("click", () => sayfaYukle(sayfa));
+                row.addEventListener("keydown", event => {
+                    if (event.key === "Enter" || event.key === " ") sayfaYukle(sayfa);
+                });
+            });
 
         } catch (error) {
 
@@ -1406,6 +1436,30 @@ async function dashboardYukle() {
                 { label: "Tarih", value: r => r.tarih ? new Date(r.tarih).toLocaleDateString("tr-TR") : "-" },
                 { label: "Müşteri", value: r => r.musteriId?.unvan || "-" },
                 { label: "Ödeme", value: r => r.odemeTipi || "-" },
+                { label: "Genel Toplam", value: r => para(r.genelToplam) }
+            ]
+        },
+        siparisler: {
+            title: "Siparişler",
+            url: "/api/tenant/siparisler",
+            key: "siparisler",
+            columns: [
+                { label: "Sipariş No", value: "siparisNo" },
+                { label: "Tarih", value: r => r.tarih ? new Date(r.tarih).toLocaleDateString("tr-TR") : "-" },
+                { label: "Müşteri", value: r => r.musteriId?.unvan || r.musteriId?.adSoyad || "-" },
+                { label: "Durum", value: r => r.durum || "-" },
+                { label: "Genel Toplam", value: r => para(r.genelToplam) }
+            ]
+        },
+        teklifler: {
+            title: "Teklifler",
+            url: "/api/tenant/teklifler",
+            key: "teklifler",
+            columns: [
+                { label: "Teklif No", value: "teklifNo" },
+                { label: "Tarih", value: r => r.tarih ? new Date(r.tarih).toLocaleDateString("tr-TR") : "-" },
+                { label: "Müşteri", value: r => r.musteriId?.unvan || r.musteriId?.adSoyad || "-" },
+                { label: "Durum", value: r => r.durum || "-" },
                 { label: "Genel Toplam", value: r => para(r.genelToplam) }
             ]
         }
@@ -3527,6 +3581,18 @@ async function dashboardYukle() {
             } catch (error) {
                 errorBox(error);
             }
+            return;
+        }
+
+        if (page === "raporlar") {
+            setTitle("Raporlar");
+            loading();
+            try {
+                const d = await api("/api/tenant/raporlar/genel");
+                const r = d.rapor || {};
+                if (buYukleme !== sayfaYuklemeNo) return;
+                content.innerHTML = `<div class="welcome-banner"><div><div class="eyebrow">YÖNETİM RAPORLARI</div><h2>İşletme Özeti</h2><p>Satış, stok, cari ve personel sonuçlarını tek ekranda inceleyin.</p></div></div><div class="dashboard-grid">${card("Stok Miktarı", Number(r.stok?.toplamAdet || 0), "Toplam mevcut stok")}${card("Tahsilat", para(r.cari?.tahsilat || 0), "Toplam cari tahsilat")}${card("Ödeme", para(r.cari?.odeme || 0), "Toplam cari ödeme")}${card("Aktif Personel", Number(r.personel?.aktif || 0), "Çalışan personel")}</div>`;
+            } catch (error) { errorBox(error); }
             return;
         }
 
