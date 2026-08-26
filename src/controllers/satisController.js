@@ -10,6 +10,7 @@ const Kasa = require("../models/Kasa");
 const Banka = require("../models/Banka");
 const ParaHareket = require("../models/ParaHareket");
 const CariHareket = require("../models/CariHareket");
+const SatisIade = require("../models/SatisIade");
 
 function tenantObjectId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
@@ -472,9 +473,39 @@ async function olustur(req, res, next) {
     }
 }
 
+async function iadeAl(req, res, next) {
+    try {
+        const tenantId = tenantObjectId(req);
+        const body = req.body || {};
+        if (!body.belgeNo || !body.musteriId || !body.depoId) return res.status(400).json({ basarili: false, mesaj: "İade belge no, müşteri ve depo zorunludur." });
+        if (!Array.isArray(body.kalemler) || !body.kalemler.length) return res.status(400).json({ basarili: false, mesaj: "En az bir iade kalemi gerekir." });
+        const [musteri, depo] = await Promise.all([Musteri.findOne({ _id: body.musteriId, tenantId }), Depo.findOne({ _id: body.depoId, tenantId })]);
+        if (!musteri || !depo) return res.status(404).json({ basarili: false, mesaj: "Müşteri veya depo bulunamadı." });
+        const kalemler = []; let genelToplam = 0;
+        for (const item of body.kalemler) {
+            const urun = await Urun.findOne({ _id: item.urunId, tenantId });
+            const miktar = Number(item.miktar || 0), birimFiyat = Number(item.birimFiyat ?? urun?.satisFiyati ?? 0), kdv = Number(item.kdv ?? urun?.kdv ?? 20), iskonto = Number(item.iskonto || 0);
+            if (!urun || miktar <= 0 || birimFiyat < 0) return res.status(400).json({ basarili: false, mesaj: "İade kalemi geçersiz." });
+            const ara = miktar * birimFiyat * (1 - iskonto / 100); const toplam = ara * (1 + kdv / 100);
+            kalemler.push({ urunId: urun._id, miktar, birimFiyat, kdv, iskonto, toplam }); genelToplam += toplam;
+        }
+        const iade = await SatisIade.create({ tenantId, belgeNo: String(body.belgeNo).trim().toUpperCase(), tarih: body.tarih || new Date(), musteriId: musteri._id, depoId: depo._id, kalemler, genelToplam, aciklama: body.notlar || "Müşteri satış iadesi", kullaniciId: req.kullanici?._id || req.user?._id || null });
+        for (const kalem of kalemler) {
+            let stok = await Stok.findOne({ tenantId, urunId: kalem.urunId, depoId: depo._id });
+            if (!stok) stok = new Stok({ tenantId, urunId: kalem.urunId, depoId: depo._id, miktar: 0, maliyet: 0 });
+            stok.miktar += kalem.miktar; stok.sonHareketTarihi = new Date(); await stok.save();
+            await StokHareket.create({ tenantId, urunId: kalem.urunId, depoId: depo._id, tip: "IADE_GIRIS", miktar: kalem.miktar, birimMaliyet: kalem.birimFiyat, kaynak: "SATIS_IADE", kaynakId: iade._id, aciklama: `Satış iadesi ${iade.belgeNo}`, kullaniciId: req.kullanici?._id || req.user?._id || null });
+        }
+        musteri.bakiye -= genelToplam; await musteri.save();
+        const cariHareket = await CariHareket.create({ tenantId, tarafTipi: "MUSTERI", tarafId: musteri._id, tip: "IADE", tutar: genelToplam, aciklama: `Satış iadesi ${iade.belgeNo}`, kaynak: "SATIS_IADE", kaynakId: iade._id, tarih: body.tarih || new Date(), kullaniciId: req.kullanici?._id || req.user?._id || null });
+        res.status(201).json({ basarili: true, iade, cariHareket, musteriBakiye: musteri.bakiye });
+    } catch (error) { next(error); }
+}
+
 module.exports = {
     listele,
     detay,
-    olustur
+    olustur,
+    iadeAl
 };
 
