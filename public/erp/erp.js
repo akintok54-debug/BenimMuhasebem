@@ -1454,6 +1454,24 @@ async function dashboardYukle() {
         }
     }
 
+    async function musteriFotografHazirla(dosya) {
+        if (!dosya || !/^image\/(png|jpe?g|webp)$/i.test(dosya.type)) throw new Error("PNG, JPG veya WebP fotoğraf seçin.");
+        const veriUrl = await new Promise((resolve, reject) => {
+            const okuyucu = new FileReader(); okuyucu.onload = () => resolve(okuyucu.result);
+            okuyucu.onerror = () => reject(new Error("Fotoğraf okunamadı.")); okuyucu.readAsDataURL(dosya);
+        });
+        const resim = await new Promise((resolve, reject) => {
+            const img = new Image(); img.onload = () => resolve(img); img.onerror = () => reject(new Error("Fotoğraf açılamadı.")); img.src = veriUrl;
+        });
+        const enBuyuk = 1280;
+        const oran = Math.min(1, enBuyuk / Math.max(resim.width, resim.height));
+        const canvas = document.createElement("canvas"); canvas.width = Math.max(1, Math.round(resim.width * oran)); canvas.height = Math.max(1, Math.round(resim.height * oran));
+        canvas.getContext("2d").drawImage(resim, 0, 0, canvas.width, canvas.height);
+        const sonuc = canvas.toDataURL("image/jpeg", 0.82);
+        if (sonuc.length > 2 * 1024 * 1024) throw new Error("Fotoğraf küçültüldükten sonra hâlâ çok büyük.");
+        return sonuc;
+    }
+
     function musteriFormVerisi(form) {
         const fd = new FormData(form);
 
@@ -1819,8 +1837,8 @@ async function dashboardYukle() {
 
                             <label class="full">
                                 Müşteri Fotoğrafı
-                                <input name="fotografDosya" type="file" accept="image/png,image/jpeg,image/webp">
-                                <small>PNG, JPG veya WebP; en fazla 1 MB.</small>
+                                <input name="fotografDosya" type="file" accept="image/*" capture="environment">
+                                <small>Telefonda kamerayı açar; fotoğraf otomatik olarak optimize edilir.</small>
                             </label>
 
                         </div>
@@ -1899,13 +1917,7 @@ async function dashboardYukle() {
                 const dosya = form.elements.fotografDosya?.files?.[0];
                 try {
                     if (dosya) {
-                        if (dosya.size > 1024 * 1024) throw new Error("Fotoğraf 1 MB'dan büyük olamaz.");
-                        veri.fotograf = await new Promise((resolve, reject) => {
-                            const okuyucu = new FileReader();
-                            okuyucu.onload = () => resolve(okuyucu.result);
-                            okuyucu.onerror = () => reject(new Error("Fotoğraf okunamadı."));
-                            okuyucu.readAsDataURL(dosya);
-                        });
+                        veri.fotograf = await musteriFotografHazirla(dosya);
                     }
                     mesaj.innerHTML = "<div class=\"dashboard-loading\">Müşteri kaydediliyor ve doğrulanıyor...</div>";
                     const olusan = await api("/api/tenant/musteriler", {
@@ -2007,7 +2019,12 @@ async function dashboardYukle() {
             root.querySelector(".kalem-sil").addEventListener("click", () => { if (kalemlerEl.children.length > 1) root.remove(); });
         };
         [...kalemlerEl.children].forEach(bagla);
-        document.getElementById("kalemEkle").addEventListener("click", () => { kalemlerEl.insertAdjacentHTML("beforeend", satirHtml()); bagla(kalemlerEl.lastElementChild); });
+        overlay.querySelector("#kalemEkle").addEventListener("click", event => {
+            event.preventDefault(); event.stopPropagation();
+            kalemlerEl.insertAdjacentHTML("beforeend", satirHtml());
+            bagla(kalemlerEl.lastElementChild);
+            kalemlerEl.lastElementChild.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        });
         overlay.querySelectorAll(".erp-modal-close,[data-kapat]").forEach(x => x.addEventListener("click", musteriModalKapat));
         overlay.querySelector("form").addEventListener("submit", async event => {
             event.preventDefault(); const fd = new FormData(event.currentTarget); const mesaj = document.getElementById("belgeMesaj");
@@ -2599,6 +2616,10 @@ async function dashboardYukle() {
                                 style="width:100%;box-sizing:border-box;margin-top:12px;"
                             >${escapeHtml(m.adres || "")}</textarea>
 
+                            <label style="display:block;margin-top:12px">Müşteri Fotoğrafı / Kameradan Çek
+                                <input name="fotografDosya" type="file" accept="image/*" capture="environment" style="display:block;margin-top:6px">
+                            </label>
+
                             <button
                                 type="submit"
                                 class="erp-primary-button"
@@ -2628,6 +2649,13 @@ async function dashboardYukle() {
                         body.riskLimiti =
                             Number(body.riskLimiti || 0);
                         body.limit = Number(body.limit || 0);
+
+                        const fotografDosya = event.currentTarget.elements.fotografDosya?.files?.[0];
+                        delete body.fotografDosya;
+                        if (fotografDosya) {
+                            try { body.fotograf = await musteriFotografHazirla(fotografDosya); }
+                            catch (error) { alert(error.message); return; }
+                        }
 
                         const response = await fetch(
                             `/api/tenant/musteriler/${encodeURIComponent(id)}`,
