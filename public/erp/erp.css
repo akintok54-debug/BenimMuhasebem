@@ -831,7 +831,15 @@ th {
 
 .cari-clickable-row { cursor:pointer; transition:background .15s ease; }
 .cari-clickable-row:hover { background:#eff6ff; }
-.danger-button { color:#b91c1c !important; border-color:#fecaca !important; background:#fff7f7 !important; }
+.row-actions [data-cari-ekstre] { color:#4338ca; border-color:#c7d2fe; background:#eef2ff; }
+.row-actions [data-cari-islem] { color:#334155; border-color:#cbd5e1; background:#f8fafc; }
+.row-actions [data-cari-tahsilat] { color:#fff; border-color:#15803d; background:#16a34a; }
+.row-actions [data-cari-musteri-odeme] { color:#fff; border-color:#1d4ed8; background:#2563eb; }
+.row-actions [data-cari-bakiye] { color:#fff; border-color:#c2410c; background:#ea580c; }
+.row-actions [data-cari-durum][data-cari-aktif="true"] { color:#854d0e; border-color:#fde047; background:#fef9c3; }
+.row-actions [data-cari-durum][data-cari-aktif="false"] { color:#fff; border-color:#15803d; background:#16a34a; }
+.danger-button { color:#fff !important; border-color:#b91c1c !important; background:#dc2626 !important; }
+.row-actions .erp-small-button:hover { filter:brightness(.94); transform:translateY(-1px); }
 
 /* MODAL */
 
