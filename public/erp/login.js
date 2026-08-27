@@ -4,6 +4,28 @@
     const form = document.getElementById("loginForm");
     const mesaj = document.getElementById("mesaj");
     const btn = document.getElementById("girisBtn");
+    const forgotBtn = document.getElementById("forgotBtn");
+
+    forgotBtn.addEventListener("click", async function () {
+        const emailInput = document.getElementById("email");
+        if (!emailInput.value.trim()) {
+            mesaj.textContent = "Önce e-posta adresinizi yazın.";
+            emailInput.focus();
+            return;
+        }
+        forgotBtn.disabled = true;
+        mesaj.textContent = "Parola yenileme isteği gönderiliyor...";
+        try {
+            const response = await fetch("/api/auth/sifremi-unuttum", { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify({ email: emailInput.value.trim() }) });
+            const data = await response.json();
+            mesaj.textContent = data.mesaj || "İstek alındı.";
+            mesaj.classList.toggle("success", response.ok);
+        } catch (_) {
+            mesaj.textContent = "İstek gönderilemedi. Lütfen tekrar deneyin.";
+        } finally {
+            forgotBtn.disabled = false;
+        }
+    });
 
     form.addEventListener("submit", async function (event) {
 

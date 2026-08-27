@@ -55,6 +55,11 @@ const KullaniciSchema = new mongoose.Schema(
         },
 
         sonGirisTarihi: { type: Date, default: null },
+        sifreSifirlama: {
+            tokenHash: { type: String, default: "", select: false },
+            sonKullanmaTarihi: { type: Date, default: null, select: false }
+        },
+        geciciSifre: { type: Boolean, default: false },
         silinmeTarihi: { type: Date, default: null }
         ,
         ikiFaktor: {

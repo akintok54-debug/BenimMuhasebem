@@ -7,6 +7,8 @@ const { rateLimit } = require("../../../middleware/guvenlikKatmani");
 const router = express.Router();
 
 router.post("/login", rateLimit({ pencereMs: 15 * 60 * 1000, limit: 10, anahtar: req => `login:${req.ip}:${String(req.body?.email || "").toLowerCase()}` }), controller.login);
+router.post("/sifremi-unuttum", rateLimit({ pencereMs: 15 * 60 * 1000, limit: 5, anahtar: req => `forgot:${req.ip}:${String(req.body?.email || "").toLowerCase()}` }), controller.sifremiUnuttum);
+router.post("/sifre-yenile", rateLimit({ pencereMs: 15 * 60 * 1000, limit: 10, anahtar: req => `reset:${req.ip}` }), controller.sifreYenile);
 router.post("/2fa-dogrula", rateLimit({ pencereMs: 5 * 60 * 1000, limit: 10, anahtar: req => `2fa:${req.ip}` }), controller.ikiFaktorDogrula);
 router.post("/logout", controller.logout);
 router.use(kimlikKontrol, tenantKontrol);

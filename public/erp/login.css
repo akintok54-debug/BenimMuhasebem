@@ -90,6 +90,9 @@ button:disabled {
     color: #dc2626;
     font-size: 14px;
 }
+#mesaj.success { color: #15803d; }
+.forgot-link { width: auto; padding: 0; margin: -5px 0 16px; background: transparent; color: #2563eb; box-shadow: none; text-align: left; }
+.forgot-link:hover { transform: none; box-shadow: none; text-decoration: underline; }
 
 .login-showcase { width: min(560px, 48vw); color: white; }
 .login-domain { color: #93c5fd; text-decoration: none; font-weight: 800; }
