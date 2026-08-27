@@ -6,6 +6,7 @@
 server-out.log
 server-err.log
 uploads/
+backups/
 *.SNAPSHOT-*
 *.bak
 .vercel

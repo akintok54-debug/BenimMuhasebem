@@ -121,6 +121,12 @@ const TenantSchema = new mongoose.Schema(
                 default: ""
             },
 
+            email: { type: String, default: "", trim: true, lowercase: true },
+            mersisNo: { type: String, default: "", trim: true },
+            ticaretSicilNo: { type: String, default: "", trim: true },
+            iban: { type: String, default: "", trim: true, uppercase: true },
+            eFaturaMukellefi: { type: Boolean, default: false },
+
             adres: {
                 type: String,
                 default: ""

@@ -3,6 +3,7 @@
 const kimlikKontrol = require("../middleware/kimlikKontrol");
 const tenantKontrol = require("../middleware/tenantKontrol");
 const controller = require("../controllers/tenantDashboardController");
+const { yetkiKontrol } = require("../middleware/yetkiKontrol");
 
 const router = express.Router();
 
@@ -18,6 +19,7 @@ router.get(
 
 router.patch(
     "/firma",
+    yetkiKontrol("tenant.settings"),
     controller.firmaGuncelle
 );
 

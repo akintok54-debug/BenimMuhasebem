@@ -16,6 +16,9 @@ const KullaniciSchema = new mongoose.Schema(
             trim: true
         },
 
+        telefon: { type: String, trim: true, default: "" },
+        unvan: { type: String, trim: true, default: "" },
+
         sifre: {
             type: String,
             required: true
@@ -25,7 +28,12 @@ const KullaniciSchema = new mongoose.Schema(
             type: String,
             enum: [
                 "SUPER_ADMIN",
+                "OWNER",
                 "ADMIN",
+                "MANAGER",
+                "SALES",
+                "CASHIER",
+                "ACCOUNTING",
                 "SATIS",
                 "DEPO",
                 "MUHASEBE",
@@ -44,6 +52,17 @@ const KullaniciSchema = new mongoose.Schema(
         aktif: {
             type: Boolean,
             default: true
+        },
+
+        sonGirisTarihi: { type: Date, default: null },
+        silinmeTarihi: { type: Date, default: null }
+        ,
+        ikiFaktor: {
+            etkin: { type: Boolean, default: false },
+            yontem: { type: String, enum: ["TOTP", "EMAIL", "NONE"], default: "NONE" },
+            gizliAnahtar: { type: String, default: "", select: false },
+            kurtarmaKodlariHash: { type: [String], default: [], select: false },
+            dogrulamaTarihi: { type: Date, default: null }
         }
     },
     {

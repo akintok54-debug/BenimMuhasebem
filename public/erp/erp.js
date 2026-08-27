@@ -41,6 +41,11 @@
             headers["Content-Type"] = "application/json";
         }
 
+        if (!["GET", "HEAD", "OPTIONS"].includes(String(options.method || "GET").toUpperCase())) {
+            const csrf = sessionStorage.getItem("bmCsrfToken");
+            if (csrf) headers["X-CSRF-Token"] = csrf;
+        }
+
         const t = token();
         if (t) {
             headers.Authorization = t.startsWith("Bearer ")
@@ -139,10 +144,10 @@
                                 <tr>
                                     ${columns.map(c => `
                                         <td>${escapeHtml(
-                                            typeof c.value === "function"
-                                                ? c.value(row)
-                                                : row[c.value] ?? "-"
-                                        )}</td>
+            typeof c.value === "function"
+                ? c.value(row)
+                : row[c.value] ?? "-"
+        )}</td>
                                     `).join("")}
                                 </tr>
                             `).join("")}
@@ -153,7 +158,7 @@
         `;
     }
 
-        function dashboardDetayKapat() {
+    function dashboardDetayKapat() {
         const el = document.getElementById("dashboardDetayOverlay");
 
         if (el) {
@@ -250,7 +255,7 @@
                 );
 
                 return tarih >= gunBaslangic &&
-                       tarih < yarin;
+                    tarih < yarin;
             });
 
             const toplamGiris =
@@ -279,20 +284,20 @@
                     <tr>
                         <td>
                             ${new Date(
-                                item.tarih || item.createdAt
-                            ).toLocaleString("tr-TR")}
+                    item.tarih || item.createdAt
+                ).toLocaleString("tr-TR")}
                         </td>
 
                         <td>
                             ${item.tip === "GIRIS"
-                                ? "Giriş"
-                                : "Çıkış"}
+                        ? "Giriş"
+                        : "Çıkış"}
                         </td>
 
                         <td>
                             ${escapeHtml(
-                                item.aciklama || "-"
-                            )}
+                            item.aciklama || "-"
+                        )}
                         </td>
 
                         <td>
@@ -316,22 +321,22 @@
                     <div class="dashboard-grid">
 
                         ${card(
-                            "Toplam Giriş",
-                            para(toplamGiris),
-                            "Bugünkü kasa girişleri"
-                        )}
+                    "Toplam Giriş",
+                    para(toplamGiris),
+                    "Bugünkü kasa girişleri"
+                )}
 
                         ${card(
-                            "Toplam Çıkış",
-                            para(toplamCikis),
-                            "Bugünkü kasa çıkışları"
-                        )}
+                    "Toplam Çıkış",
+                    para(toplamCikis),
+                    "Bugünkü kasa çıkışları"
+                )}
 
                         ${card(
-                            "Net Hareket",
-                            para(net),
-                            "Giriş - çıkış"
-                        )}
+                    "Net Hareket",
+                    para(net),
+                    "Giriş - çıkış"
+                )}
                     </div>
 
                     <div class="dashboard-panel">
@@ -406,14 +411,14 @@
                             new Date(item.tarih);
 
                         return tarih >= bugunBaslangic &&
-                               tarih < yarin;
+                            tarih < yarin;
                     })
                     : satislar.filter(item => {
                         const tarih =
                             new Date(item.tarih);
 
                         return tarih >= ayBaslangic &&
-                               tarih < gelecekAy;
+                            tarih < gelecekAy;
                     });
 
             const toplam =
@@ -430,36 +435,36 @@
                     <tr>
                         <td>
                             ${new Date(
-                                item.tarih
-                            ).toLocaleString("tr-TR")}
+                    item.tarih
+                ).toLocaleString("tr-TR")}
                         </td>
 
                         <td>
                             ${escapeHtml(
-                                item.belgeNo || "-"
-                            )}
+                    item.belgeNo || "-"
+                )}
                         </td>
 
                         <td>
                             ${escapeHtml(
-                                item.musteriId?.unvan ||
-                                item.musteriId?.adSoyad ||
-                                "-"
-                            )}
+                    item.musteriId?.unvan ||
+                    item.musteriId?.adSoyad ||
+                    "-"
+                )}
                         </td>
 
                         <td>
                             <strong>
                                 ${para(
-                                    item.genelToplam
-                                )}
+                    item.genelToplam
+                )}
                             </strong>
                         </td>
 
                         <td>
                             ${escapeHtml(
-                                item.odemeDurumu || "-"
-                            )}
+                    item.odemeDurumu || "-"
+                )}
                         </td>
                     </tr>
                 `).join("")
@@ -479,18 +484,18 @@
                     <div class="dashboard-grid">
 
                         ${card(
-                            "Satış Adedi",
-                            String(filtreli.length),
-                            "Satış belgesi"
-                        )}
+                    "Satış Adedi",
+                    String(filtreli.length),
+                    "Satış belgesi"
+                )}
 
                         ${card(
-                            "Toplam Ciro",
-                            para(toplam),
-                            tip === "bugun"
-                                ? "Bugünkü satış"
-                                : "Bu ayki satış"
-                        )}
+                    "Toplam Ciro",
+                    para(toplam),
+                    tip === "bugun"
+                        ? "Bugünkü satış"
+                        : "Bu ayki satış"
+                )}
                     </div>
 
                     <div class="dashboard-panel">
@@ -641,7 +646,7 @@
                 );
             });
     }
-async function dashboardYukle() {
+    async function dashboardYukle() {
         setTitle("Ana Sayfa");
         loading();
 
@@ -688,13 +693,13 @@ async function dashboardYukle() {
             const bugunSatislari = satislar.filter(item => {
                 const tarih = new Date(item.tarih);
                 return tarih >= bugunBaslangic &&
-                       tarih < yarinBaslangic;
+                    tarih < yarinBaslangic;
             });
 
             const buAySatislari = satislar.filter(item => {
                 const tarih = new Date(item.tarih);
                 return tarih >= ayBaslangic &&
-                       tarih < gelecekAyBaslangic;
+                    tarih < gelecekAyBaslangic;
             });
 
             const gunlukSatis =
@@ -880,14 +885,14 @@ async function dashboardYukle() {
 
                         <div class="dashboard-card-info">
                             ${simdi.toLocaleDateString(
-                                "tr-TR",
-                                {
-                                    weekday: "long",
-                                    year: "numeric",
-                                    month: "long",
-                                    day: "numeric"
-                                }
-                            )}
+                "tr-TR",
+                {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric"
+                }
+            )}
                         </div>
 
                     </div>
@@ -1188,11 +1193,10 @@ async function dashboardYukle() {
 
                         <div class="category-list">
 
-                            ${
-                                oneriler
-                                    .slice(0, 5)
-                                    .map(
-                                        (item, index) => `
+                            ${oneriler
+                    .slice(0, 5)
+                    .map(
+                        (item, index) => `
                                             <div class="category-row">
                                                 <span>
                                                     ${index + 1}.
@@ -1200,9 +1204,9 @@ async function dashboardYukle() {
                                                 </span>
                                             </div>
                                         `
-                                    )
-                                    .join("")
-                            }
+                    )
+                    .join("")
+                }
 
                         </div>
 
@@ -1566,7 +1570,7 @@ async function dashboardYukle() {
         adimlar.forEach(el => {
             el.style.display =
                 String(el.dataset.musteriAdim) ===
-                String(adim)
+                    String(adim)
                     ? ""
                     : "none";
         });
@@ -2024,7 +2028,7 @@ async function dashboardYukle() {
             <div class="erp-modal-header"><div><h2>Tahsilat Yap</h2><p>${escapeHtml(musteri.kod)} · ${escapeHtml(musteri.unvan || musteri.adSoyad)}</p></div><button class="erp-modal-close" type="button">×</button></div>
             <form id="musteriTahsilatForm"><div class="erp-form-grid">
                 <label>Tutar<input name="tutar" type="number" min="0.01" max="${Number(musteri.bakiye || 0)}" step="0.01" required></label>
-                <label>Tarih<input name="tarih" type="date" value="${new Date().toISOString().slice(0,10)}" required></label>
+                <label>Tarih<input name="tarih" type="date" value="${new Date().toISOString().slice(0, 10)}" required></label>
                 <label class="full">Kasa / Banka<select name="hesap" required><option value="">Hesap seçin</option>${hesaplar.map(x => `<option value="${x.tip}|${x._id}">${x.tip} · ${escapeHtml(x.kod || "")} ${escapeHtml(x.adGoster || "")} (${para(x.bakiye)})</option>`).join("")}</select></label>
                 <label class="full">Açıklama<textarea name="aciklama">Müşteri tahsilatı</textarea></label>
             </div><div id="tahsilatMesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button secondary" data-kapat>Vazgeç</button><button class="erp-primary-button" type="submit">Kaydet</button></div></form></div>`;
@@ -2063,10 +2067,10 @@ async function dashboardYukle() {
         const overlay = document.createElement("div");
         overlay.id = "musteriIslemOverlay"; overlay.className = "erp-modal-overlay";
         const urunOptions = urunler.map(x => `<option value="${x._id}" data-fiyat="${Number(x.satisFiyati || 0)}" data-kdv="${Number(x.kdv ?? 20)}">${escapeHtml(x.kod)} · ${escapeHtml(x.ad)}</option>`).join("");
-        const satirHtml = (k = {}) => { const uid=String(k.urunId?._id||k.urunId||""); const opts=urunler.map(x=>`<option value="${x._id}" data-fiyat="${Number(x.satisFiyati||0)}" data-kdv="${Number(x.kdv??20)}" ${String(x._id)===uid?"selected":""}>${escapeHtml(x.kod)} · ${escapeHtml(x.ad)}</option>`).join(""); return `<tr class="belge-kalem"><td><select name="urunId" required style="min-width:220px"><option value="">Ürün seçin</option>${opts}</select></td><td><input name="miktar" type="number" min="0.0001" step="0.0001" value="${Number(k.miktar||1)}" required style="width:90px"></td><td><input name="birimFiyat" type="number" min="0" step="0.01" value="${k.birimFiyat??""}" required style="width:110px"></td><td><input name="kdv" type="number" min="0" step="0.01" value="${Number(k.kdv??20)}" style="width:75px"></td><td><input name="iskonto" type="number" min="0" max="100" step="0.01" value="${Number(k.iskonto||0)}" style="width:75px"></td><td><button type="button" class="erp-small-button secondary kalem-sil">Sil</button></td></tr>`; };
+        const satirHtml = (k = {}) => { const uid = String(k.urunId?._id || k.urunId || ""); const opts = urunler.map(x => `<option value="${x._id}" data-fiyat="${Number(x.satisFiyati || 0)}" data-kdv="${Number(x.kdv ?? 20)}" ${String(x._id) === uid ? "selected" : ""}>${escapeHtml(x.kod)} · ${escapeHtml(x.ad)}</option>`).join(""); return `<tr class="belge-kalem"><td><select name="urunId" required style="min-width:220px"><option value="">Ürün seçin</option>${opts}</select></td><td><input name="miktar" type="number" min="0.0001" step="0.0001" value="${Number(k.miktar || 1)}" required style="width:90px"></td><td><input name="birimFiyat" type="number" min="0" step="0.01" value="${k.birimFiyat ?? ""}" required style="width:110px"></td><td><input name="kdv" type="number" min="0" step="0.01" value="${Number(k.kdv ?? 20)}" style="width:75px"></td><td><input name="iskonto" type="number" min="0" max="100" step="0.01" value="${Number(k.iskonto || 0)}" style="width:75px"></td><td><button type="button" class="erp-small-button secondary kalem-sil">Sil</button></td></tr>`; };
         const ilkSatirlar = mevcut?.kalemler?.length ? mevcut.kalemler.map(satirHtml).join("") : satirHtml();
-        const belgeTarihi = new Date(mevcut?.tarih || Date.now()).toISOString().slice(0,10);
-        overlay.innerHTML = `<div class="erp-modal" style="max-width:1100px;width:98%"><div class="erp-modal-header"><div><h2>${mevcut ? `${ayar.baslik} - Düzenle` : ayar.baslik}</h2><p>${escapeHtml(musteri.kod)} · ${escapeHtml(musteri.unvan || musteri.adSoyad)} · Bakiye ${para(musteri.bakiye)}</p></div><button type="button" class="erp-modal-close">×</button></div><form id="musteriBelgeForm"><div class="erp-form-grid"><label>${ayar.no}<input name="no" value="${escapeHtml(no)}" required></label><label>Tarih<input name="tarih" type="date" value="${belgeTarihi}" required></label>${ayar.depo ? `<label class="full">Depo<select name="depoId" required><option value="">Depo seçin</option>${depolar.map(x => `<option value="${x._id}" ${String(x._id)===String(mevcut?.depoId?._id||mevcut?.depoId||"")?"selected":""}>${escapeHtml(x.kod)} · ${escapeHtml(x.ad)}</option>`).join("")}</select></label>` : `<label>Geçerlilik Tarihi<input name="gecerlilikTarihi" type="date" value="${mevcut?.gecerlilikTarihi?new Date(mevcut.gecerlilikTarihi).toISOString().slice(0,10):""}"></label>`}</div><div class="panel-heading" style="margin-top:16px"><div><h3>Belge Kalemleri</h3><p>Ürünleri aynı tabloya satır olarak ekleyin.</p></div><button type="button" id="kalemEkle" class="erp-primary-button">+ Kalem Ekle</button></div><div class="table-scroll"><table><thead><tr><th>Ürün</th><th>Miktar</th><th>Birim Fiyat</th><th>KDV %</th><th>İskonto %</th><th></th></tr></thead><tbody id="belgeKalemler">${ilkSatirlar}</tbody></table></div><label style="display:block;margin-top:12px">Notlar<textarea name="notlar" style="width:100%">${escapeHtml(mevcut?.notlar||"")}</textarea></label><div id="belgeMesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button secondary" data-kapat>Vazgeç</button><button type="submit" class="erp-primary-button">${mevcut?"Değişiklikleri Kaydet":tur === "iade" ? "İadeyi Kaydet" : "Kaydet"}</button></div></form></div>`;
+        const belgeTarihi = new Date(mevcut?.tarih || Date.now()).toISOString().slice(0, 10);
+        overlay.innerHTML = `<div class="erp-modal" style="max-width:1100px;width:98%"><div class="erp-modal-header"><div><h2>${mevcut ? `${ayar.baslik} - Düzenle` : ayar.baslik}</h2><p>${escapeHtml(musteri.kod)} · ${escapeHtml(musteri.unvan || musteri.adSoyad)} · Bakiye ${para(musteri.bakiye)}</p></div><button type="button" class="erp-modal-close">×</button></div><form id="musteriBelgeForm"><div class="erp-form-grid"><label>${ayar.no}<input name="no" value="${escapeHtml(no)}" required></label><label>Tarih<input name="tarih" type="date" value="${belgeTarihi}" required></label>${ayar.depo ? `<label class="full">Depo<select name="depoId" required><option value="">Depo seçin</option>${depolar.map(x => `<option value="${x._id}" ${String(x._id) === String(mevcut?.depoId?._id || mevcut?.depoId || "") ? "selected" : ""}>${escapeHtml(x.kod)} · ${escapeHtml(x.ad)}</option>`).join("")}</select></label>` : `<label>Geçerlilik Tarihi<input name="gecerlilikTarihi" type="date" value="${mevcut?.gecerlilikTarihi ? new Date(mevcut.gecerlilikTarihi).toISOString().slice(0, 10) : ""}"></label>`}</div><div class="panel-heading" style="margin-top:16px"><div><h3>Belge Kalemleri</h3><p>Ürünleri aynı tabloya satır olarak ekleyin.</p></div><button type="button" id="kalemEkle" class="erp-primary-button">+ Kalem Ekle</button></div><div class="table-scroll"><table><thead><tr><th>Ürün</th><th>Miktar</th><th>Birim Fiyat</th><th>KDV %</th><th>İskonto %</th><th></th></tr></thead><tbody id="belgeKalemler">${ilkSatirlar}</tbody></table></div><label style="display:block;margin-top:12px">Notlar<textarea name="notlar" style="width:100%">${escapeHtml(mevcut?.notlar || "")}</textarea></label><div id="belgeMesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button secondary" data-kapat>Vazgeç</button><button type="submit" class="erp-primary-button">${mevcut ? "Değişiklikleri Kaydet" : tur === "iade" ? "İadeyi Kaydet" : "Kaydet"}</button></div></form></div>`;
         document.body.appendChild(overlay);
         const kalemlerEl = document.getElementById("belgeKalemler");
         const bagla = root => {
@@ -2087,12 +2091,14 @@ async function dashboardYukle() {
             event.preventDefault(); const fd = new FormData(event.currentTarget); const mesaj = document.getElementById("belgeMesaj");
             const kalemler = [...kalemlerEl.querySelectorAll(".belge-kalem")].map(x => ({ urunId: x.querySelector("[name=urunId]").value, miktar: Number(x.querySelector("[name=miktar]").value), birimFiyat: Number(x.querySelector("[name=birimFiyat]").value), kdv: Number(x.querySelector("[name=kdv]").value), iskonto: Number(x.querySelector("[name=iskonto]").value) }));
             const body = { musteriId: musteri._id, tarih: fd.get("tarih"), depoId: fd.get("depoId") || undefined, gecerlilikTarihi: fd.get("gecerlilikTarihi") || undefined, notlar: fd.get("notlar"), kalemler }; body[ayar.noAlan] = fd.get("no");
-            try { const endpoint=mevcut?`${ayar.endpoint}/${encodeURIComponent(mevcut._id)}`:ayar.endpoint; await api(endpoint, { method: mevcut ? "PATCH" : "POST", body: JSON.stringify(body) }); musteriModalKapat(); await musteriAnaSayfaAc(musteri._id); }
+            try { const endpoint = mevcut ? `${ayar.endpoint}/${encodeURIComponent(mevcut._id)}` : ayar.endpoint; await api(endpoint, { method: mevcut ? "PATCH" : "POST", body: JSON.stringify(body) }); musteriModalKapat(); await musteriAnaSayfaAc(musteri._id); }
             catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; }
         });
     }
 
-    function musteriBelgeMerkeziAc(tur, belge, musteri) {
+    async function musteriBelgeMerkeziAc(tur, belge, musteri) {
+        let belgeTercihi = {};
+        try { belgeTercihi = (await api("/api/tenant/ayarlar")).ayarlar?.belgeAyari || {}; } catch (_) { belgeTercihi = {}; }
         const turler = {
             SATIS: "Satış Faturası", TAHSILAT: "Tahsilat Makbuzu", SIPARIS: "Sipariş Makbuzu",
             IADE: "Satış İade Belgesi", TESELLUM: "Açık Hesap Tesellüm Makbuzu"
@@ -2111,6 +2117,16 @@ async function dashboardYukle() {
         musteriModalKapat();
         const overlay = document.createElement("div"); overlay.id = "musteriIslemOverlay"; overlay.className = "erp-modal-overlay";
         overlay.innerHTML = `<div class="invoice-preview-shell"><div class="invoice-toolbar"><div><strong>${baslik}</strong><span>${escapeHtml(no)}</span></div><div class="invoice-toolbar-actions"><button id="belgePdf" class="erp-primary-button">PDF / Yazdır</button><button id="belgeExcel" class="erp-small-button">Excel İndir</button><button id="belgeEposta" class="erp-small-button">E-posta</button><button id="belgeWhatsapp" class="erp-small-button">WhatsApp</button><button class="erp-small-button erp-modal-close">Kapat</button></div></div><div id="musteriBelgeSayfa" class="invoice-page"><div class="invoice-header"><div><div class="invoice-brand">BENİMMUHASEBE</div><div class="invoice-subtitle">${baslik}</div></div><div class="invoice-meta"><div><span>Belge No</span><strong>${escapeHtml(no)}</strong></div><div><span>Tarih</span><strong>${tarihText}</strong></div></div></div><div class="invoice-parties"><div class="invoice-party"><span>MÜŞTERİ</span><strong>${escapeHtml(musteri.unvan || musteri.adSoyad || "-")}</strong><small>Kod: ${escapeHtml(musteri.kod || "-")}</small><small>Tel: ${escapeHtml(musteri.telefon || musteri.whatsapp || "-")}</small><small>E-posta: ${escapeHtml(musteri.email || "-")}</small></div><div class="invoice-party"><span>BELGE TOPLAMI</span><strong>${para(toplam)}</strong><small>${tur === "TESELLUM" ? "Açık hesap teslim belgesidir" : escapeHtml(belge.durum || belge.tip || "")}</small></div></div><div class="invoice-table-wrap"><table class="invoice-table"><thead><tr><th>#</th><th>Kod</th><th>Ürün / Açıklama</th><th>Miktar</th><th>Birim Fiyat</th><th>KDV</th><th>İskonto</th><th>Toplam</th></tr></thead><tbody>${satirlar.map(x => `<tr><td>${x.sira}</td><td>${escapeHtml(x.kod)}</td><td>${escapeHtml(x.urun)}</td><td>${x.miktar} ${escapeHtml(x.birim)}</td><td>${para(x.fiyat)}</td><td>%${x.kdv}</td><td>%${x.iskonto}</td><td><strong>${para(x.toplam)}</strong></td></tr>`).join("")}</tbody></table></div><div class="invoice-bottom"><div class="invoice-notes"><strong>Açıklama</strong><p>${escapeHtml(belge.notlar || belge.aciklama || "Belge elektronik ortamda hazırlanmıştır.")}</p>${tur === "TESELLUM" ? "<p>Teslim eden / Teslim alan imza alanı</p>" : ""}</div><div class="invoice-totals"><div><span>Genel Toplam</span><strong>${para(toplam)}</strong></div></div></div></div></div>`;
+        const belgeSayfasi = overlay.querySelector("#musteriBelgeSayfa");
+        const sablon = tur === "TESELLUM" ? belgeTercihi.irsaliyeSablonu : belgeTercihi.faturaSablonu;
+        belgeSayfasi.classList.add(`invoice-template-${sablon || "modern"}`);
+        belgeSayfasi.style.setProperty("--invoice-primary", belgeTercihi.anaRenk || "#2563eb");
+        belgeSayfasi.style.setProperty("--invoice-accent", belgeTercihi.vurguRengi || "#0f172a");
+        const marka = belgeSayfasi.querySelector(".invoice-brand");
+        if (belgeTercihi.logo) marka.innerHTML = `<img src="${escapeHtml(belgeTercihi.logo)}" alt="Firma logosu" class="invoice-logo">`;
+        else if (belgeTercihi.belgeBasligi) marka.textContent = belgeTercihi.belgeBasligi;
+        const not = belgeSayfasi.querySelector(".invoice-notes p");
+        if (not && !belge.notlar && !belge.aciklama && belgeTercihi.dipnot) not.textContent = belgeTercihi.dipnot;
         document.body.appendChild(overlay); overlay.querySelector(".erp-modal-close").addEventListener("click", musteriModalKapat);
         const metin = `${baslik}\nBelge No: ${no}\nTarih: ${tarihText}\nTutar: ${para(toplam)}\nMüşteri: ${musteri.unvan || musteri.adSoyad || musteri.kod}`;
         document.getElementById("belgePdf").addEventListener("click", () => {
@@ -2120,7 +2136,7 @@ async function dashboardYukle() {
         document.getElementById("belgeExcel").addEventListener("click", () => {
             if (!window.XLSX) return alert("Excel kitaplığı yüklenemedi.");
             const ws = XLSX.utils.json_to_sheet(satirlar.map(x => ({ "Belge Türü": baslik, "Belge No": no, Tarih: tarihText, "Müşteri Kodu": musteri.kod, Müşteri: musteri.unvan || musteri.adSoyad, "Ürün Kodu": x.kod, "Ürün/Açıklama": x.urun, Miktar: x.miktar, Birim: x.birim, "Birim Fiyat": x.fiyat, "KDV %": x.kdv, "İskonto %": x.iskonto, Toplam: x.toplam })));
-            ws["!cols"] = [{wch:22},{wch:22},{wch:14},{wch:16},{wch:28},{wch:16},{wch:30},{wch:12},{wch:10},{wch:14},{wch:10},{wch:12},{wch:14}]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Belge"); XLSX.writeFile(wb, `${baslik.replaceAll(" ", "-")}-${no}.xlsx`);
+            ws["!cols"] = [{ wch: 22 }, { wch: 22 }, { wch: 14 }, { wch: 16 }, { wch: 28 }, { wch: 16 }, { wch: 30 }, { wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 10 }, { wch: 12 }, { wch: 14 }]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Belge"); XLSX.writeFile(wb, `${baslik.replaceAll(" ", "-")}-${no}.xlsx`);
         });
         document.getElementById("belgeEposta").addEventListener("click", () => {
             if (!musteri.email) return alert("Müşterinin e-posta adresi yok.");
@@ -2498,17 +2514,16 @@ async function dashboardYukle() {
                                 </thead>
 
                                 <tbody>
-                                    ${
-                                        satislar.length
-                                            ? satislar.map(x => `
+                                    ${satislar.length
+                        ? satislar.map(x => `
                                                 <tr>
                                                     <td>${tarih(x)}</td>
                                                     <td>${escapeHtml(x.belgeNo || x.faturaNo || "-")}</td>
                                                     <td><strong>${para(Number(x.genelToplam || x.toplam || x.tutar || 0))}</strong></td>
                                                 </tr>
                                             `).join("")
-                                            : `<tr><td colspan="3">Satış kaydı yok.</td></tr>`
-                                    }
+                        : `<tr><td colspan="3">Satış kaydı yok.</td></tr>`
+                    }
                                 </tbody>
                             </table>
                         </div>
@@ -2554,9 +2569,8 @@ async function dashboardYukle() {
                                 </thead>
 
                                 <tbody>
-                                    ${
-                                        hareketler.length
-                                            ? hareketler.map(x => `
+                                    ${hareketler.length
+                        ? hareketler.map(x => `
                                                 <tr>
                                                     <td>${tarih(x)}</td>
                                                     <td>${escapeHtml(x.tip || x.islemTipi || "-")}</td>
@@ -2564,8 +2578,8 @@ async function dashboardYukle() {
                                                     <td><strong>${para(Number(x.tutar || 0))}</strong></td>
                                                 </tr>
                                             `).join("")
-                                            : `<tr><td colspan="4">Cari hareket yok.</td></tr>`
-                                    }
+                        : `<tr><td colspan="4">Cari hareket yok.</td></tr>`
+                    }
                                 </tbody>
                             </table>
                         </div>
@@ -2797,10 +2811,10 @@ async function dashboardYukle() {
                     ...iadeler.map(x => ({ tur: "IADE", belge: x, etiket: "İade Belgesi", no: x.belgeNo })),
                     ...hareketler.filter(x => x.tip === "TAHSILAT").map(x => ({ tur: "TAHSILAT", belge: x, etiket: "Tahsilat Makbuzu", no: String(x._id || "").slice(-8).toUpperCase() }))
                 ];
-                panel.innerHTML = `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Belgeler ve Dökümler</h2><p>Satıra tıklayarak içeriği görüntüleyin; uygun belgeleri düzenleyin.</p></div></div><div class="table-scroll"><table><thead><tr><th>Tarih</th><th>Belge Türü</th><th>Belge No</th><th>Tutar</th><th>İşlem</th></tr></thead><tbody>${belgeler.length ? belgeler.map((x,i) => `<tr data-belge-row="${i}" style="cursor:pointer"><td>${tarih(x.belge)}</td><td>${escapeHtml(x.etiket)}</td><td><strong>${escapeHtml(x.no || "-")}</strong></td><td>${para(x.belge.genelToplam || x.belge.tutar)}</td><td><button class="erp-small-button" data-belge-index="${i}">Görüntüle</button>${["SATIS","SIPARIS","TEKLIF"].includes(x.tur)?` <button class="erp-primary-button" data-belge-duzenle="${i}">Düzenle / Kalem Ekle</button>`:""}</td></tr>`).join("") : `<tr><td colspan="5">Henüz belge bulunmuyor.</td></tr>`}</tbody></table></div><div class="dashboard-panel" style="margin-top:12px"><small>Ödemesi alınmış satışlar doğrudan değiştirilemez; iade/düzeltme belgesi kullanılır.</small></div></div>`;
+                panel.innerHTML = `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Belgeler ve Dökümler</h2><p>Satıra tıklayarak içeriği görüntüleyin; uygun belgeleri düzenleyin.</p></div></div><div class="table-scroll"><table><thead><tr><th>Tarih</th><th>Belge Türü</th><th>Belge No</th><th>Tutar</th><th>İşlem</th></tr></thead><tbody>${belgeler.length ? belgeler.map((x, i) => `<tr data-belge-row="${i}" style="cursor:pointer"><td>${tarih(x.belge)}</td><td>${escapeHtml(x.etiket)}</td><td><strong>${escapeHtml(x.no || "-")}</strong></td><td>${para(x.belge.genelToplam || x.belge.tutar)}</td><td><button class="erp-small-button" data-belge-index="${i}">Görüntüle</button>${["SATIS", "SIPARIS", "TEKLIF"].includes(x.tur) ? ` <button class="erp-primary-button" data-belge-duzenle="${i}">Düzenle / Kalem Ekle</button>` : ""}</td></tr>`).join("") : `<tr><td colspan="5">Henüz belge bulunmuyor.</td></tr>`}</tbody></table></div><div class="dashboard-panel" style="margin-top:12px"><small>Ödemesi alınmış satışlar doğrudan değiştirilemez; iade/düzeltme belgesi kullanılır.</small></div></div>`;
                 panel.querySelectorAll("[data-belge-index]").forEach(btn => btn.addEventListener("click", () => { const x = belgeler[Number(btn.dataset.belgeIndex)]; musteriBelgeMerkeziAc(x.tur, x.belge, m); }));
-                panel.querySelectorAll("[data-belge-row]").forEach(row => row.addEventListener("click", event => { if(event.target.closest("button"))return;const x=belgeler[Number(row.dataset.belgeRow)];musteriBelgeMerkeziAc(x.tur,x.belge,m); }));
-                panel.querySelectorAll("[data-belge-duzenle]").forEach(btn => btn.addEventListener("click", event => { event.stopPropagation();const x=belgeler[Number(btn.dataset.belgeDuzenle)];const tur=x.tur==="SATIS"?"satis":x.tur==="SIPARIS"?"siparis":"teklif";musteriBelgeFormu(tur,m,x.belge).catch(error=>alert(error.message)); }));
+                panel.querySelectorAll("[data-belge-row]").forEach(row => row.addEventListener("click", event => { if (event.target.closest("button")) return; const x = belgeler[Number(row.dataset.belgeRow)]; musteriBelgeMerkeziAc(x.tur, x.belge, m); }));
+                panel.querySelectorAll("[data-belge-duzenle]").forEach(btn => btn.addEventListener("click", event => { event.stopPropagation(); const x = belgeler[Number(btn.dataset.belgeDuzenle)]; const tur = x.tur === "SATIS" ? "satis" : x.tur === "SIPARIS" ? "siparis" : "teklif"; musteriBelgeFormu(tur, m, x.belge).catch(error => alert(error.message)); }));
             };
 
 
@@ -3186,7 +3200,7 @@ async function dashboardYukle() {
                 .addEventListener("click", () => {
                     const sayilar = musteriler.reduce((a, x) => { const g = x.grup || "Genel"; a[g] = (a[g] || 0) + 1; return a; }, {});
                     altPanel.innerHTML = `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Müşteri Grupları</h2><p>Müşterileri satış ve takip gruplarına ayırın.</p></div></div>
-                        <div class="dashboard-grid">${Object.entries(sayilar).map(([g,n]) => `<div class="dashboard-card"><div class="dashboard-card-title">${escapeHtml(g)}</div><div class="dashboard-card-value">${n}</div><div class="dashboard-card-info">müşteri</div></div>`).join("")}</div>
+                        <div class="dashboard-grid">${Object.entries(sayilar).map(([g, n]) => `<div class="dashboard-card"><div class="dashboard-card-title">${escapeHtml(g)}</div><div class="dashboard-card-value">${n}</div><div class="dashboard-card-info">müşteri</div></div>`).join("")}</div>
                         <form id="musteriGrupForm" class="erp-form-grid" style="margin-top:16px"><label>Müşteri<select name="musteriId" required><option value="">Müşteri seçin</option>${musteriler.map(x => `<option value="${x._id}">${escapeHtml(x.kod)} · ${escapeHtml(x.unvan || x.adSoyad)}</option>`).join("")}</select></label><label>Grup<input name="grup" required placeholder="Örn. VIP, Bayi, Perakende"></label><div class="full"><button class="erp-primary-button" type="submit">Grubu Kaydet</button></div></form><div id="musteriGrupMesaj"></div></div>`;
                     document.getElementById("musteriGrupForm").addEventListener("submit", async event => {
                         event.preventDefault(); const fd = new FormData(event.currentTarget); const mesaj = document.getElementById("musteriGrupMesaj");
@@ -3285,7 +3299,8 @@ async function dashboardYukle() {
 
             const render = () => {
                 const q = arama.value.trim().toLocaleLowerCase("tr-TR");
-                const list = musteriler
+                const kaynakListe = aktif === "musteri" ? musteriler : tedarikciler;
+                const list = kaynakListe
                     .filter(x => {
                         const text = [
                             x.kod,
@@ -3293,7 +3308,7 @@ async function dashboardYukle() {
                             x.adSoyad,
                             x.yetkili
                         ].filter(Boolean).join(" ")
-                         .toLocaleLowerCase("tr-TR");
+                            .toLocaleLowerCase("tr-TR");
                         return !q || text.includes(q);
                     });
 
@@ -3325,12 +3340,13 @@ async function dashboardYukle() {
                                                     Ekstre
                                                 </button>
                                                 ${aktif === "musteri"
-                                                    ? `<button type="button"
+                        ? `<button type="button" class="erp-small-button" data-cari-islem="${item._id}">Cari İşlem</button>
+                                                       <button type="button"
                                                                class="erp-small-button"
                                                                data-cari-tahsilat="${item._id}">
                                                            Tahsilat
                                                        </button>`
-                                                    : `<button type="button"
+                        : `<button type="button"
                                                                class="erp-small-button"
                                                                data-cari-odeme="${item._id}">
                                                            Ödeme
@@ -3351,7 +3367,8 @@ async function dashboardYukle() {
 
             document.querySelectorAll("[data-cari-tab]").forEach(btn => {
                 btn.addEventListener("click", () => {
-                    aktif = "musteri";
+                    aktif = btn.dataset.cariTab;
+                    document.querySelectorAll("[data-cari-tab]").forEach(x => x.classList.toggle("active", x === btn));
                     btn.classList.add("active");
                     arama.value = "";
                     render();
@@ -3370,6 +3387,24 @@ async function dashboardYukle() {
         } catch (error) {
             errorBox(error);
         }
+    }
+
+    function cariManuelHareketFormu(musteriId) {
+        const overlay = document.createElement("div");
+        overlay.className = "erp-modal-overlay";
+        overlay.innerHTML = `<div class="erp-modal"><div class="erp-modal-header"><div><h2>Manuel Cari İşlem</h2><p>Borç, alacak veya müşteriye yansıtılacak masraf girin.</p></div><button class="erp-modal-close" aria-label="Kapat">×</button></div><form id="cariManuelForm"><div class="erp-form-grid"><label>İşlem Türü<select name="tip" required><option value="BORC">Borçlandır</option><option value="ALACAK">Alacaklandır</option><option value="MASRAF">Masraf Ekle (Kargo vb.)</option></select></label><label>Tutar<input name="tutar" type="number" min="0.01" step="0.01" required></label><label>Tarih<input name="tarih" type="date" value="${new Date().toISOString().slice(0, 10)}" required></label><label>Belge No (isteğe bağlı)<input name="belgeNo"></label><label class="full">Açıklama<input name="aciklama" placeholder="Örn. Kargo ücreti"></label><div id="cariManuelMesaj" class="full"></div></div><div class="erp-modal-footer"><button class="erp-primary-button" type="submit">Hareketi Kaydet</button></div></form></div>`;
+        document.body.appendChild(overlay);
+        overlay.querySelector(".erp-modal-close").onclick = () => overlay.remove();
+        overlay.querySelector("#cariManuelForm").onsubmit = async event => {
+            event.preventDefault();
+            const fd = new FormData(event.currentTarget);
+            const mesaj = overlay.querySelector("#cariManuelMesaj");
+            try {
+                const result = await api("/api/tenant/cari/musteri/hareket", { method: "POST", body: JSON.stringify({ musteriId, tip: fd.get("tip"), tutar: Number(fd.get("tutar")), tarih: fd.get("tarih"), belgeNo: fd.get("belgeNo"), aciklama: fd.get("aciklama") }) });
+                mesaj.innerHTML = `<div class="success">${escapeHtml(result.mesaj)}</div>`;
+                setTimeout(() => { overlay.remove(); cariEkstreAc("musteri", musteriId); }, 500);
+            } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; }
+        };
     }
 
     async function cariEkstreAc(tip, id) {
@@ -3397,7 +3432,7 @@ async function dashboardYukle() {
                 ...h,
                 tarihText: h.tarih ? new Date(h.tarih).toLocaleDateString("tr-TR") : "-",
                 borc: h.tip === "BORC" ? Number(h.tutar || 0) : 0,
-                alacak: ["TAHSILAT", "ODEME", "ALACAK"].includes(h.tip)
+                alacak: ["TAHSILAT", "ODEME", "ALACAK", "IADE"].includes(h.tip)
                     ? Number(h.tutar || 0)
                     : 0
             }));
@@ -3419,6 +3454,7 @@ async function dashboardYukle() {
                         </div>
 
                         <div class="invoice-toolbar-actions">
+                            ${tip === "musteri" ? `<button id="cariManuel" class="erp-small-button">+ Cari İşlem</button><button id="cariPaylas" class="erp-small-button">Ekstre Linki Paylaş</button>` : ""}
                             <button id="normalEkstre" class="erp-small-button">Normal Ekstre</button>
                             <button id="detayliEkstre" class="erp-small-button">Detaylı Ekstre</button>
                             <button id="cariYazdir" class="erp-primary-button">
@@ -3524,6 +3560,20 @@ async function dashboardYukle() {
             const detayGoster = goster => overlay.querySelectorAll(".ekstre-detay").forEach(x => x.style.display = goster ? "" : "none");
             document.getElementById("normalEkstre").onclick = () => detayGoster(false);
             document.getElementById("detayliEkstre").onclick = () => detayGoster(true);
+            if (tip === "musteri") {
+                document.getElementById("cariManuel").onclick = () => { overlay.remove(); cariManuelHareketFormu(id); };
+                document.getElementById("cariPaylas").onclick = async () => {
+                    try {
+                        const result = await api(`/api/tenant/cari/musteri/${encodeURIComponent(id)}/ekstre-paylas`, { method: "POST" });
+                        const mesaj = `${taraf?.unvan || taraf?.adSoyad || "Müşteri"} cari hesap ekstresi: ${result.link}`;
+                        if (navigator.share) await navigator.share({ title: "Cari Hesap Ekstresi", text: mesaj, url: result.link });
+                        else {
+                            await navigator.clipboard.writeText(result.link);
+                            alert("Ekstre bağlantısı panoya kopyalandı. Bağlantı 30 gün geçerlidir.");
+                        }
+                    } catch (error) { if (error.name !== "AbortError") alert(error.message); }
+                };
+            }
             document.getElementById("cariYazdir").onclick = () => {
                 const page = document.getElementById("cariEkstreSayfa");
                 const old = document.body.innerHTML;
@@ -3555,44 +3605,276 @@ async function dashboardYukle() {
         const overlay = document.createElement("div"); overlay.id = "tedarikciV2Modal"; overlay.className = "erp-modal-overlay";
         const v = mevcut || {};
         overlay.innerHTML = `<div class="erp-modal"><div class="erp-modal-header"><div><h2>${mevcut ? "Tedarikçi Düzenle" : "Yeni Tedarikçi"}</h2><p>Firma, iletişim, vergi ve ticari bilgileri</p></div><button class="erp-modal-close">×</button></div><form id="tedarikciV2Form"><div class="erp-form-grid">
-        ${[["kod","Tedarikçi Kodu","text",true],["unvan","Firma / Ünvan","text",true],["yetkili","Yetkili"],["telefon","Telefon"],["whatsapp","WhatsApp"],["email","E-posta","email"],["vergiDairesi","Vergi Dairesi"],["vergiNo","Vergi Numarası"],["adres","Adres"],["il","İl"],["ilce","İlçe"],["postaKodu","Posta Kodu"],["vadeGun","Vade (Gün)","number"],["limit","Limit","number"],["iban","IBAN"],["banka","Banka"],["grup","Grup"]].map(([n,l,t="text",r=false])=>`<label>${l}<input name="${n}" type="${t}" ${r?"required":""} value="${escapeHtml(v[n] ?? (n==="grup"?"Genel":""))}"></label>`).join("")}
-        <label class="full">Not<textarea name="notlar">${escapeHtml(v.notlar || "")}</textarea></label><label class="full"><span><input name="aktif" type="checkbox" ${v.aktif===false?"":"checked"}> Aktif tedarikçi</span></label></div><div id="tedarikciV2Mesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button" data-kapat>Geri</button><button type="button" class="erp-small-button" data-kapat>Vazgeç</button><button class="erp-primary-button" type="submit">Kaydet</button></div></form></div>`;
-        document.body.appendChild(overlay); const kapat=()=>overlay.remove(); overlay.querySelector(".erp-modal-close").onclick=kapat; overlay.querySelectorAll("[data-kapat]").forEach(button=>button.onclick=kapat);
-        overlay.querySelector("form").onsubmit=async event=>{event.preventDefault();const mesaj=overlay.querySelector("#tedarikciV2Mesaj");try{const veri=tedarikciFormVerisi(event.currentTarget);const sonuc=await api(mevcut?`/api/tenant/tedarikciler/${mevcut._id}`:"/api/tenant/tedarikciler",{method:mevcut?"PATCH":"POST",body:JSON.stringify(veri)});const dogrula=await api(`/api/tenant/tedarikciler/${sonuc.tedarikci._id}`);if(!dogrula.tedarikci||dogrula.tedarikci.kod!==sonuc.tedarikci.kod)throw new Error("MongoDB kayıt doğrulaması başarısız.");kapat();await tedarikciDashboardAc(sonuc.tedarikci._id);}catch(error){mesaj.innerHTML=`<div class="error">${escapeHtml(error.message)}</div>`;}};
+        ${[["kod", "Tedarikçi Kodu", "text", true], ["unvan", "Firma / Ünvan", "text", true], ["yetkili", "Yetkili"], ["telefon", "Telefon"], ["whatsapp", "WhatsApp"], ["email", "E-posta", "email"], ["vergiDairesi", "Vergi Dairesi"], ["vergiNo", "Vergi Numarası"], ["adres", "Adres"], ["il", "İl"], ["ilce", "İlçe"], ["postaKodu", "Posta Kodu"], ["vadeGun", "Vade (Gün)", "number"], ["limit", "Limit", "number"], ["iban", "IBAN"], ["banka", "Banka"], ["grup", "Grup"]].map(([n, l, t = "text", r = false]) => `<label>${l}<input name="${n}" type="${t}" ${r ? "required" : ""} value="${escapeHtml(v[n] ?? (n === "grup" ? "Genel" : ""))}"></label>`).join("")}
+        <label class="full">Not<textarea name="notlar">${escapeHtml(v.notlar || "")}</textarea></label><label class="full"><span><input name="aktif" type="checkbox" ${v.aktif === false ? "" : "checked"}> Aktif tedarikçi</span></label></div><div id="tedarikciV2Mesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button" data-kapat>Geri</button><button type="button" class="erp-small-button" data-kapat>Vazgeç</button><button class="erp-primary-button" type="submit">Kaydet</button></div></form></div>`;
+        document.body.appendChild(overlay); const kapat = () => overlay.remove(); overlay.querySelector(".erp-modal-close").onclick = kapat; overlay.querySelectorAll("[data-kapat]").forEach(button => button.onclick = kapat);
+        overlay.querySelector("form").onsubmit = async event => { event.preventDefault(); const mesaj = overlay.querySelector("#tedarikciV2Mesaj"); try { const veri = tedarikciFormVerisi(event.currentTarget); const sonuc = await api(mevcut ? `/api/tenant/tedarikciler/${mevcut._id}` : "/api/tenant/tedarikciler", { method: mevcut ? "PATCH" : "POST", body: JSON.stringify(veri) }); const dogrula = await api(`/api/tenant/tedarikciler/${sonuc.tedarikci._id}`); if (!dogrula.tedarikci || dogrula.tedarikci.kod !== sonuc.tedarikci.kod) throw new Error("MongoDB kayıt doğrulaması başarısız."); kapat(); await tedarikciDashboardAc(sonuc.tedarikci._id); } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } };
     }
 
-    function tedarikciKalemSatiri(urunler, kalem = {}) { return `<tr class="tedarikci-kalem"><td><select name="urunId" required><option value="">Ürün seçin</option>${urunler.map(u=>`<option value="${u._id}" ${String(kalem.urunId?._id||kalem.urunId)===String(u._id)?"selected":""}>${escapeHtml(u.kod)} · ${escapeHtml(u.ad)}</option>`).join("")}</select></td><td><input name="miktar" type="number" min="0.0001" step="0.0001" value="${kalem.miktar||1}" required></td><td><input name="birimFiyat" type="number" min="0" step="0.01" value="${kalem.birimFiyat??""}" required></td><td><input name="kdv" type="number" min="0" step="0.01" value="${kalem.kdv??20}"></td><td><input name="iskonto" type="number" min="0" step="0.01" value="${kalem.iskonto||0}"></td><td><button type="button" class="erp-small-button" data-sil>Sil</button></td></tr>`; }
+    function tedarikciKalemSatiri(urunler, kalem = {}) { return `<tr class="tedarikci-kalem"><td><select name="urunId" required><option value="">Ürün seçin</option>${urunler.map(u => `<option value="${u._id}" ${String(kalem.urunId?._id || kalem.urunId) === String(u._id) ? "selected" : ""}>${escapeHtml(u.kod)} · ${escapeHtml(u.ad)}</option>`).join("")}</select></td><td><input name="miktar" type="number" min="0.0001" step="0.0001" value="${kalem.miktar || 1}" required></td><td><input name="birimFiyat" type="number" min="0" step="0.01" value="${kalem.birimFiyat ?? ""}" required></td><td><input name="kdv" type="number" min="0" step="0.01" value="${kalem.kdv ?? 20}"></td><td><input name="iskonto" type="number" min="0" step="0.01" value="${kalem.iskonto || 0}"></td><td><button type="button" class="erp-small-button" data-sil>Sil</button></td></tr>`; }
 
-    async function tedarikciBelgeFormu(tur, tedarikci) {
-        const [uData,dData,fData]=await Promise.all([api("/api/tenant/urunler"),api("/api/tenant/stok/depolar"),api("/api/tenant/finans/ozet")]); const urunler=uData.urunler||[], depolar=dData.depolar||[];
-        const cfg={alis:{baslik:"Alış Yap",no:"Belge No",endpoint:"/api/tenant/alis",prefix:"AL"},iade:{baslik:"Alış İade",no:"İade Belge No",endpoint:"/api/tenant/alis/iade",prefix:"AI"},siparis:{baslik:"Satın Alma Siparişi",no:"Sipariş No",endpoint:"/api/tenant/alis/siparis",prefix:"SAS"}}[tur];
-        const overlay=document.createElement("div");overlay.id="tedarikciV2Modal";overlay.className="erp-modal-overlay";const no=`${cfg.prefix}-${Date.now()}`;
-        overlay.innerHTML=`<div class="erp-modal"><div class="erp-modal-header"><div><h2>${cfg.baslik}</h2><p>${escapeHtml(tedarikci.kod)} · ${escapeHtml(tedarikciAdi(tedarikci))}</p></div><button class="erp-modal-close">×</button></div><form><div class="erp-form-grid"><label>${cfg.no}<input name="belgeNo" value="${no}" required></label><label>Tarih<input name="tarih" type="date" value="${new Date().toISOString().slice(0,10)}" required></label>${tur!=="siparis"?`<label>Depo<select name="depoId" required><option value="">Depo seçin</option>${depolar.map(d=>`<option value="${d._id}">${escapeHtml(d.kod)} · ${escapeHtml(d.ad)}</option>`).join("")}</select></label>`:""}${tur==="alis"?`<label>Ödeme Durumu<select name="odemeDurumu"><option value="ACIK">Açık Hesap</option><option value="KISMI">Kısmi</option><option value="ODENDI">Ödendi</option></select></label><label>Ödenen Tutar<input name="odenenTutar" type="number" min="0" step="0.01" value="0"></label><label>Ödeme Hesabı<select name="hesap"><option value="">Hesap seçin</option>${(fData.kasalar||[]).map(x=>`<option value="KASA:${x._id}">Kasa · ${escapeHtml(x.ad)}</option>`).join("")}${(fData.bankalar||[]).map(x=>`<option value="BANKA:${x._id}">Banka · ${escapeHtml(x.bankaAdi)}</option>`).join("")}</select></label>`:""}<label class="full">Not<textarea name="notlar"></textarea></label></div><div class="dashboard-panel"><div class="panel-heading"><div><h3>Belge Kalemleri</h3><p>Kalem ekleme aynı tabloda satır açar.</p></div><button type="button" class="erp-primary-button" id="tedKalemEkle">+ Kalem Ekle</button></div><div class="table-scroll"><table><thead><tr><th>Ürün</th><th>Miktar</th><th>Fiyat</th><th>KDV %</th><th>İskonto %</th><th></th></tr></thead><tbody id="tedKalemler">${tedarikciKalemSatiri(urunler)}</tbody></table></div></div><div id="tedBelgeMesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button" data-kapat>Vazgeç</button><button class="erp-primary-button" type="submit">Kaydet</button></div></form></div>`;
-        document.body.appendChild(overlay);const kapat=()=>overlay.remove();overlay.querySelector(".erp-modal-close").onclick=kapat;overlay.querySelector("[data-kapat]").onclick=kapat;const tbody=overlay.querySelector("#tedKalemler");const bagla=()=>tbody.querySelectorAll("[data-sil]").forEach(b=>b.onclick=()=>{if(tbody.rows.length>1)b.closest("tr").remove();});bagla();overlay.querySelector("#tedKalemEkle").onclick=()=>{tbody.insertAdjacentHTML("beforeend",tedarikciKalemSatiri(urunler));bagla();};
-        const toplamKutusu=document.createElement("div");toplamKutusu.className="supplier-document-total";toplamKutusu.innerHTML='Genel Toplam: <strong id="tedGenelToplam">₺0,00</strong>';tbody.closest(".dashboard-panel").appendChild(toplamKutusu);const toplamHesapla=()=>{const toplam=[...tbody.rows].reduce((n,row)=>{const get=name=>Number(row.querySelector(`[name="${name}"]`)?.value||0),ara=get("miktar")*get("birimFiyat")*(1-get("iskonto")/100);return n+ara*(1+get("kdv")/100);},0);toplamKutusu.querySelector("strong").textContent=para(toplam);};tbody.addEventListener("input",toplamHesapla);tbody.addEventListener("click",()=>setTimeout(toplamHesapla));toplamHesapla();
-        overlay.querySelector("form").onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,mesaj=overlay.querySelector("#tedBelgeMesaj");try{const kalemler=[...tbody.rows].map(row=>Object.fromEntries([...row.querySelectorAll("input,select")].map(x=>[x.name,x.type==="number"?Number(x.value):x.value])));const body={tedarikciId:tedarikci._id,belgeNo:form.elements.belgeNo.value,tarih:form.elements.tarih.value,depoId:form.elements.depoId?.value,kalemler,notlar:form.elements.notlar.value,aciklama:form.elements.notlar.value};if(tur==="siparis"){body.siparisNo=body.belgeNo;delete body.belgeNo;}if(tur==="alis"){body.odemeDurumu=form.elements.odemeDurumu.value;body.odenenTutar=Number(form.elements.odenenTutar.value||0);const [hesapTipi,hesapId]=String(form.elements.hesap.value||":").split(":");body.hesapTipi=hesapTipi;body.hesapId=hesapId;}await api(cfg.endpoint,{method:"POST",body:JSON.stringify(body)});kapat();await tedarikciDashboardAc(tedarikci._id,tur==="siparis"?"siparisler":tur==="iade"?"iadeler":"alislar");}catch(error){mesaj.innerHTML=`<div class="error">${escapeHtml(error.message)}</div>`;}};
+    async function tedarikciBelgeFormu(tur, tedarikci, donus = "tedarikci") {
+        const [uData, dData, fData] = await Promise.all([api("/api/tenant/urunler"), api("/api/tenant/stok/depolar"), api("/api/tenant/finans/ozet")]); const urunler = uData.urunler || [], depolar = dData.depolar || [];
+        const cfg = { alis: { baslik: "Alış Yap", no: "Belge No", endpoint: "/api/tenant/alis", prefix: "AL" }, iade: { baslik: "Alış İade", no: "İade Belge No", endpoint: "/api/tenant/alis/iade", prefix: "AI" }, siparis: { baslik: "Satın Alma Siparişi", no: "Sipariş No", endpoint: "/api/tenant/alis/siparis", prefix: "SAS" } }[tur];
+        const overlay = document.createElement("div"); overlay.id = "tedarikciV2Modal"; overlay.className = "erp-modal-overlay"; const no = `${cfg.prefix}-${Date.now()}`;
+        overlay.innerHTML = `<div class="erp-modal"><div class="erp-modal-header"><div><h2>${cfg.baslik}</h2><p>${escapeHtml(tedarikci.kod)} · ${escapeHtml(tedarikciAdi(tedarikci))}</p></div><button class="erp-modal-close">×</button></div><form><div class="erp-form-grid"><label>${cfg.no}<input name="belgeNo" value="${no}" required></label><label>Tarih<input name="tarih" type="date" value="${new Date().toISOString().slice(0, 10)}" required></label>${tur !== "siparis" ? `<label>Depo<select name="depoId" required><option value="">Depo seçin</option>${depolar.map(d => `<option value="${d._id}">${escapeHtml(d.kod)} · ${escapeHtml(d.ad)}</option>`).join("")}</select></label>` : ""}${tur === "alis" ? `<label>Ödeme Durumu<select name="odemeDurumu"><option value="ACIK">Açık Hesap</option><option value="KISMI">Kısmi</option><option value="ODENDI">Ödendi</option></select></label><label>Ödenen Tutar<input name="odenenTutar" type="number" min="0" step="0.01" value="0"></label><label>Ödeme Hesabı<select name="hesap"><option value="">Hesap seçin</option>${(fData.kasalar || []).map(x => `<option value="KASA:${x._id}">Kasa · ${escapeHtml(x.ad)}</option>`).join("")}${(fData.bankalar || []).map(x => `<option value="BANKA:${x._id}">Banka · ${escapeHtml(x.bankaAdi)}</option>`).join("")}</select></label>` : ""}<label class="full">Not<textarea name="notlar"></textarea></label></div><div class="dashboard-panel"><div class="panel-heading"><div><h3>Belge Kalemleri</h3><p>Kalem ekleme aynı tabloda satır açar.</p></div><button type="button" class="erp-primary-button" id="tedKalemEkle">+ Kalem Ekle</button></div><div class="table-scroll"><table><thead><tr><th>Ürün</th><th>Miktar</th><th>Fiyat</th><th>KDV %</th><th>İskonto %</th><th></th></tr></thead><tbody id="tedKalemler">${tedarikciKalemSatiri(urunler)}</tbody></table></div></div><div id="tedBelgeMesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button" data-kapat>Vazgeç</button><button class="erp-primary-button" type="submit">Kaydet</button></div></form></div>`;
+        document.body.appendChild(overlay); const kapat = () => overlay.remove(); overlay.querySelector(".erp-modal-close").onclick = kapat; overlay.querySelector("[data-kapat]").onclick = kapat; const tbody = overlay.querySelector("#tedKalemler"); const bagla = () => tbody.querySelectorAll("[data-sil]").forEach(b => b.onclick = () => { if (tbody.rows.length > 1) b.closest("tr").remove(); }); bagla(); overlay.querySelector("#tedKalemEkle").onclick = () => { tbody.insertAdjacentHTML("beforeend", tedarikciKalemSatiri(urunler)); bagla(); };
+        const toplamKutusu = document.createElement("div"); toplamKutusu.className = "supplier-document-total"; toplamKutusu.innerHTML = 'Genel Toplam: <strong id="tedGenelToplam">₺0,00</strong>'; tbody.closest(".dashboard-panel").appendChild(toplamKutusu); const toplamHesapla = () => { const toplam = [...tbody.rows].reduce((n, row) => { const get = name => Number(row.querySelector(`[name="${name}"]`)?.value || 0), ara = get("miktar") * get("birimFiyat") * (1 - get("iskonto") / 100); return n + ara * (1 + get("kdv") / 100); }, 0); toplamKutusu.querySelector("strong").textContent = para(toplam); }; tbody.addEventListener("input", toplamHesapla); tbody.addEventListener("click", () => setTimeout(toplamHesapla)); toplamHesapla();
+        overlay.querySelector("form").onsubmit = async event => { event.preventDefault(); const form = event.currentTarget, mesaj = overlay.querySelector("#tedBelgeMesaj"); try { const kalemler = [...tbody.rows].map(row => Object.fromEntries([...row.querySelectorAll("input,select")].map(x => [x.name, x.type === "number" ? Number(x.value) : x.value]))); const body = { tedarikciId: tedarikci._id, belgeNo: form.elements.belgeNo.value, tarih: form.elements.tarih.value, depoId: form.elements.depoId?.value, kalemler, notlar: form.elements.notlar.value, aciklama: form.elements.notlar.value }; if (tur === "siparis") { body.siparisNo = body.belgeNo; delete body.belgeNo; } if (tur === "alis") { body.odemeDurumu = form.elements.odemeDurumu.value; body.odenenTutar = Number(form.elements.odenenTutar.value || 0); const [hesapTipi, hesapId] = String(form.elements.hesap.value || ":").split(":"); body.hesapTipi = hesapTipi; body.hesapId = hesapId; } await api(cfg.endpoint, { method: "POST", body: JSON.stringify(body) }); kapat(); if (donus === "alis") await alisMerkeziYukle(tur === "iade" ? "iadeler" : "alislar"); else await tedarikciDashboardAc(tedarikci._id, tur === "siparis" ? "siparisler" : tur === "iade" ? "iadeler" : "alislar"); } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } };
     }
 
     async function tedarikciOdemeFormu(tedarikci) {
-        const f=await api("/api/tenant/finans/ozet"),overlay=document.createElement("div");overlay.id="tedarikciV2Modal";overlay.className="erp-modal-overlay";overlay.innerHTML=`<div class="erp-modal" style="max-width:650px"><div class="erp-modal-header"><div><h2>Ödeme Yap</h2><p>${escapeHtml(tedarikciAdi(tedarikci))} · Borç ${para(tedarikci.bakiye)}</p></div><button class="erp-modal-close">×</button></div><form><div class="erp-form-grid"><label>Tutar<input name="tutar" type="number" min="0.01" max="${Math.max(0,tedarikci.bakiye)}" step="0.01" required></label><label>Tarih<input name="tarih" type="date" value="${new Date().toISOString().slice(0,10)}"></label><label>Belge No<input name="belgeNo" value="ODM-${Date.now()}"></label><label>Hesap<select name="hesap" required><option value="">Seçin</option>${(f.kasalar||[]).map(x=>`<option value="KASA:${x._id}">Kasa · ${escapeHtml(x.ad)} · ${para(x.bakiye)}</option>`).join("")}${(f.bankalar||[]).map(x=>`<option value="BANKA:${x._id}">Banka · ${escapeHtml(x.bankaAdi)} · ${para(x.bakiye)}</option>`).join("")}</select></label><label class="full">Açıklama<input name="aciklama" value="Tedarikçi ödemesi"></label></div><div id="tedOdemeMesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button" data-kapat>Vazgeç</button><button class="erp-primary-button">Ödemeyi Kaydet</button></div></form></div>`;document.body.appendChild(overlay);const kapat=()=>overlay.remove();overlay.querySelector(".erp-modal-close").onclick=kapat;overlay.querySelector("[data-kapat]").onclick=kapat;overlay.querySelector("form").onsubmit=async e=>{e.preventDefault();try{const fd=new FormData(e.currentTarget),[hesapTipi,hesapId]=fd.get("hesap").split(":");await api("/api/tenant/cari/tedarikci/odeme",{method:"POST",body:JSON.stringify({tedarikciId:tedarikci._id,tutar:Number(fd.get("tutar")),tarih:fd.get("tarih"),belgeNo:fd.get("belgeNo"),hesapTipi,hesapId,aciklama:fd.get("aciklama")})});kapat();await tedarikciDashboardAc(tedarikci._id,"cari");}catch(error){overlay.querySelector("#tedOdemeMesaj").innerHTML=`<div class="error">${escapeHtml(error.message)}</div>`;}};
+        const f = await api("/api/tenant/finans/ozet"), overlay = document.createElement("div"); overlay.id = "tedarikciV2Modal"; overlay.className = "erp-modal-overlay"; overlay.innerHTML = `<div class="erp-modal" style="max-width:650px"><div class="erp-modal-header"><div><h2>Ödeme Yap</h2><p>${escapeHtml(tedarikciAdi(tedarikci))} · Borç ${para(tedarikci.bakiye)}</p></div><button class="erp-modal-close">×</button></div><form><div class="erp-form-grid"><label>Tutar<input name="tutar" type="number" min="0.01" max="${Math.max(0, tedarikci.bakiye)}" step="0.01" required></label><label>Tarih<input name="tarih" type="date" value="${new Date().toISOString().slice(0, 10)}"></label><label>Belge No<input name="belgeNo" value="ODM-${Date.now()}"></label><label>Hesap<select name="hesap" required><option value="">Seçin</option>${(f.kasalar || []).map(x => `<option value="KASA:${x._id}">Kasa · ${escapeHtml(x.ad)} · ${para(x.bakiye)}</option>`).join("")}${(f.bankalar || []).map(x => `<option value="BANKA:${x._id}">Banka · ${escapeHtml(x.bankaAdi)} · ${para(x.bakiye)}</option>`).join("")}</select></label><label class="full">Açıklama<input name="aciklama" value="Tedarikçi ödemesi"></label></div><div id="tedOdemeMesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button" data-kapat>Vazgeç</button><button class="erp-primary-button">Ödemeyi Kaydet</button></div></form></div>`; document.body.appendChild(overlay); const kapat = () => overlay.remove(); overlay.querySelector(".erp-modal-close").onclick = kapat; overlay.querySelector("[data-kapat]").onclick = kapat; overlay.querySelector("form").onsubmit = async e => { e.preventDefault(); try { const fd = new FormData(e.currentTarget), [hesapTipi, hesapId] = fd.get("hesap").split(":"); await api("/api/tenant/cari/tedarikci/odeme", { method: "POST", body: JSON.stringify({ tedarikciId: tedarikci._id, tutar: Number(fd.get("tutar")), tarih: fd.get("tarih"), belgeNo: fd.get("belgeNo"), hesapTipi, hesapId, aciklama: fd.get("aciklama") }) }); kapat(); await tedarikciDashboardAc(tedarikci._id, "cari"); } catch (error) { overlay.querySelector("#tedOdemeMesaj").innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } };
     }
 
-    async function tedarikciDashboardAc(id, aktifSekme="ozet") {
-        loading("Tedarikçi paneli hazırlanıyor..."); const [d,a,c,i,s]=await Promise.all([api(`/api/tenant/tedarikciler/${id}`),api(`/api/tenant/alis?tedarikciId=${id}`),api(`/api/tenant/cari/hareketler?tarafTipi=TEDARIKCI&tarafId=${id}`),api(`/api/tenant/alis/iade?tedarikciId=${id}`),api(`/api/tenant/alis/siparis?tedarikciId=${id}`)]);const t=d.tedarikci;tedarikciV2Index=Math.max(0,tedarikciV2Liste.findIndex(x=>x._id===id));const alislar=a.alislar||[],hareketler=c.hareketler||[],iadeler=i.iadeler||[],siparisler=s.siparisler||[];const simdi=new Date(),aylik=alislar.filter(x=>{const dt=new Date(x.tarih);return dt.getMonth()===simdi.getMonth()&&dt.getFullYear()===simdi.getFullYear();}).reduce((n,x)=>n+Number(x.genelToplam||0),0),yillik=alislar.filter(x=>new Date(x.tarih).getFullYear()===simdi.getFullYear()).reduce((n,x)=>n+Number(x.genelToplam||0),0),toplam=alislar.reduce((n,x)=>n+Number(x.genelToplam||0),0);
-        const odenenCari=hareketler.filter(x=>x.tip==="ODEME").reduce((n,x)=>n+Number(x.tutar||0),0),vadeGun=Number(t.vadeGun||0),yediGun=new Date(simdi.getTime()+7*86400000),vadesiYaklasan=alislar.filter(x=>Number(x.kalanTutar||0)>0&&new Date(new Date(x.tarih).getTime()+vadeGun*86400000)<=yediGun).reduce((n,x)=>n+Number(x.kalanTutar||0),0);
-        setTitle("Tedarikçi");content.innerHTML=`<div class="supplier-hero"><div><span>${escapeHtml(t.kod)}</span><h2>${escapeHtml(tedarikciAdi(t))}</h2><p>${escapeHtml(t.yetkili||"Yetkili belirtilmemiş")} · ${escapeHtml(t.telefon||"Telefon yok")}</p></div><div class="supplier-nav"><button id="tedOnceki" ${tedarikciV2Index<=0?"disabled":""}>← Önceki</button><button id="tedListe">Tedarikçi Listesi</button><button id="tedSonraki" ${tedarikciV2Index>=tedarikciV2Liste.length-1?"disabled":""}>Sonraki →</button></div></div><div class="dashboard-grid">${card("Güncel Borç",para(t.bakiye),"Cari bakiye")}${card("Ödenen",para(odenenCari),"Cari ödemeler")}${card("Kalan Borç",para(t.bakiye),"Ödenecek")}${card("Bu Ay Alış",para(aylik),"Aylık")}${card("Bu Yıl Alış",para(yillik),"Yıllık")}${card("Toplam Alış",para(toplam),`${alislar.length} belge`)}${card("Vadesi Yaklaşan",para(vadesiYaklasan),"7 gün içinde")}</div><div class="supplier-tabs">${[["ozet","Özet"],["alis","Alış Yap"],["alislar","Alışlar"],["odeme","Ödeme Yap"],["cari","Cari / Ekstre"],["iade","Alış İade"],["iadeler","İadeler"],["siparis","Sipariş Oluştur"],["siparisler","Siparişler"],["whatsapp","WhatsApp"],["bilgiler","Bilgiler / Düzenle"]].map(([k,l])=>`<button data-ted-tab="${k}" class="${aktifSekme===k?"active":""}">${l}</button>`).join("")}</div><div id="tedarikciSekme"></div>`;
-        const panel=content.querySelector("#tedarikciSekme");const tablo=(baslik,rows,noKey)=>`<div class="dashboard-panel"><div class="panel-heading"><div><h2>${baslik}</h2><p>${rows.length} kayıt</p></div></div><div class="table-scroll"><table><thead><tr><th>Tarih</th><th>Belge</th><th>Tutar</th><th>Durum/Açıklama</th></tr></thead><tbody>${rows.length?rows.map(x=>`<tr><td>${tarihKisa(x.tarih)}</td><td>${escapeHtml(x[noKey]||x.belgeNo||x.belgeNo||"-")}</td><td>${para(x.genelToplam||x.tutar)}</td><td>${escapeHtml(x.durum||x.aciklama||x.notlar||"-")}</td></tr>`).join(""):`<tr><td colspan="4">Henüz kayıt yok.</td></tr>`}</tbody></table></div></div>`;
-        const cariTablo=()=>{let bakiye=0;const sirali=[...hareketler].sort((a,b)=>new Date(a.tarih)-new Date(b.tarih));return `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Tedarikçi Cari Ekstresi</h2><p>Normal ve detaylı hareket görünümü</p></div><div><button class="erp-small-button" id="tedNormal">Normal Ekstre</button> <button class="erp-primary-button" id="tedDetay">Detaylı Ekstre</button></div></div><div class="table-scroll"><table><thead><tr><th>Tarih</th><th>İşlem</th><th>Belge</th><th class="ted-detay">Açıklama</th><th>Borç</th><th>Alacak</th><th>Bakiye</th></tr></thead><tbody>${sirali.map(x=>{const borc=x.tip==="ODEME"||x.tip==="IADE"?Number(x.tutar||0):0,alacak=borc?0:Number(x.tutar||0);bakiye+=alacak-borc;return `<tr><td>${tarihKisa(x.tarih)}</td><td>${escapeHtml(x.tip)}</td><td>${escapeHtml(x.belgeNo||"-")}</td><td class="ted-detay">${escapeHtml(x.aciklama||"-")}</td><td>${borc?para(borc):"-"}</td><td>${alacak?para(alacak):"-"}</td><td><b>${para(bakiye)}</b></td></tr>`;}).join("")||`<tr><td colspan="7">Henüz cari hareket yok.</td></tr>`}</tbody></table></div></div>`;};
-        const sekmeAc=async key=>{if(key==="alis")return tedarikciBelgeFormu("alis",t);if(key==="odeme")return tedarikciOdemeFormu(t);if(key==="iade")return tedarikciBelgeFormu("iade",t);if(key==="siparis")return tedarikciBelgeFormu("siparis",t);if(key==="bilgiler")return tedarikciFormAc(t);if(key==="whatsapp"){const tel=String(t.whatsapp||t.telefon||"").replace(/\D/g,"");if(!tel)return alert("Tedarikçinin WhatsApp numarası yok.");window.open(`https://wa.me/${tel}?text=${encodeURIComponent(`${tedarikciAdi(t)} cari bakiye: ${para(t.bakiye)}`)}`,"_blank","noopener");return;}if(key==="alislar")panel.innerHTML=tablo("Alışlar",alislar,"belgeNo");else if(key==="iadeler")panel.innerHTML=tablo("Alış İadeleri",iadeler,"belgeNo");else if(key==="siparisler")panel.innerHTML=tablo("Satın Alma Siparişleri",siparisler,"siparisNo");else if(key==="cari"){panel.innerHTML=cariTablo();panel.querySelector("#tedNormal").onclick=()=>panel.querySelectorAll(".ted-detay").forEach(x=>x.style.display="none");panel.querySelector("#tedDetay").onclick=()=>panel.querySelectorAll(".ted-detay").forEach(x=>x.style.display="");}else panel.innerHTML=`<div class="dashboard-panel"><h2>Tedarikçi Özeti</h2><div class="supplier-info"><div><b>Yetkili</b><span>${escapeHtml(t.yetkili||"-")}</span></div><div><b>Telefon</b><span>${escapeHtml(t.telefon||"-")}</span></div><div><b>WhatsApp</b><span>${escapeHtml(t.whatsapp||"-")}</span></div><div><b>E-posta</b><span>${escapeHtml(t.email||"-")}</span></div><div><b>Vergi No</b><span>${escapeHtml(t.vergiNo||"-")}</span></div><div><b>IBAN</b><span>${escapeHtml(t.iban||"-")}</span></div></div></div>`;};content.querySelectorAll("[data-ted-tab]").forEach(b=>b.onclick=()=>sekmeAc(b.dataset.tedTab));content.querySelector("#tedListe").onclick=tedarikcilerYukle;content.querySelector("#tedOnceki").onclick=()=>tedarikciDashboardAc(tedarikciV2Liste[tedarikciV2Index-1]._id);content.querySelector("#tedSonraki").onclick=()=>tedarikciDashboardAc(tedarikciV2Liste[tedarikciV2Index+1]._id);await sekmeAc(aktifSekme);
+    async function tedarikciDashboardAc(id, aktifSekme = "ozet") {
+        loading("Tedarikçi paneli hazırlanıyor..."); const [d, a, c, i, s] = await Promise.all([api(`/api/tenant/tedarikciler/${id}`), api(`/api/tenant/alis?tedarikciId=${id}`), api(`/api/tenant/cari/hareketler?tarafTipi=TEDARIKCI&tarafId=${id}`), api(`/api/tenant/alis/iade?tedarikciId=${id}`), api(`/api/tenant/alis/siparis?tedarikciId=${id}`)]); const t = d.tedarikci; tedarikciV2Index = Math.max(0, tedarikciV2Liste.findIndex(x => x._id === id)); const alislar = a.alislar || [], hareketler = c.hareketler || [], iadeler = i.iadeler || [], siparisler = s.siparisler || []; const simdi = new Date(), aylik = alislar.filter(x => { const dt = new Date(x.tarih); return dt.getMonth() === simdi.getMonth() && dt.getFullYear() === simdi.getFullYear(); }).reduce((n, x) => n + Number(x.genelToplam || 0), 0), yillik = alislar.filter(x => new Date(x.tarih).getFullYear() === simdi.getFullYear()).reduce((n, x) => n + Number(x.genelToplam || 0), 0), toplam = alislar.reduce((n, x) => n + Number(x.genelToplam || 0), 0);
+        const odenenCari = hareketler.filter(x => x.tip === "ODEME").reduce((n, x) => n + Number(x.tutar || 0), 0), vadeGun = Number(t.vadeGun || 0), yediGun = new Date(simdi.getTime() + 7 * 86400000), vadesiYaklasan = alislar.filter(x => Number(x.kalanTutar || 0) > 0 && new Date(new Date(x.tarih).getTime() + vadeGun * 86400000) <= yediGun).reduce((n, x) => n + Number(x.kalanTutar || 0), 0);
+        setTitle("Tedarikçi"); content.innerHTML = `<div class="supplier-hero"><div><span>${escapeHtml(t.kod)}</span><h2>${escapeHtml(tedarikciAdi(t))}</h2><p>${escapeHtml(t.yetkili || "Yetkili belirtilmemiş")} · ${escapeHtml(t.telefon || "Telefon yok")}</p></div><div class="supplier-nav"><button id="tedOnceki" ${tedarikciV2Index <= 0 ? "disabled" : ""}>← Önceki</button><button id="tedListe">Tedarikçi Listesi</button><button id="tedSonraki" ${tedarikciV2Index >= tedarikciV2Liste.length - 1 ? "disabled" : ""}>Sonraki →</button></div></div><div class="dashboard-grid">${card("Güncel Borç", para(t.bakiye), "Cari bakiye")}${card("Ödenen", para(odenenCari), "Cari ödemeler")}${card("Kalan Borç", para(t.bakiye), "Ödenecek")}${card("Bu Ay Alış", para(aylik), "Aylık")}${card("Bu Yıl Alış", para(yillik), "Yıllık")}${card("Toplam Alış", para(toplam), `${alislar.length} belge`)}${card("Vadesi Yaklaşan", para(vadesiYaklasan), "7 gün içinde")}</div><div class="supplier-tabs">${[["ozet", "Özet"], ["alis", "Alış Yap"], ["alislar", "Alışlar"], ["odeme", "Ödeme Yap"], ["cari", "Cari / Ekstre"], ["iade", "Alış İade"], ["iadeler", "İadeler"], ["siparis", "Sipariş Oluştur"], ["siparisler", "Siparişler"], ["whatsapp", "WhatsApp"], ["bilgiler", "Bilgiler / Düzenle"]].map(([k, l]) => `<button data-ted-tab="${k}" class="${aktifSekme === k ? "active" : ""}">${l}</button>`).join("")}</div><div id="tedarikciSekme"></div>`;
+        const panel = content.querySelector("#tedarikciSekme"); const tablo = (baslik, rows, noKey) => `<div class="dashboard-panel"><div class="panel-heading"><div><h2>${baslik}</h2><p>${rows.length} kayıt</p></div></div><div class="table-scroll"><table><thead><tr><th>Tarih</th><th>Belge</th><th>Tutar</th><th>Durum/Açıklama</th></tr></thead><tbody>${rows.length ? rows.map(x => `<tr><td>${tarihKisa(x.tarih)}</td><td>${escapeHtml(x[noKey] || x.belgeNo || x.belgeNo || "-")}</td><td>${para(x.genelToplam || x.tutar)}</td><td>${escapeHtml(x.durum || x.aciklama || x.notlar || "-")}</td></tr>`).join("") : `<tr><td colspan="4">Henüz kayıt yok.</td></tr>`}</tbody></table></div></div>`;
+        const cariTablo = () => { let bakiye = 0; const sirali = [...hareketler].sort((a, b) => new Date(a.tarih) - new Date(b.tarih)); return `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Tedarikçi Cari Ekstresi</h2><p>Normal ve detaylı hareket görünümü</p></div><div><button class="erp-small-button" id="tedNormal">Normal Ekstre</button> <button class="erp-primary-button" id="tedDetay">Detaylı Ekstre</button></div></div><div class="table-scroll"><table><thead><tr><th>Tarih</th><th>İşlem</th><th>Belge</th><th class="ted-detay">Açıklama</th><th>Borç</th><th>Alacak</th><th>Bakiye</th></tr></thead><tbody>${sirali.map(x => { const borc = x.tip === "ODEME" || x.tip === "IADE" ? Number(x.tutar || 0) : 0, alacak = borc ? 0 : Number(x.tutar || 0); bakiye += alacak - borc; return `<tr><td>${tarihKisa(x.tarih)}</td><td>${escapeHtml(x.tip)}</td><td>${escapeHtml(x.belgeNo || "-")}</td><td class="ted-detay">${escapeHtml(x.aciklama || "-")}</td><td>${borc ? para(borc) : "-"}</td><td>${alacak ? para(alacak) : "-"}</td><td><b>${para(bakiye)}</b></td></tr>`; }).join("") || `<tr><td colspan="7">Henüz cari hareket yok.</td></tr>`}</tbody></table></div></div>`; };
+        const sekmeAc = async key => { if (key === "alis") return tedarikciBelgeFormu("alis", t); if (key === "odeme") return tedarikciOdemeFormu(t); if (key === "iade") return tedarikciBelgeFormu("iade", t); if (key === "siparis") return tedarikciBelgeFormu("siparis", t); if (key === "bilgiler") return tedarikciFormAc(t); if (key === "whatsapp") { const tel = String(t.whatsapp || t.telefon || "").replace(/\D/g, ""); if (!tel) return alert("Tedarikçinin WhatsApp numarası yok."); window.open(`https://wa.me/${tel}?text=${encodeURIComponent(`${tedarikciAdi(t)} cari bakiye: ${para(t.bakiye)}`)}`, "_blank", "noopener"); return; } if (key === "alislar") panel.innerHTML = tablo("Alışlar", alislar, "belgeNo"); else if (key === "iadeler") panel.innerHTML = tablo("Alış İadeleri", iadeler, "belgeNo"); else if (key === "siparisler") panel.innerHTML = tablo("Satın Alma Siparişleri", siparisler, "siparisNo"); else if (key === "cari") { panel.innerHTML = cariTablo(); panel.querySelector("#tedNormal").onclick = () => panel.querySelectorAll(".ted-detay").forEach(x => x.style.display = "none"); panel.querySelector("#tedDetay").onclick = () => panel.querySelectorAll(".ted-detay").forEach(x => x.style.display = ""); } else panel.innerHTML = `<div class="dashboard-panel"><h2>Tedarikçi Özeti</h2><div class="supplier-info"><div><b>Yetkili</b><span>${escapeHtml(t.yetkili || "-")}</span></div><div><b>Telefon</b><span>${escapeHtml(t.telefon || "-")}</span></div><div><b>WhatsApp</b><span>${escapeHtml(t.whatsapp || "-")}</span></div><div><b>E-posta</b><span>${escapeHtml(t.email || "-")}</span></div><div><b>Vergi No</b><span>${escapeHtml(t.vergiNo || "-")}</span></div><div><b>IBAN</b><span>${escapeHtml(t.iban || "-")}</span></div></div></div>`; }; content.querySelectorAll("[data-ted-tab]").forEach(b => b.onclick = () => sekmeAc(b.dataset.tedTab)); content.querySelector("#tedListe").onclick = tedarikcilerYukle; content.querySelector("#tedOnceki").onclick = () => tedarikciDashboardAc(tedarikciV2Liste[tedarikciV2Index - 1]._id); content.querySelector("#tedSonraki").onclick = () => tedarikciDashboardAc(tedarikciV2Liste[tedarikciV2Index + 1]._id); await sekmeAc(aktifSekme);
     }
 
     function tedarikciExcelPaneli() {
-        const panel=content.querySelector("#tedarikciAltPanel");panel.innerHTML=`<div class="dashboard-panel"><div class="panel-heading"><div><h2>Excel'den Toplu Tedarikçi Yükle</h2><p>Şablonu doldurun, önizleyin ve doğrulanmış satırları aktarın.</p></div><button id="tedSablon" class="erp-primary-button">Şablon İndir</button></div><label>Dosya Seç<input id="tedExcelDosya" type="file" accept=".xlsx,.xls"></label><div id="tedExcelOnizleme" style="margin-top:16px"></div></div>`;panel.querySelector("#tedSablon").onclick=()=>{const baslik=["Tedarikçi Kodu","Ünvan","Yetkili","Telefon","WhatsApp","E-posta","Vergi Dairesi","Vergi Numarası","Adres","İl","İlçe","Posta Kodu","Vade","Limit","IBAN","Banka","Not"];const ws=XLSX.utils.aoa_to_sheet([baslik]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Tedarikçiler");XLSX.writeFile(wb,"tedarikci-sablonu.xlsx");};panel.querySelector("#tedExcelDosya").onchange=async e=>{const file=e.target.files[0];if(!file)return;const wb=XLSX.read(await file.arrayBuffer(),{type:"array"}),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:""}),map={"Tedarikçi Kodu":"kod","Ünvan":"unvan","Yetkili":"yetkili","Telefon":"telefon","WhatsApp":"whatsapp","E-posta":"email","Vergi Dairesi":"vergiDairesi","Vergi Numarası":"vergiNo","Adres":"adres","İl":"il","İlçe":"ilce","Posta Kodu":"postaKodu","Vade":"vadeGun","Limit":"limit","IBAN":"iban","Banka":"banka","Not":"notlar"},veriler=rows.map(r=>Object.fromEntries(Object.entries(map).map(([a,b])=>[b,r[a]]))),kodlar=new Set(tedarikciV2Liste.map(x=>x.kod)),dosyaKodlari=new Set(),hatalar=veriler.map((r,i)=>{const kod=String(r.kod||"").trim().toUpperCase();if(!kod||!r.unvan)return `${i+2}. satır: kod ve ünvan zorunlu`;if(kodlar.has(kod)||dosyaKodlari.has(kod))return `${i+2}. satır: mükerrer kod`;dosyaKodlari.add(kod);return null;}).filter(Boolean);panel.querySelector("#tedExcelOnizleme").innerHTML=`<p>${veriler.length} satır · ${hatalar.length} hata</p>${hatalar.length?`<div class="error">${hatalar.map(escapeHtml).join("<br>")}</div>`:`<button id="tedExcelAktar" class="erp-primary-button">Tedarikçileri Aktar</button>`}`;panel.querySelector("#tedExcelAktar")?.addEventListener("click",async()=>{let eklenen=0;for(const row of veriler){await api("/api/tenant/tedarikciler",{method:"POST",body:JSON.stringify(row)});eklenen++;}alert(`${eklenen} tedarikçi aktarıldı.`);await tedarikcilerYukle();});};
-        panel.querySelector("#tedExcelDosya").addEventListener("change",async event=>{const file=event.target.files[0];if(!file)return;const wb=XLSX.read(await file.arrayBuffer(),{type:"array"}),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:""});const hedef=panel.querySelector("#tedExcelOnizleme");hedef.insertAdjacentHTML("beforeend",`<div class="table-scroll" style="margin-top:14px"><table><thead><tr><th>Satır</th><th>Tedarikçi Kodu</th><th>Ünvan</th><th>Yetkili</th><th>Telefon</th><th>Vergi No</th></tr></thead><tbody>${rows.slice(0,100).map((r,i)=>`<tr><td>${i+2}</td><td>${escapeHtml(r["Tedarikçi Kodu"]||"")}</td><td>${escapeHtml(r["Ünvan"]||"")}</td><td>${escapeHtml(r["Yetkili"]||"")}</td><td>${escapeHtml(r["Telefon"]||"")}</td><td>${escapeHtml(r["Vergi Numarası"]||"")}</td></tr>`).join("")}</tbody></table></div>`);});
+        const panel = content.querySelector("#tedarikciAltPanel"); panel.innerHTML = `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Excel'den Toplu Tedarikçi Yükle</h2><p>Şablonu doldurun, önizleyin ve doğrulanmış satırları aktarın.</p></div><button id="tedSablon" class="erp-primary-button">Şablon İndir</button></div><label>Dosya Seç<input id="tedExcelDosya" type="file" accept=".xlsx,.xls"></label><div id="tedExcelOnizleme" style="margin-top:16px"></div></div>`; panel.querySelector("#tedSablon").onclick = () => { const baslik = ["Tedarikçi Kodu", "Ünvan", "Yetkili", "Telefon", "WhatsApp", "E-posta", "Vergi Dairesi", "Vergi Numarası", "Adres", "İl", "İlçe", "Posta Kodu", "Vade", "Limit", "IBAN", "Banka", "Not"]; const ws = XLSX.utils.aoa_to_sheet([baslik]); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Tedarikçiler"); XLSX.writeFile(wb, "tedarikci-sablonu.xlsx"); }; panel.querySelector("#tedExcelDosya").onchange = async e => { const file = e.target.files[0]; if (!file) return; const wb = XLSX.read(await file.arrayBuffer(), { type: "array" }), rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" }), map = { "Tedarikçi Kodu": "kod", "Ünvan": "unvan", "Yetkili": "yetkili", "Telefon": "telefon", "WhatsApp": "whatsapp", "E-posta": "email", "Vergi Dairesi": "vergiDairesi", "Vergi Numarası": "vergiNo", "Adres": "adres", "İl": "il", "İlçe": "ilce", "Posta Kodu": "postaKodu", "Vade": "vadeGun", "Limit": "limit", "IBAN": "iban", "Banka": "banka", "Not": "notlar" }, veriler = rows.map(r => Object.fromEntries(Object.entries(map).map(([a, b]) => [b, r[a]]))), kodlar = new Set(tedarikciV2Liste.map(x => x.kod)), dosyaKodlari = new Set(), hatalar = veriler.map((r, i) => { const kod = String(r.kod || "").trim().toUpperCase(); if (!kod || !r.unvan) return `${i + 2}. satır: kod ve ünvan zorunlu`; if (kodlar.has(kod) || dosyaKodlari.has(kod)) return `${i + 2}. satır: mükerrer kod`; dosyaKodlari.add(kod); return null; }).filter(Boolean); panel.querySelector("#tedExcelOnizleme").innerHTML = `<p>${veriler.length} satır · ${hatalar.length} hata</p>${hatalar.length ? `<div class="error">${hatalar.map(escapeHtml).join("<br>")}</div>` : `<button id="tedExcelAktar" class="erp-primary-button">Tedarikçileri Aktar</button>`}`; panel.querySelector("#tedExcelAktar")?.addEventListener("click", async () => { let eklenen = 0; for (const row of veriler) { await api("/api/tenant/tedarikciler", { method: "POST", body: JSON.stringify(row) }); eklenen++; } alert(`${eklenen} tedarikçi aktarıldı.`); await tedarikcilerYukle(); }); };
+        panel.querySelector("#tedExcelDosya").addEventListener("change", async event => { const file = event.target.files[0]; if (!file) return; const wb = XLSX.read(await file.arrayBuffer(), { type: "array" }), rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" }); const hedef = panel.querySelector("#tedExcelOnizleme"); hedef.insertAdjacentHTML("beforeend", `<div class="table-scroll" style="margin-top:14px"><table><thead><tr><th>Satır</th><th>Tedarikçi Kodu</th><th>Ünvan</th><th>Yetkili</th><th>Telefon</th><th>Vergi No</th></tr></thead><tbody>${rows.slice(0, 100).map((r, i) => `<tr><td>${i + 2}</td><td>${escapeHtml(r["Tedarikçi Kodu"] || "")}</td><td>${escapeHtml(r["Ünvan"] || "")}</td><td>${escapeHtml(r["Yetkili"] || "")}</td><td>${escapeHtml(r["Telefon"] || "")}</td><td>${escapeHtml(r["Vergi Numarası"] || "")}</td></tr>`).join("")}</tbody></table></div>`); });
     }
 
     async function tedarikcilerYukle() {
-        setTitle("Tedarikçiler");loading();try{const d=await api("/api/tenant/tedarikciler");tedarikciV2Liste=d.tedarikciler||[];const borc=tedarikciV2Liste.reduce((n,x)=>n+Number(x.bakiye||0),0);content.innerHTML=`<div class="welcome-banner"><div><div class="eyebrow">TEDARİKÇİLER V2</div><h2>Tedarikçi Merkezi</h2><p>Satın alma, ödeme, cari ve tedarikçi belgelerini tek merkezden yönetin.</p></div></div><div class="musteri-toolbar"><button class="dashboard-action dashboard-action-blue" id="tedSec">Tedarikçi Seç</button><button class="dashboard-action dashboard-action-green" id="tedYeni">+ Yeni Tedarikçi</button><button class="dashboard-action dashboard-action-purple" id="tedExcel">Excel'den Toplu Yükle</button><button class="dashboard-action shortcut-orange" id="tedGruplar">Tedarikçi Grupları</button></div><div class="dashboard-grid">${card("Tedarikçi Sayısı",tedarikciV2Liste.length,"Kayıtlı tedarikçi")}${card("Toplam Borç",para(borc),"Ödenecek bakiye")}</div><div id="tedarikciAltPanel"></div>`;const panel=content.querySelector("#tedarikciAltPanel");const liste=()=>{panel.innerHTML=`<div class="dashboard-panel"><div class="panel-heading"><div><h2>Tedarikçi Seç</h2><p>Kod, ünvan, yetkili, telefon veya vergi no ile arayın.</p></div></div><input id="tedAra" class="erp-input" placeholder="Tedarikçi ara..."><div class="table-scroll"><table><thead><tr><th>Kod</th><th>Ünvan</th><th>Yetkili</th><th>Telefon</th><th>Bakiye</th><th>Durum</th></tr></thead><tbody id="tedListeGovde">${tedarikciV2Liste.map((x,i)=>`<tr data-ted-id="${x._id}" data-ted-index="${i}" style="cursor:pointer"><td><b>${escapeHtml(x.kod)}</b></td><td>${escapeHtml(tedarikciAdi(x))}</td><td>${escapeHtml(x.yetkili||"-")}</td><td>${escapeHtml(x.telefon||"-")}</td><td>${para(x.bakiye)}</td><td>${x.aktif===false?"Pasif":"Aktif"}</td></tr>`).join("")}</tbody></table></div></div>`;const bagla=()=>panel.querySelectorAll("[data-ted-id]").forEach(row=>row.onclick=()=>tedarikciDashboardAc(row.dataset.tedId));bagla();panel.querySelector("#tedAra").oninput=e=>{const q=e.target.value.toLocaleLowerCase("tr-TR");panel.querySelectorAll("#tedListeGovde tr").forEach(row=>row.hidden=!row.textContent.toLocaleLowerCase("tr-TR").includes(q));};};content.querySelector("#tedSec").onclick=liste;content.querySelector("#tedYeni").onclick=()=>tedarikciFormAc();content.querySelector("#tedExcel").onclick=tedarikciExcelPaneli;content.querySelector("#tedGruplar").onclick=()=>{const gruplar={};tedarikciV2Liste.forEach(x=>gruplar[x.grup||"Genel"]=(gruplar[x.grup||"Genel"]||0)+1);panel.innerHTML=`<div class="dashboard-panel"><h2>Tedarikçi Grupları</h2><div class="dashboard-grid">${Object.entries(gruplar).map(([g,n])=>card(g,n,"tedarikçi")).join("")}</div></div>`;};liste();}catch(error){errorBox(error);}
+        setTitle("Tedarikçiler"); loading(); try { const d = await api("/api/tenant/tedarikciler"); tedarikciV2Liste = d.tedarikciler || []; const borc = tedarikciV2Liste.reduce((n, x) => n + Number(x.bakiye || 0), 0); content.innerHTML = `<div class="welcome-banner"><div><div class="eyebrow">TEDARİKÇİLER V2</div><h2>Tedarikçi Merkezi</h2><p>Satın alma, ödeme, cari ve tedarikçi belgelerini tek merkezden yönetin.</p></div></div><div class="musteri-toolbar"><button class="dashboard-action dashboard-action-blue" id="tedSec">Tedarikçi Seç</button><button class="dashboard-action dashboard-action-green" id="tedYeni">+ Yeni Tedarikçi</button><button class="dashboard-action dashboard-action-purple" id="tedExcel">Excel'den Toplu Yükle</button><button class="dashboard-action shortcut-orange" id="tedGruplar">Tedarikçi Grupları</button></div><div class="dashboard-grid">${card("Tedarikçi Sayısı", tedarikciV2Liste.length, "Kayıtlı tedarikçi")}${card("Toplam Borç", para(borc), "Ödenecek bakiye")}</div><div id="tedarikciAltPanel"></div>`; const panel = content.querySelector("#tedarikciAltPanel"); const liste = () => { panel.innerHTML = `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Tedarikçi Seç</h2><p>Kod, ünvan, yetkili, telefon veya vergi no ile arayın.</p></div></div><input id="tedAra" class="erp-input" placeholder="Tedarikçi ara..."><div class="table-scroll"><table><thead><tr><th>Kod</th><th>Ünvan</th><th>Yetkili</th><th>Telefon</th><th>Bakiye</th><th>Durum</th></tr></thead><tbody id="tedListeGovde">${tedarikciV2Liste.map((x, i) => `<tr data-ted-id="${x._id}" data-ted-index="${i}" style="cursor:pointer"><td><b>${escapeHtml(x.kod)}</b></td><td>${escapeHtml(tedarikciAdi(x))}</td><td>${escapeHtml(x.yetkili || "-")}</td><td>${escapeHtml(x.telefon || "-")}</td><td>${para(x.bakiye)}</td><td>${x.aktif === false ? "Pasif" : "Aktif"}</td></tr>`).join("")}</tbody></table></div></div>`; const bagla = () => panel.querySelectorAll("[data-ted-id]").forEach(row => row.onclick = () => tedarikciDashboardAc(row.dataset.tedId)); bagla(); panel.querySelector("#tedAra").oninput = e => { const q = e.target.value.toLocaleLowerCase("tr-TR"); panel.querySelectorAll("#tedListeGovde tr").forEach(row => row.hidden = !row.textContent.toLocaleLowerCase("tr-TR").includes(q)); }; }; content.querySelector("#tedSec").onclick = liste; content.querySelector("#tedYeni").onclick = () => tedarikciFormAc(); content.querySelector("#tedExcel").onclick = tedarikciExcelPaneli; content.querySelector("#tedGruplar").onclick = () => { const gruplar = {}; tedarikciV2Liste.forEach(x => gruplar[x.grup || "Genel"] = (gruplar[x.grup || "Genel"] || 0) + 1); panel.innerHTML = `<div class="dashboard-panel"><h2>Tedarikçi Grupları</h2><div class="dashboard-grid">${Object.entries(gruplar).map(([g, n]) => card(g, n, "tedarikçi")).join("")}</div></div>`; }; liste(); } catch (error) { errorBox(error); }
+    }
+
+    let alisMerkezi = { alislar: [], iadeler: [], tedarikciler: [] };
+
+    async function alisMerkeziYukle(aktifSekme = "alislar") {
+        setTitle("Alışlar"); loading("Alış merkezi hazırlanıyor...");
+        try {
+            const [a, i, t] = await Promise.all([api("/api/tenant/alis"), api("/api/tenant/alis/iade"), api("/api/tenant/tedarikciler")]);
+            alisMerkezi = { alislar: a.alislar || [], iadeler: i.iadeler || [], tedarikciler: (t.tedarikciler || []).filter(x => x.aktif !== false) };
+            const toplam = alisMerkezi.alislar.reduce((n, x) => n + Number(x.genelToplam || 0), 0), odenen = alisMerkezi.alislar.reduce((n, x) => n + Number(x.odenenTutar || 0), 0), kalan = alisMerkezi.alislar.reduce((n, x) => n + Number(x.kalanTutar || 0), 0), iadeToplam = alisMerkezi.iadeler.reduce((n, x) => n + Number(x.genelToplam || 0), 0), buAy = alisMerkezi.alislar.filter(x => { const d = new Date(x.tarih), n = new Date(); return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear(); }).reduce((n, x) => n + Number(x.genelToplam || 0), 0);
+            content.innerHTML = `<div class="purchase-hero"><div><span>ALIŞ MERKEZİ</span><h2>Satın alma ve tedarik kontrolü</h2><p>Alış faturalarını, ödemeleri, iadeleri ve stok girişlerini tek merkezden yönetin.</p></div><div class="stock-hero-actions"><button id="alisExcel">Excel Dökümü</button><button id="alisYazdir">Yazdır / PDF</button><button id="alisYenile">Yenile</button><button id="alisYeni">+ Yeni Alış</button></div></div><div class="dashboard-grid">${card("Toplam Alış", para(toplam), `${alisMerkezi.alislar.length} belge`)}${card("Bu Ay", para(buAy), "Aylık satın alma")}${card("Ödenen", para(odenen), "Gerçekleşen ödeme")}${card("Açık Borç", para(kalan), "Ödenecek tutar")}${card("Alış İadesi", para(iadeToplam), `${alisMerkezi.iadeler.length} belge`)}</div><div class="stock-tabs">${[["alislar", "Alış Faturaları"], ["yeni", "Yeni Alış"], ["iadeler", "Alış İadeleri"], ["iade", "Yeni İade"], ["analiz", "Tedarikçi Analizi"]].map(([k, l]) => `<button data-alis-tab="${k}" class="${aktifSekme === k ? "active" : ""}">${l}</button>`).join("")}</div><div id="alisAltPanel"></div>`;
+            const panel = content.querySelector("#alisAltPanel");
+            const ac = key => { content.querySelectorAll("[data-alis-tab]").forEach(b => b.classList.toggle("active", b.dataset.alisTab === key)); if (key === "yeni") return alisIslemBaslat(panel, "alis"); if (key === "iade") return alisIslemBaslat(panel, "iade"); if (key === "iadeler") return alisIadeListesi(panel); if (key === "analiz") return alisTedarikciAnalizi(panel); return alisFaturaListesi(panel); };
+            content.querySelectorAll("[data-alis-tab]").forEach(b => b.onclick = () => ac(b.dataset.alisTab));
+            content.querySelector("#alisYeni").onclick = () => ac("yeni"); content.querySelector("#alisYenile").onclick = () => alisMerkeziYukle(aktifSekme); content.querySelector("#alisExcel").onclick = alisExcelDokumu; content.querySelector("#alisYazdir").onclick = () => alisListeYazdir(alisMerkezi.alislar, "Alış Faturaları Dökümü"); ac(aktifSekme);
+        } catch (error) { errorBox(error); }
+    }
+
+    function alisFaturaListesi(panel) {
+        const rows = alisMerkezi.alislar;
+        panel.innerHTML = `<div class="dashboard-panel"><div class="stock-filterbar"><input id="alisAra" class="erp-input" placeholder="Belge, tedarikçi veya depo ara"><select id="alisDurum"><option value="">Tüm ödeme durumları</option><option value="ACIK">Açık</option><option value="KISMI">Kısmi</option><option value="ODENDI">Ödendi</option></select><input id="alisBaslangic" type="date" title="Başlangıç"><input id="alisBitis" type="date" title="Bitiş"></div><div class="table-scroll"><table><thead><tr><th>Tarih / Belge</th><th>Tedarikçi</th><th>Depo</th><th>Toplam</th><th>Ödenen</th><th>Kalan</th><th>Durum</th><th></th></tr></thead><tbody id="alisGovde">${rows.length ? rows.map((x, i) => `<tr data-index="${i}" data-durum="${escapeHtml(x.odemeDurumu || "")}" data-tarih="${String(x.tarih || "").slice(0, 10)}"><td>${tarihKisa(x.tarih)}<small>${escapeHtml(x.belgeNo)}</small></td><td><b>${escapeHtml(x.tedarikciId?.kod || "-")}</b><small>${escapeHtml(x.tedarikciId?.unvan || x.tedarikciId?.adSoyad || "-")}</small></td><td>${escapeHtml(x.depoId?.ad || "-")}</td><td><b>${para(x.genelToplam)}</b></td><td>${para(x.odenenTutar)}</td><td>${para(x.kalanTutar)}</td><td><span class="purchase-status ${String(x.odemeDurumu || "").toLowerCase()}">${escapeHtml(x.odemeDurumu || "-")}</span></td><td><button class="erp-small-button" data-alis-detay="${i}">Detay</button></td></tr>`).join("") : '<tr><td colspan="8">Henüz alış faturası yok.</td></tr>'}</tbody></table></div></div>`;
+        const uygula = () => { const q = panel.querySelector("#alisAra").value.toLocaleLowerCase("tr-TR"), durum = panel.querySelector("#alisDurum").value, bas = panel.querySelector("#alisBaslangic").value, bit = panel.querySelector("#alisBitis").value; panel.querySelectorAll("#alisGovde tr[data-index]").forEach(r => r.hidden = (q && !r.textContent.toLocaleLowerCase("tr-TR").includes(q)) || (durum && r.dataset.durum !== durum) || (bas && r.dataset.tarih < bas) || (bit && r.dataset.tarih > bit)); };
+        ["#alisAra", "#alisDurum", "#alisBaslangic", "#alisBitis"].forEach(s => { const e = panel.querySelector(s); e.oninput = e.onchange = uygula; }); panel.querySelectorAll("[data-alis-detay]").forEach(b => b.onclick = () => alisDetayAc(rows[Number(b.dataset.alisDetay)]._id));
+    }
+
+    function alisIslemBaslat(panel, tur) {
+        panel.innerHTML = `<div class="dashboard-panel"><div class="panel-heading"><div><h2>${tur === "alis" ? "Yeni Alış Faturası" : "Yeni Alış İadesi"}</h2><p>İşleme devam etmek için tedarikçi seçin.</p></div></div><div class="purchase-start"><label>Tedarikçi<select id="alisTedarikciSec"><option value="">Tedarikçi seçin</option>${stokSecenekleri(alisMerkezi.tedarikciler)}</select></label><button id="alisDevam" class="erp-primary-button">Belgeyi Hazırla</button></div></div>`;
+        panel.querySelector("#alisDevam").onclick = () => { const id = panel.querySelector("#alisTedarikciSec").value, t = alisMerkezi.tedarikciler.find(x => String(x._id) === id); if (!t) return alert("Tedarikçi seçin."); tedarikciBelgeFormu(tur, t, "alis"); };
+    }
+
+    async function alisDetayAc(id) {
+        try { const d = await api(`/api/tenant/alis/${id}`), x = d.alis, rows = x.kalemler || []; document.getElementById("alisDetayModal")?.remove(); const overlay = document.createElement("div"); overlay.id = "alisDetayModal"; overlay.className = "erp-modal-overlay"; overlay.innerHTML = `<div class="erp-modal"><div class="erp-modal-header"><div><h2>Alış Faturası · ${escapeHtml(x.belgeNo)}</h2><p>${tarihKisa(x.tarih)} · ${escapeHtml(x.tedarikciId?.unvan || x.tedarikciId?.adSoyad || "-")}</p></div><button class="erp-modal-close">×</button></div><div class="purchase-detail-meta"><span>Depo <b>${escapeHtml(x.depoId?.ad || "-")}</b></span><span>Durum <b>${escapeHtml(x.odemeDurumu)}</b></span><span>Kalan <b>${para(x.kalanTutar)}</b></span></div><div class="table-scroll"><table><thead><tr><th>Kod</th><th>Ürün</th><th>Miktar</th><th>Fiyat</th><th>KDV</th><th>İskonto</th><th>Toplam</th></tr></thead><tbody>${rows.map(k => `<tr><td>${escapeHtml(k.urunId?.kod || "-")}</td><td>${escapeHtml(k.urunId?.ad || "-")}</td><td>${Number(k.miktar)}</td><td>${para(k.birimFiyat)}</td><td>%${Number(k.kdv)}</td><td>%${Number(k.iskonto)}</td><td><b>${para(k.toplam)}</b></td></tr>`).join("")}</tbody></table></div><div class="purchase-totals"><span>Ara Toplam <b>${para(x.araToplam)}</b></span><span>KDV <b>${para(x.toplamKdv)}</b></span><span>Genel Toplam <b>${para(x.genelToplam)}</b></span></div><div class="erp-modal-footer"><button id="alisDetayYazdir" class="erp-primary-button">Yazdır / PDF</button><button data-kapat class="erp-small-button">Kapat</button></div></div>`; document.body.appendChild(overlay); const kapat = () => overlay.remove(); overlay.querySelectorAll(".erp-modal-close,[data-kapat]").forEach(b => b.onclick = kapat); overlay.querySelector("#alisDetayYazdir").onclick = () => stokYazdir(`Alış Faturası · ${x.belgeNo}`, rows.map(k => [k.urunId?.kod, k.urunId?.ad, k.miktar, para(k.birimFiyat), `%${k.kdv}`, `%${k.iskonto}`, para(k.toplam)]), ["Kod", "Ürün", "Miktar", "Birim Fiyat", "KDV", "İskonto", "Toplam"], `${x.tedarikciId?.unvan || ""} · Genel toplam ${para(x.genelToplam)}`); } catch (error) { alert(error.message); }
+    }
+
+    function alisIadeListesi(panel) { const rows = alisMerkezi.iadeler; panel.innerHTML = `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Alış İadeleri</h2><p>${rows.length} iade belgesi</p></div></div><div class="table-scroll"><table><thead><tr><th>Tarih / Belge</th><th>Tedarikçi</th><th>Depo</th><th>Kalem</th><th>Toplam</th><th>Açıklama</th></tr></thead><tbody>${rows.map(x => `<tr><td>${tarihKisa(x.tarih)}<small>${escapeHtml(x.belgeNo)}</small></td><td>${escapeHtml(x.tedarikciId?.unvan || x.tedarikciId?.adSoyad || "-")}</td><td>${escapeHtml(x.depoId?.ad || "-")}</td><td>${x.kalemler?.length || 0}</td><td><b>${para(x.genelToplam)}</b></td><td>${escapeHtml(x.aciklama || "-")}</td></tr>`).join("") || '<tr><td colspan="6">Alış iadesi bulunmuyor.</td></tr>'}</tbody></table></div></div>`; }
+
+    function alisTedarikciAnalizi(panel) { const map = {}; alisMerkezi.alislar.forEach(x => { const id = String(x.tedarikciId?._id || ""), ad = x.tedarikciId?.unvan || x.tedarikciId?.adSoyad || "Tedarikçi"; if (!map[id]) map[id] = { ad, adet: 0, toplam: 0, kalan: 0 }; map[id].adet++; map[id].toplam += Number(x.genelToplam || 0); map[id].kalan += Number(x.kalanTutar || 0); }); panel.innerHTML = `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Tedarikçi Satın Alma Analizi</h2><p>Toplam alış hacmi ve açık borç karşılaştırması</p></div></div><div class="table-scroll"><table><thead><tr><th>Tedarikçi</th><th>Belge</th><th>Toplam Alış</th><th>Açık Borç</th><th>Ortalama Belge</th></tr></thead><tbody>${Object.values(map).sort((a, b) => b.toplam - a.toplam).map(x => `<tr><td><b>${escapeHtml(x.ad)}</b></td><td>${x.adet}</td><td>${para(x.toplam)}</td><td>${para(x.kalan)}</td><td>${para(x.toplam / x.adet)}</td></tr>`).join("") || '<tr><td colspan="5">Analiz için alış kaydı yok.</td></tr>'}</tbody></table></div></div>`; }
+
+    function alisListeYazdir(rows, baslik) { stokYazdir(baslik, rows.map(x => [tarihKisa(x.tarih), x.belgeNo, x.tedarikciId?.unvan || x.tedarikciId?.adSoyad, x.depoId?.ad, para(x.genelToplam), para(x.odenenTutar), para(x.kalanTutar), x.odemeDurumu]), ["Tarih", "Belge", "Tedarikçi", "Depo", "Toplam", "Ödenen", "Kalan", "Durum"]); }
+    function alisExcelDokumu() { if (!window.XLSX) return alert("Excel kitaplığı yüklenemedi."); const ws = XLSX.utils.json_to_sheet(alisMerkezi.alislar.map(x => ({ Tarih: String(x.tarih || "").slice(0, 10), "Belge No": x.belgeNo, "Tedarikçi Kodu": x.tedarikciId?.kod || "", Tedarikçi: x.tedarikciId?.unvan || x.tedarikciId?.adSoyad || "", Depo: x.depoId?.ad || "", "Ara Toplam": Number(x.araToplam || 0), KDV: Number(x.toplamKdv || 0), "Genel Toplam": Number(x.genelToplam || 0), Ödenen: Number(x.odenenTutar || 0), Kalan: Number(x.kalanTutar || 0), Durum: x.odemeDurumu }))); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Alışlar"); XLSX.writeFile(wb, `alis-dokumu-${new Date().toISOString().slice(0, 10)}.xlsx`); }
+
+    let stokMerkezi = { stoklar: [], urunler: [], depolar: [], hareketler: [], transferler: [], sayimlar: [] };
+
+    function stokDurumu(item) {
+        const miktar = Number(item.miktar || 0);
+        const kritik = Number(item.urunId?.kritikStok || item.urunId?.minimumStok || 0);
+        if (kritik > 0 && miktar <= kritik) return { className: "danger", label: "Kritik" };
+        if (kritik > 0 && miktar <= kritik * 1.5) return { className: "warn", label: "Düşük" };
+        return { className: "ok", label: "Normal" };
+    }
+
+    function stokSecenekleri(list, selected = "") {
+        return list.map(x => `<option value="${x._id}" ${String(x._id) === String(selected) ? "selected" : ""}>${escapeHtml(x.kod || "")} · ${escapeHtml(x.ad || x.unvan || "")}</option>`).join("");
+    }
+
+    async function stokMerkeziYukle(aktifSekme = "liste") {
+        setTitle("Stok");
+        loading("Stok merkezi hazırlanıyor...");
+        try {
+            const [stokData, urunData, depoData, hareketData, transferData, sayimData] = await Promise.all([
+                api("/api/tenant/stok"),
+                api("/api/tenant/urunler?aktif=true"),
+                api("/api/tenant/stok/depolar"),
+                api("/api/tenant/stok/hareketler"),
+                api("/api/tenant/stok/transferler"),
+                api("/api/tenant/stok/sayimlar")
+            ]);
+            stokMerkezi = {
+                stoklar: stokData.stoklar || [],
+                urunler: urunData.urunler || [],
+                depolar: depoData.depolar || [],
+                hareketler: hareketData.hareketler || [],
+                transferler: transferData.transferler || [],
+                sayimlar: sayimData.sayimlar || []
+            };
+            const toplamMiktar = stokMerkezi.stoklar.reduce((n, x) => n + Number(x.miktar || 0), 0);
+            const stokDegeri = stokMerkezi.stoklar.reduce((n, x) => n + Number(x.miktar || 0) * Number(x.maliyet || x.urunId?.alisFiyati || 0), 0);
+            const kritikler = stokMerkezi.stoklar.filter(x => stokDurumu(x).className === "danger");
+            const hareketsiz = stokMerkezi.stoklar.filter(x => {
+                if (!x.sonHareketTarihi && !x.updatedAt) return true;
+                return Date.now() - new Date(x.sonHareketTarihi || x.updatedAt).getTime() > 30 * 86400000;
+            });
+
+            content.innerHTML = `<div class="stock-hero"><div><span>STOK MERKEZİ</span><h2>Depo, sayım ve transfer kontrolü</h2><p>Ürün bazlı stokları, kritik seviyeleri ve hareket geçmişini tek panelden yönetin.</p></div><div class="stock-hero-actions"><button id="stokExcel">Excel Dökümü</button><button id="stokYazdir">Yazdır / PDF</button><button id="stokYenile">Yenile</button><button id="stokHizliHareket">Hızlı Hareket</button></div></div><div class="dashboard-grid">${card("Toplam Stok", toplamMiktar, "Tüm depo satırları")}${card("Stok Değeri", para(stokDegeri), "Maliyet üzerinden")}${card("Kritik Satır", kritikler.length, "Acil kontrol")}${card("Hareketsiz", hareketsiz.length, "30 günü aşan")}${card("Aktif Depo", stokMerkezi.depolar.length, "Kullanılabilir depo")}</div><div class="stock-tabs">${[["liste", "Stok Listesi"], ["kritik", "Kritik Stok"], ["sayim", "Sayım Ekranı"], ["hareket", "Hareket İşle"], ["transfer", "Depo Transfer"], ["transferler", "Transfer Fişleri"], ["sayimlar", "Sayım Tutanakları"], ["depolar", "Depolar"], ["gecmis", "Hareket Geçmişi"]].map(([k, l]) => `<button data-stok-tab="${k}" class="${aktifSekme === k ? "active" : ""}">${l}</button>`).join("")}</div><div id="stokAltPanel"></div>`;
+
+            const panel = content.querySelector("#stokAltPanel");
+            let aktifStokSekme = aktifSekme;
+            const sekmeAc = key => {
+                aktifStokSekme = key;
+                content.querySelectorAll("[data-stok-tab]").forEach(b => b.classList.toggle("active", b.dataset.stokTab === key));
+                if (key === "kritik") return stokKritikPanel(panel);
+                if (key === "sayim") return stokSayimPaneli(panel);
+                if (key === "sayimlar") return stokSayimGecmisi(panel);
+                if (key === "hareket") return stokHareketFormu(panel);
+                if (key === "transfer") return stokTransferFormu(panel);
+                if (key === "transferler") return stokTransferGecmisi(panel);
+                if (key === "depolar") return stokDepoPaneli(panel);
+                if (key === "gecmis") return stokHareketGecmisi(panel);
+                return stokListePaneli(panel);
+            };
+            content.querySelectorAll("[data-stok-tab]").forEach(b => b.onclick = () => sekmeAc(b.dataset.stokTab));
+            content.querySelector("#stokYenile").onclick = () => stokMerkeziYukle(aktifStokSekme);
+            content.querySelector("#stokHizliHareket").onclick = () => sekmeAc("hareket");
+            content.querySelector("#stokExcel").onclick = stokExcelDokumu;
+            content.querySelector("#stokYazdir").onclick = () => stokYazdir("Güncel Stok Dökümü", stokMerkezi.stoklar.map(x => [x.urunId?.kod, x.urunId?.ad, x.depoId?.ad, x.miktar, x.urunId?.birim, para(x.maliyet), para(Number(x.miktar || 0) * Number(x.maliyet || 0))]), ["Kod", "Ürün", "Depo", "Miktar", "Birim", "Maliyet", "Değer"]);
+            sekmeAc(aktifSekme);
+        } catch (error) { errorBox(error); }
+    }
+
+    function stokYazdir(baslik, satirlar, kolonlar, altBilgi = "") {
+        const pencere = window.open("", "_blank");
+        if (!pencere) return alert("Döküm için açılır pencereye izin verin.");
+        pencere.opener = null;
+        const hucreler = satirlar.map(row => `<tr>${row.map(x => `<td>${escapeHtml(x ?? "-")}</td>`).join("")}</tr>`).join("");
+        pencere.document.write(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${escapeHtml(baslik)}</title><style>body{font:12px Arial;color:#172033;margin:28px}h1{font-size:22px;margin:0 0 5px}.meta{color:#64748b;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #cbd5e1;padding:7px;text-align:left}th{background:#e2e8f0}.footer{margin-top:24px;color:#475569}@media print{button{display:none}}</style></head><body><h1>BAHADIR ERP · ${escapeHtml(baslik)}</h1><div class="meta">Döküm tarihi: ${new Date().toLocaleString("tr-TR")}</div><table><thead><tr>${kolonlar.map(x => `<th>${escapeHtml(x)}</th>`).join("")}</tr></thead><tbody>${hucreler || `<tr><td colspan="${kolonlar.length}">Kayıt yok</td></tr>`}</tbody></table><div class="footer">${escapeHtml(altBilgi)}</div><script>window.onload=()=>window.print()<\/script></body></html>`);
+        pencere.document.close();
+    }
+
+    function stokExcelDokumu() {
+        if (!window.XLSX) return alert("Excel kitaplığı yüklenemedi.");
+        const rows = stokMerkezi.stoklar.map(x => ({ "Ürün Kodu": x.urunId?.kod || "", Barkod: x.urunId?.barkod || "", Ürün: x.urunId?.ad || "", Depo: x.depoId?.ad || "", "Depo Kodu": x.depoId?.kod || "", Miktar: Number(x.miktar || 0), Birim: x.urunId?.birim || "", Maliyet: Number(x.maliyet || 0), "Stok Değeri": Number(x.miktar || 0) * Number(x.maliyet || 0), Durum: stokDurumu(x).label, "Son Hareket": x.sonHareketTarihi || "" }));
+        const ws = XLSX.utils.json_to_sheet(rows), wb = XLSX.utils.book_new();
+        ws["!cols"] = [{ wch: 16 }, { wch: 18 }, { wch: 32 }, { wch: 24 }, { wch: 14 }, { wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 16 }, { wch: 12 }, { wch: 20 }];
+        XLSX.utils.book_append_sheet(wb, ws, "Stok Dökümü");
+        XLSX.writeFile(wb, `stok-dokumu-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    }
+
+    function stokSayimPaneli(panel) {
+        panel.innerHTML = `<div class="dashboard-panel stock-panel"><div class="panel-heading"><div><h2>Depo Sayım Ekranı</h2><p>Depoyu seçin, sayılan miktarları girin ve farkları tek tutanakla işleyin.</p></div><button id="sayimBosForm" class="erp-small-button">Boş Sayım Formu</button></div><div class="erp-form-grid"><label>Sayım No<input id="sayimBelgeNo" value="SYM-${Date.now()}"></label><label>Tarih<input id="sayimTarih" type="date" value="${new Date().toISOString().slice(0, 10)}"></label><label>Depo<select id="sayimDepo"><option value="">Depo seçin</option>${stokSecenekleri(stokMerkezi.depolar)}</select></label><label>Ürün Ara<input id="sayimAra" placeholder="Kod, barkod veya ürün"></label><label class="full">Açıklama<input id="sayimAciklama" placeholder="Sayım notu / ekip bilgisi"></label></div><div id="sayimMesaj"></div><div class="stock-count-summary" id="sayimOzet"></div><div class="table-scroll"><table><thead><tr><th>Kod / Barkod</th><th>Ürün</th><th>Birim</th><th>Sistem</th><th>Sayılan</th><th>Fark</th></tr></thead><tbody id="sayimGovde"><tr><td colspan="6">Sayım için depo seçin.</td></tr></tbody></table></div><div class="stock-form-actions"><button id="sayimKaydet" class="erp-primary-button" disabled>Sayımı Tamamla ve Farkları İşle</button></div></div>`;
+        const depo = panel.querySelector("#sayimDepo"), govde = panel.querySelector("#sayimGovde"), ozet = panel.querySelector("#sayimOzet");
+        const ozetle = () => { const rows = [...govde.querySelectorAll("tr[data-urun]")]; let arti = 0, eksi = 0, farkli = 0; rows.forEach(row => { const fark = Number(row.querySelector("input").value || 0) - Number(row.dataset.sistem || 0); row.querySelector("[data-fark]").textContent = fark > 0 ? `+${fark}` : String(fark); row.classList.toggle("stock-count-diff", fark !== 0); if (fark > 0) arti += fark; if (fark < 0) eksi += Math.abs(fark); if (fark) farkli++; }); ozet.innerHTML = `<span>${rows.length} ürün</span><span>${farkli} farklı satır</span><span class="positive">+${arti}</span><span class="negative">-${eksi}</span>`; };
+        const doldur = () => { const depoId = depo.value; if (!depoId) return; const map = new Map(stokMerkezi.stoklar.filter(x => String(x.depoId?._id) === depoId).map(x => [String(x.urunId?._id), Number(x.miktar || 0)])); govde.innerHTML = stokMerkezi.urunler.map(u => { const sistem = map.get(String(u._id)) || 0; return `<tr data-urun="${u._id}" data-sistem="${sistem}"><td><b>${escapeHtml(u.kod)}</b><small>${escapeHtml(u.barkod || "-")}</small></td><td>${escapeHtml(u.ad)}</td><td>${escapeHtml(u.birim || "")}</td><td><b>${sistem}</b></td><td><input class="stock-count-input" type="number" min="0" step="0.0001" value="${sistem}"></td><td data-fark>0</td></tr>`; }).join("") || '<tr><td colspan="6">Aktif ürün yok.</td></tr>'; govde.querySelectorAll("input").forEach(x => x.oninput = ozetle); panel.querySelector("#sayimKaydet").disabled = !stokMerkezi.urunler.length; ozetle(); };
+        depo.onchange = doldur;
+        panel.querySelector("#sayimAra").oninput = e => { const q = e.target.value.toLocaleLowerCase("tr-TR"); govde.querySelectorAll("tr[data-urun]").forEach(row => row.hidden = !row.textContent.toLocaleLowerCase("tr-TR").includes(q)); };
+        panel.querySelector("#sayimBosForm").onclick = () => { if (!depo.value) return alert("Önce depo seçin."); stokYazdir(`Boş Sayım Formu · ${depo.options[depo.selectedIndex].text}`, [...govde.querySelectorAll("tr[data-urun]")].map(r => [r.cells[0].innerText, r.cells[1].innerText, r.cells[2].innerText, r.dataset.sistem, "", ""]), ["Kod / Barkod", "Ürün", "Birim", "Sistem", "Sayılan", "Fark"]); };
+        panel.querySelector("#sayimKaydet").onclick = async () => { if (!depo.value) return alert("Depo seçin."); if (!confirm("Sayım tamamlanacak ve stok farkları işlenecek. Devam edilsin mi?")) return; const mesaj = panel.querySelector("#sayimMesaj"); try { const kalemler = [...govde.querySelectorAll("tr[data-urun]")].map(row => ({ urunId: row.dataset.urun, sayilanMiktar: Number(row.querySelector("input").value) })); await api("/api/tenant/stok/sayim", { method: "POST", body: JSON.stringify({ belgeNo: panel.querySelector("#sayimBelgeNo").value, tarih: panel.querySelector("#sayimTarih").value, depoId: depo.value, aciklama: panel.querySelector("#sayimAciklama").value, kalemler }) }); await stokMerkeziYukle("sayimlar"); } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } };
+    }
+
+    function stokListePaneli(panel) {
+        const rows = stokMerkezi.stoklar;
+        const depoOptions = stokSecenekleri(stokMerkezi.depolar);
+        panel.innerHTML = `<div class="dashboard-panel stock-panel"><div class="stock-filterbar"><input id="stokAra" class="erp-input" placeholder="Kod, barkod, ürün veya depo ara"><select id="stokDepoFiltre"><option value="">Tüm depolar</option>${depoOptions}</select><select id="stokDurumFiltre"><option value="">Tüm durumlar</option><option value="danger">Kritik</option><option value="warn">Düşük</option><option value="ok">Normal</option></select></div><div class="table-scroll"><table><thead><tr><th>Ürün</th><th>Depo</th><th>Miktar</th><th>Maliyet</th><th>Değer</th><th>Durum</th><th>Son Hareket</th></tr></thead><tbody id="stokListeGovde">${rows.length ? rows.map(x => { const durum = stokDurumu(x); return `<tr data-depo="${x.depoId?._id || ""}" data-durum="${durum.className}"><td><b>${escapeHtml(x.urunId?.kod || "-")}</b><small>${escapeHtml(x.urunId?.ad || "-")} · ${escapeHtml(x.urunId?.barkod || "Barkod yok")}</small></td><td>${escapeHtml(x.depoId?.ad || "-")}<small>${escapeHtml(x.depoId?.kod || "")}</small></td><td><b>${Number(x.miktar || 0)} ${escapeHtml(x.urunId?.birim || "")}</b></td><td>${para(x.maliyet || x.urunId?.alisFiyati)}</td><td>${para(Number(x.miktar || 0) * Number(x.maliyet || x.urunId?.alisFiyati || 0))}</td><td><span class="stock-status ${durum.className}">${durum.label}</span></td><td>${x.sonHareketTarihi ? tarihKisa(x.sonHareketTarihi) : "-"}</td></tr>`; }).join("") : '<tr><td colspan="7">Henüz stok kaydı yok.</td></tr>'}</tbody></table></div></div>`;
+        const uygula = () => {
+            const q = panel.querySelector("#stokAra").value.toLocaleLowerCase("tr-TR");
+            const depo = panel.querySelector("#stokDepoFiltre").value;
+            const durum = panel.querySelector("#stokDurumFiltre").value;
+            panel.querySelectorAll("#stokListeGovde tr").forEach(row => {
+                if (!row.dataset.durum) return;
+                row.hidden = (q && !row.textContent.toLocaleLowerCase("tr-TR").includes(q)) || (depo && row.dataset.depo !== depo) || (durum && row.dataset.durum !== durum);
+            });
+        };
+        panel.querySelector("#stokAra").oninput = uygula;
+        panel.querySelector("#stokDepoFiltre").onchange = uygula;
+        panel.querySelector("#stokDurumFiltre").onchange = uygula;
+    }
+
+    function stokKritikPanel(panel) {
+        const kritikler = stokMerkezi.stoklar.filter(x => stokDurumu(x).className !== "ok");
+        panel.innerHTML = `<div class="dashboard-panel stock-panel"><div class="panel-heading"><div><h2>Kritik ve Düşük Stok</h2><p>Minimum veya kritik seviyeye yaklaşan ürünler.</p></div></div><div class="table-scroll"><table><thead><tr><th>Ürün</th><th>Depo</th><th>Mevcut</th><th>Kritik</th><th>Minimum</th><th>Öneri</th></tr></thead><tbody>${kritikler.length ? kritikler.map(x => { const mevcut = Number(x.miktar || 0), kritik = Number(x.urunId?.kritikStok || 0), min = Number(x.urunId?.minimumStok || 0), hedef = Math.max(kritik, min); return `<tr><td><b>${escapeHtml(x.urunId?.kod || "-")}</b><small>${escapeHtml(x.urunId?.ad || "-")}</small></td><td>${escapeHtml(x.depoId?.ad || "-")}</td><td><b>${mevcut}</b></td><td>${kritik}</td><td>${min}</td><td>${hedef > mevcut ? `${hedef - mevcut} ${escapeHtml(x.urunId?.birim || "")} tamamlanmalı` : "Kontrol edin"}</td></tr>`; }).join("") : '<tr><td colspan="6">Kritik stok bulunmuyor.</td></tr>'}</tbody></table></div></div>`;
+    }
+
+    function stokHareketFormu(panel) {
+        panel.innerHTML = `<div class="dashboard-panel stock-panel"><div class="panel-heading"><div><h2>Manuel Stok Hareketi</h2><p>Giriş, çıkış, sayım farkı veya iade hareketi işleyin.</p></div></div><form id="stokHareketForm" class="erp-form-grid"><label>Ürün<select name="urunId" required><option value="">Ürün seçin</option>${stokSecenekleri(stokMerkezi.urunler)}</select></label><label>Depo<select name="depoId" required><option value="">Depo seçin</option>${stokSecenekleri(stokMerkezi.depolar)}</select></label><label>Hareket Tipi<select name="tip" required><option value="GIRIS">Giriş</option><option value="CIKIS">Çıkış</option><option value="SAYIM_ARTI">Sayım Fazlası</option><option value="SAYIM_EKSI">Sayım Eksiği</option><option value="IADE_GIRIS">İade Giriş</option><option value="IADE_CIKIS">İade Çıkış</option></select></label><label>Miktar<input name="miktar" type="number" min="0.0001" step="0.0001" required></label><label>Birim Maliyet<input name="birimMaliyet" type="number" min="0" step="0.01" placeholder="Mevcut maliyet"></label><label class="full">Açıklama<textarea name="aciklama" placeholder="Sayım, düzeltme veya işlem notu"></textarea></label><div id="stokHareketMesaj" class="full"></div><div class="full"><button class="erp-primary-button" type="submit">Hareketi Kaydet</button></div></form></div>`;
+        panel.querySelector("#stokHareketForm").onsubmit = async event => {
+            event.preventDefault();
+            const form = event.currentTarget, mesaj = panel.querySelector("#stokHareketMesaj");
+            try {
+                const body = Object.fromEntries(new FormData(form).entries());
+                body.miktar = Number(body.miktar || 0);
+                if (body.birimMaliyet === "") delete body.birimMaliyet;
+                else body.birimMaliyet = Number(body.birimMaliyet);
+                await api("/api/tenant/stok/hareket", { method: "POST", body: JSON.stringify(body) });
+                mesaj.innerHTML = `<div class="success">Stok hareketi kaydedildi.</div>`;
+                await stokMerkeziYukle("liste");
+            } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; }
+        };
+    }
+
+    function stokTransferFormu(panel) {
+        panel.innerHTML = `<div class="dashboard-panel stock-panel"><div class="panel-heading"><div><h2>Depolar Arası Transfer Fişi</h2><p>Kaynak stok kontrolüyle çift taraflı depo hareketi ve kalıcı transfer fişi oluşturun.</p></div></div><form id="stokTransferForm" class="erp-form-grid"><label>Transfer No<input name="belgeNo" value="TRF-${Date.now()}" required></label><label>Tarih<input name="tarih" type="date" value="${new Date().toISOString().slice(0, 10)}" required></label><label>Ürün<select name="urunId" required><option value="">Ürün seçin</option>${stokSecenekleri(stokMerkezi.urunler)}</select></label><label>Çıkış Deposu<select name="kaynakDepoId" required><option value="">Depo seçin</option>${stokSecenekleri(stokMerkezi.depolar)}</select></label><label>Giriş Deposu<select name="hedefDepoId" required><option value="">Depo seçin</option>${stokSecenekleri(stokMerkezi.depolar)}</select></label><label>Miktar<input name="miktar" type="number" min="0.0001" step="0.0001" required></label><label>Birim Maliyet<input name="birimMaliyet" type="number" min="0" step="0.01" placeholder="Kaynak maliyet kullanılır"></label><label class="full">Açıklama<textarea name="aciklama" placeholder="Sevk, araç, teslim alan veya transfer notu"></textarea></label><div id="stokTransferMesaj" class="full"></div><div class="full"><button class="erp-primary-button" type="submit">Transfer Fişini Oluştur</button></div></form></div>`;
+        panel.querySelector("#stokTransferForm").onsubmit = async event => {
+            event.preventDefault();
+            const form = event.currentTarget, mesaj = panel.querySelector("#stokTransferMesaj");
+            try {
+                const body = Object.fromEntries(new FormData(form).entries());
+                body.miktar = Number(body.miktar || 0);
+                if (body.birimMaliyet === "") delete body.birimMaliyet;
+                else body.birimMaliyet = Number(body.birimMaliyet);
+                await api("/api/tenant/stok/transfer", { method: "POST", body: JSON.stringify(body) });
+                mesaj.innerHTML = `<div class="success">Depo transferi kaydedildi.</div>`;
+                await stokMerkeziYukle("liste");
+            } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; }
+        };
+    }
+
+    function stokTransferGecmisi(panel) {
+        const rows = stokMerkezi.transferler;
+        panel.innerHTML = `<div class="dashboard-panel stock-panel"><div class="panel-heading"><div><h2>Transfer Fişleri</h2><p>${rows.length} kayıtlı depo transferi</p></div></div><div class="table-scroll"><table><thead><tr><th>Tarih / Fiş</th><th>Ürün</th><th>Kaynak</th><th>Hedef</th><th>Miktar</th><th>Değer</th><th></th></tr></thead><tbody>${rows.length ? rows.map((x, i) => `<tr><td>${tarihKisa(x.tarih)}<small>${escapeHtml(x.belgeNo)}</small></td><td><b>${escapeHtml(x.urunId?.kod || "-")}</b><small>${escapeHtml(x.urunId?.ad || "-")}</small></td><td>${escapeHtml(x.kaynakDepoId?.ad || "-")}</td><td>${escapeHtml(x.hedefDepoId?.ad || "-")}</td><td><b>${Number(x.miktar || 0)} ${escapeHtml(x.urunId?.birim || "")}</b></td><td>${para(Number(x.miktar || 0) * Number(x.birimMaliyet || 0))}</td><td><button class="erp-small-button" data-transfer-yazdir="${i}">Döküm</button></td></tr>`).join("") : '<tr><td colspan="7">Transfer fişi bulunmuyor.</td></tr>'}</tbody></table></div></div>`;
+        panel.querySelectorAll("[data-transfer-yazdir]").forEach(button => button.onclick = () => { const x = rows[Number(button.dataset.transferYazdir)]; stokYazdir(`Transfer Fişi · ${x.belgeNo}`, [[tarihKisa(x.tarih), x.urunId?.kod, x.urunId?.ad, x.kaynakDepoId?.ad, x.hedefDepoId?.ad, `${x.miktar} ${x.urunId?.birim || ""}`, para(x.birimMaliyet), para(Number(x.miktar || 0) * Number(x.birimMaliyet || 0))]], ["Tarih", "Kod", "Ürün", "Çıkış Deposu", "Giriş Deposu", "Miktar", "Maliyet", "Toplam"], x.aciklama || ""); });
+    }
+
+    function stokSayimGecmisi(panel) {
+        const rows = stokMerkezi.sayimlar;
+        panel.innerHTML = `<div class="dashboard-panel stock-panel"><div class="panel-heading"><div><h2>Sayım Tutanakları</h2><p>Tamamlanan sayımlar ve işlenen farklar</p></div></div><div class="table-scroll"><table><thead><tr><th>Tarih / Tutanak</th><th>Depo</th><th>Kalem</th><th>Farklı</th><th>Artı</th><th>Eksi</th><th></th></tr></thead><tbody>${rows.length ? rows.map((x, i) => { const farkli = x.kalemler.filter(k => Number(k.fark) !== 0), arti = farkli.filter(k => k.fark > 0).reduce((n, k) => n + k.fark, 0), eksi = farkli.filter(k => k.fark < 0).reduce((n, k) => n + Math.abs(k.fark), 0); return `<tr><td>${tarihKisa(x.tarih)}<small>${escapeHtml(x.belgeNo)}</small></td><td>${escapeHtml(x.depoId?.ad || "-")}</td><td>${x.kalemler.length}</td><td><b>${farkli.length}</b></td><td class="stock-positive">+${arti}</td><td class="stock-negative">-${eksi}</td><td><button class="erp-small-button" data-sayim-yazdir="${i}">Tutanak</button></td></tr>`; }).join("") : '<tr><td colspan="7">Sayım tutanağı bulunmuyor.</td></tr>'}</tbody></table></div></div>`;
+        panel.querySelectorAll("[data-sayim-yazdir]").forEach(button => button.onclick = () => { const x = rows[Number(button.dataset.sayimYazdir)]; stokYazdir(`Sayım Tutanağı · ${x.belgeNo}`, x.kalemler.map(k => [k.urunId?.kod, k.urunId?.ad, k.sistemMiktari, k.sayilanMiktar, k.fark > 0 ? `+${k.fark}` : k.fark, k.urunId?.birim]), ["Kod", "Ürün", "Sistem", "Sayılan", "Fark", "Birim"], `${x.depoId?.ad || ""} · ${x.aciklama || ""}`); });
+    }
+
+    function stokDepoPaneli(panel) {
+        panel.innerHTML = `<div class="stock-two-column"><div class="dashboard-panel stock-panel"><div class="panel-heading"><div><h2>Depolar</h2><p>Aktif depo listesi ve stok satırı sayıları.</p></div></div><div class="stock-depot-list">${stokMerkezi.depolar.length ? stokMerkezi.depolar.map(d => { const satir = stokMerkezi.stoklar.filter(x => String(x.depoId?._id) === String(d._id)); const miktar = satir.reduce((n, x) => n + Number(x.miktar || 0), 0); return `<div class="stock-depot"><b>${escapeHtml(d.kod)} · ${escapeHtml(d.ad)}</b><span>${miktar} adet · ${satir.length} ürün satırı</span><small>${escapeHtml(d.adres || "Adres yok")}</small></div>`; }).join("") : "<p>Henüz depo yok.</p>"}</div></div><div class="dashboard-panel stock-panel"><div class="panel-heading"><div><h2>Yeni Depo</h2><p>Stok işlemleri için depo kartı açın.</p></div></div><form id="stokDepoForm" class="erp-form-grid"><label>Depo Kodu<input name="kod" required maxlength="30"></label><label>Depo Adı<input name="ad" required maxlength="120"></label><label class="full">Adres<textarea name="adres"></textarea></label><div id="stokDepoMesaj" class="full"></div><div class="full"><button class="erp-primary-button" type="submit">Depoyu Kaydet</button></div></form></div></div>`;
+        panel.querySelector("#stokDepoForm").onsubmit = async event => {
+            event.preventDefault();
+            const mesaj = panel.querySelector("#stokDepoMesaj");
+            try {
+                await api("/api/tenant/stok/depolar", { method: "POST", body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget).entries())) });
+                await stokMerkeziYukle("depolar");
+            } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; }
+        };
+    }
+
+    function stokHareketGecmisi(panel) {
+        const rows = stokMerkezi.hareketler;
+        panel.innerHTML = `<div class="dashboard-panel stock-panel"><div class="stock-filterbar"><input id="stokHareketAra" class="erp-input" placeholder="Hareket, ürün, depo veya açıklama ara"><select id="stokHareketTip"><option value="">Tüm hareketler</option>${["GIRIS", "CIKIS", "SAYIM_ARTI", "SAYIM_EKSI", "IADE_GIRIS", "IADE_CIKIS", "TRANSFER_GIRIS", "TRANSFER_CIKIS"].map(x => `<option value="${x}">${x}</option>`).join("")}</select></div><div class="table-scroll"><table><thead><tr><th>Tarih</th><th>Tip</th><th>Ürün</th><th>Depo</th><th>Miktar</th><th>Maliyet</th><th>Kaynak</th><th>Açıklama</th></tr></thead><tbody id="stokHareketGovde">${rows.length ? rows.map(x => `<tr data-tip="${escapeHtml(x.tip || "")}"><td>${tarihKisa(x.createdAt || x.tarih)}</td><td><span class="stock-status ${String(x.tip || "").includes("CIKIS") || String(x.tip || "").includes("EKSI") ? "danger" : "ok"}">${escapeHtml(x.tip || "-")}</span></td><td><b>${escapeHtml(x.urunId?.kod || "-")}</b><small>${escapeHtml(x.urunId?.ad || "-")}</small></td><td>${escapeHtml(x.depoId?.ad || "-")}</td><td><b>${Number(x.miktar || 0)}</b></td><td>${para(x.birimMaliyet)}</td><td>${escapeHtml(x.kaynak || "-")}</td><td>${escapeHtml(x.aciklama || "-")}</td></tr>`).join("") : '<tr><td colspan="8">Henüz stok hareketi yok.</td></tr>'}</tbody></table></div></div>`;
+        const uygula = () => {
+            const q = panel.querySelector("#stokHareketAra").value.toLocaleLowerCase("tr-TR");
+            const tip = panel.querySelector("#stokHareketTip").value;
+            panel.querySelectorAll("#stokHareketGovde tr").forEach(row => {
+                if (!row.dataset.tip) return;
+                row.hidden = (q && !row.textContent.toLocaleLowerCase("tr-TR").includes(q)) || (tip && row.dataset.tip !== tip);
+            });
+        };
+        panel.querySelector("#stokHareketAra").oninput = uygula;
+        panel.querySelector("#stokHareketTip").onchange = uygula;
     }
 
     let urunV2Liste = [];
@@ -3604,12 +3886,14 @@ async function dashboardYukle() {
         return new Promise((resolve, reject) => {
             const img = new Image(), reader = new FileReader();
             reader.onerror = () => reject(new Error("Görsel okunamadı."));
-            reader.onload = () => { img.onerror = () => reject(new Error("Görsel açılamadı.")); img.onload = () => {
-                const max = 1000, oran = Math.min(1, max / Math.max(img.width, img.height));
-                const canvas = document.createElement("canvas"); canvas.width = Math.round(img.width * oran); canvas.height = Math.round(img.height * oran);
-                canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-                resolve(canvas.toDataURL("image/jpeg", .82));
-            }; img.src = reader.result; }; reader.readAsDataURL(file);
+            reader.onload = () => {
+                img.onerror = () => reject(new Error("Görsel açılamadı.")); img.onload = () => {
+                    const max = 1000, oran = Math.min(1, max / Math.max(img.width, img.height));
+                    const canvas = document.createElement("canvas"); canvas.width = Math.round(img.width * oran); canvas.height = Math.round(img.height * oran);
+                    canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+                    resolve(canvas.toDataURL("image/jpeg", .82));
+                }; img.src = reader.result;
+            }; reader.readAsDataURL(file);
         });
     }
 
@@ -3618,36 +3902,36 @@ async function dashboardYukle() {
         const kategoriler = kategoriData.kategoriler || [];
         document.getElementById("urunV2Modal")?.remove();
         const v = mevcut || {}, overlay = document.createElement("div"); overlay.id = "urunV2Modal"; overlay.className = "erp-modal-overlay";
-        const alan = (n,l,t="text",r=false) => `<label>${l}<input name="${n}" type="${t}" ${r?"required":""} ${t==="number"?'min="0" step="0.01"':""} value="${escapeHtml(v[n] ?? "")}"></label>`;
-        overlay.innerHTML = `<div class="erp-modal product-modal"><div class="erp-modal-header"><div><h2>${mevcut?"Ürün Kartını Düzenle":"Yeni Ürün"}</h2><p>Kod, barkod, fiyat, stok ve görsel bilgileri</p></div><button type="button" class="erp-modal-close">×</button></div><form><div class="product-form-layout"><div class="product-photo-editor"><div id="urunGorselOnizleme" class="product-photo">${v.gorsel?`<img src="${v.gorsel}" alt="Ürün">`:'<span>📦</span>'}</div><label class="erp-small-button">Görsel Seç<input name="gorselDosya" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden></label><small>Telefon kamerası veya galeriden eklenebilir.</small></div><div class="erp-form-grid">${alan("kod","Ürün Kodu / SKU","text",true)}${alan("barkod","Barkod")}${alan("ad","Ürün Adı","text",true)}<label>Kategori<select name="kategori"><option value="">Kategori seçin</option>${[...new Set([...kategoriler,v.kategori].filter(Boolean))].map(x=>`<option value="${escapeHtml(x)}" ${v.kategori===x?"selected":""}>${escapeHtml(x)}</option>`).join("")}</select></label>${alan("marka","Marka")}${alan("model","Model")}<label>Birim<select name="birim">${["ADET","KUTU","PAKET","KG","LT","MT"].map(x=>`<option ${v.birim===x?"selected":""}>${x}</option>`).join("")}</select></label>${alan("kdv","KDV %","number")}${alan("alisFiyati","Alış Fiyatı","number")}${alan("satisFiyati","Satış Fiyatı","number")}${alan("bayiFiyati","Bayi Fiyatı","number")}${alan("perakendeFiyati","Perakende Fiyatı","number")}${alan("minimumStok","Minimum Stok","number")}${alan("kritikStok","Kritik Stok","number")}${alan("uyumluluk","Uyumluluk (virgülle)")}<label class="full">Notlar<textarea name="notlar">${escapeHtml(v.notlar||"")}</textarea></label><label class="full"><span><input name="aktif" type="checkbox" ${v.aktif===false?"":"checked"}> Aktif ürün</span></label></div></div><div id="urunV2Mesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button" data-kapat>Vazgeç</button><button class="erp-primary-button" type="submit">Ürünü Kaydet</button></div></form></div>`;
-        document.body.appendChild(overlay); const kapat=()=>overlay.remove(); overlay.querySelectorAll(".erp-modal-close,[data-kapat]").forEach(x=>x.onclick=kapat);
-        let gorsel = v.gorsel || ""; overlay.querySelector('[name="gorselDosya"]').onchange=async e=>{try{gorsel=await urunGorselHazirla(e.target.files[0]);overlay.querySelector("#urunGorselOnizleme").innerHTML=`<img src="${gorsel}" alt="Ürün">`;}catch(error){overlay.querySelector("#urunV2Mesaj").innerHTML=`<div class="error">${escapeHtml(error.message)}</div>`;}};
-        overlay.querySelector("form").onsubmit=async e=>{e.preventDefault();const mesaj=overlay.querySelector("#urunV2Mesaj");try{const fd=new FormData(e.currentTarget), veri={};for(const [k,val] of fd.entries())if(k!=="gorselDosya")veri[k]=val;["kdv","alisFiyati","satisFiyati","bayiFiyati","perakendeFiyati","minimumStok","kritikStok"].forEach(k=>veri[k]=Number(veri[k]||0));veri.uyumluluk=String(veri.uyumluluk||"").split(",").map(x=>x.trim()).filter(Boolean);veri.aktif=e.currentTarget.elements.aktif.checked;veri.gorsel=gorsel;const sonuc=await api(mevcut?`/api/tenant/urunler/${mevcut._id}`:"/api/tenant/urunler",{method:mevcut?"PATCH":"POST",body:JSON.stringify(veri)});await api(`/api/tenant/urunler/${sonuc.urun._id}`);kapat();await urunDashboardAc(sonuc.urun._id);}catch(error){mesaj.innerHTML=`<div class="error">${escapeHtml(error.message)}</div>`;}};
+        const alan = (n, l, t = "text", r = false) => `<label>${l}<input name="${n}" type="${t}" ${r ? "required" : ""} ${t === "number" ? 'min="0" step="0.01"' : ""} value="${escapeHtml(v[n] ?? "")}"></label>`;
+        overlay.innerHTML = `<div class="erp-modal product-modal"><div class="erp-modal-header"><div><h2>${mevcut ? "Ürün Kartını Düzenle" : "Yeni Ürün"}</h2><p>Kod, barkod, fiyat, stok ve görsel bilgileri</p></div><button type="button" class="erp-modal-close">×</button></div><form><div class="product-form-layout"><div class="product-photo-editor"><div id="urunGorselOnizleme" class="product-photo">${v.gorsel ? `<img src="${v.gorsel}" alt="Ürün">` : '<span>📦</span>'}</div><label class="erp-small-button">Görsel Seç<input name="gorselDosya" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden></label><small>Telefon kamerası veya galeriden eklenebilir.</small></div><div class="erp-form-grid">${alan("kod", "Ürün Kodu / SKU", "text", true)}${alan("barkod", "Barkod")}${alan("ad", "Ürün Adı", "text", true)}<label>Kategori<select name="kategori"><option value="">Kategori seçin</option>${[...new Set([...kategoriler, v.kategori].filter(Boolean))].map(x => `<option value="${escapeHtml(x)}" ${v.kategori === x ? "selected" : ""}>${escapeHtml(x)}</option>`).join("")}</select></label>${alan("marka", "Marka")}${alan("model", "Model")}<label>Birim<select name="birim">${["ADET", "KUTU", "PAKET", "KG", "LT", "MT"].map(x => `<option ${v.birim === x ? "selected" : ""}>${x}</option>`).join("")}</select></label>${alan("kdv", "KDV %", "number")}${alan("alisFiyati", "Alış Fiyatı", "number")}${alan("satisFiyati", "Satış Fiyatı", "number")}${alan("bayiFiyati", "Bayi Fiyatı", "number")}${alan("perakendeFiyati", "Perakende Fiyatı", "number")}${alan("minimumStok", "Minimum Stok", "number")}${alan("kritikStok", "Kritik Stok", "number")}${alan("uyumluluk", "Uyumluluk (virgülle)")}<label class="full">Notlar<textarea name="notlar">${escapeHtml(v.notlar || "")}</textarea></label><label class="full"><span><input name="aktif" type="checkbox" ${v.aktif === false ? "" : "checked"}> Aktif ürün</span></label></div></div><div id="urunV2Mesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button" data-kapat>Vazgeç</button><button class="erp-primary-button" type="submit">Ürünü Kaydet</button></div></form></div>`;
+        document.body.appendChild(overlay); const kapat = () => overlay.remove(); overlay.querySelectorAll(".erp-modal-close,[data-kapat]").forEach(x => x.onclick = kapat);
+        let gorsel = v.gorsel || ""; overlay.querySelector('[name="gorselDosya"]').onchange = async e => { try { gorsel = await urunGorselHazirla(e.target.files[0]); overlay.querySelector("#urunGorselOnizleme").innerHTML = `<img src="${gorsel}" alt="Ürün">`; } catch (error) { overlay.querySelector("#urunV2Mesaj").innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } };
+        overlay.querySelector("form").onsubmit = async e => { e.preventDefault(); const mesaj = overlay.querySelector("#urunV2Mesaj"); try { const fd = new FormData(e.currentTarget), veri = {}; for (const [k, val] of fd.entries()) if (k !== "gorselDosya") veri[k] = val;["kdv", "alisFiyati", "satisFiyati", "bayiFiyati", "perakendeFiyati", "minimumStok", "kritikStok"].forEach(k => veri[k] = Number(veri[k] || 0)); veri.uyumluluk = String(veri.uyumluluk || "").split(",").map(x => x.trim()).filter(Boolean); veri.aktif = e.currentTarget.elements.aktif.checked; veri.gorsel = gorsel; const sonuc = await api(mevcut ? `/api/tenant/urunler/${mevcut._id}` : "/api/tenant/urunler", { method: mevcut ? "PATCH" : "POST", body: JSON.stringify(veri) }); await api(`/api/tenant/urunler/${sonuc.urun._id}`); kapat(); await urunDashboardAc(sonuc.urun._id); } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } };
     }
 
-    async function urunDashboardAc(id, sekme="ozet") {
+    async function urunDashboardAc(id, sekme = "ozet") {
         try {
-            const [ud, sd, hd] = await Promise.all([api(`/api/tenant/urunler/${id}`),api(`/api/tenant/stok?urunId=${id}`),api(`/api/tenant/stok/hareketler?urunId=${id}`)]);
-            const u=ud.urun, stoklar=sd.stoklar||[], hareketler=hd.hareketler||[]; urunV2Index=urunV2Liste.findIndex(x=>String(x._id)===String(id)); if(urunV2Index<0){urunV2Liste.push(u);urunV2Index=urunV2Liste.length-1;}
-            const toplam=stoklar.reduce((n,x)=>n+Number(x.miktar||0),0), maliyet=stoklar.reduce((n,x)=>n+Number(x.miktar||0)*Number(x.maliyet||u.alisFiyati||0),0), kritik=toplam<=Number(u.kritikStok||u.minimumStok||0);
-            setTitle("Ürün Kartı"); content.innerHTML=`<div class="product-hero"><div class="product-identity"><div class="product-avatar">${u.gorsel?`<img src="${u.gorsel}" alt="${escapeHtml(u.ad)}">`:'📦'}</div><div><span>ÜRÜN KARTI · ${escapeHtml(u.kod)}</span><h2>${escapeHtml(u.ad)}</h2><p>${escapeHtml([u.marka,u.model,u.kategori].filter(Boolean).join(" · ")||"Kategori bilgisi yok")}</p></div></div><div class="supplier-nav"><button id="urunListe">Liste</button><button id="urunOnceki" ${urunV2Index<=0?"disabled":""}>← Önceki</button><button id="urunSonraki" ${urunV2Index>=urunV2Liste.length-1?"disabled":""}>Sonraki →</button></div></div><div class="dashboard-grid">${card("Mevcut Stok",`${toplam} ${u.birim||"ADET"}`,kritik?"Kritik stok seviyesinde":"Stok seviyesi normal")}${card("Stok Değeri",para(maliyet),"Güncel maliyet")}${card("Alış / Satış",`${para(u.alisFiyati)} / ${para(u.satisFiyati)}`,"Standart fiyatlar")}${card("Tahmini Marj",para(Number(u.satisFiyati||0)-Number(u.alisFiyati||0)),"Birim brüt fark")}</div><div class="supplier-tabs">${[["ozet","Özet"],["stok","Depo Stokları"],["hareket","Stok Hareketleri"],["duzenle","Düzenle"]].map(([k,l])=>`<button class="${sekme===k?"active":""}" data-urun-tab="${k}">${l}</button>`).join("")}</div><div id="urunAltPanel"></div>`;
-            const panel=content.querySelector("#urunAltPanel"), ac=k=>{if(k==="duzenle")return urunFormAc(u);if(k==="stok")panel.innerHTML=`<div class="dashboard-panel"><h2>Depo Bazlı Stok</h2><div class="table-scroll"><table><thead><tr><th>Depo</th><th>Miktar</th><th>Maliyet</th><th>Stok Değeri</th></tr></thead><tbody>${stoklar.length?stoklar.map(x=>`<tr><td>${escapeHtml(x.depoId?.ad||"-")}</td><td><b>${Number(x.miktar||0)} ${escapeHtml(u.birim||"")}</b></td><td>${para(x.maliyet)}</td><td>${para(Number(x.miktar||0)*Number(x.maliyet||0))}</td></tr>`).join(""):'<tr><td colspan="4">Bu ürün için stok kaydı yok.</td></tr>'}</tbody></table></div></div>`;else if(k==="hareket")panel.innerHTML=`<div class="dashboard-panel"><h2>Stok Hareketleri</h2><div class="table-scroll"><table><thead><tr><th>Tarih</th><th>Tür</th><th>Depo</th><th>Miktar</th><th>Birim Maliyet</th><th>Açıklama</th></tr></thead><tbody>${hareketler.length?hareketler.map(x=>`<tr><td>${tarihKisa(x.tarih||x.createdAt)}</td><td>${escapeHtml(x.tip||"-")}</td><td>${escapeHtml(x.depoId?.ad||"-")}</td><td><b>${Number(x.miktar||0)}</b></td><td>${para(x.birimMaliyet||x.maliyet)}</td><td>${escapeHtml(x.aciklama||"-")}</td></tr>`).join(""):'<tr><td colspan="6">Stok hareketi bulunmuyor.</td></tr>'}</tbody></table></div></div>`;else panel.innerHTML=`<div class="dashboard-panel"><h2>Ürün Bilgileri</h2><div class="supplier-info"><div><b>Barkod</b><span>${escapeHtml(u.barkod||"-")}</span></div><div><b>Kategori</b><span>${escapeHtml(u.kategori||"-")}</span></div><div><b>Birim / KDV</b><span>${escapeHtml(u.birim||"-")} · %${Number(u.kdv||0)}</span></div><div><b>Bayi Fiyatı</b><span>${para(u.bayiFiyati)}</span></div><div><b>Perakende Fiyatı</b><span>${para(u.perakendeFiyati||u.satisFiyati)}</span></div><div><b>Durum</b><span>${u.aktif===false?"Pasif":"Aktif"}</span></div><div><b>Uyumluluk</b><span>${escapeHtml((u.uyumluluk||[]).join(", ")||"-")}</span></div><div><b>Minimum / Kritik</b><span>${Number(u.minimumStok||0)} / ${Number(u.kritikStok||0)}</span></div><div><b>Not</b><span>${escapeHtml(u.notlar||"-")}</span></div></div></div>`;};
-            content.querySelectorAll("[data-urun-tab]").forEach(b=>b.onclick=()=>ac(b.dataset.urunTab));content.querySelector("#urunListe").onclick=urunlerYukle;content.querySelector("#urunOnceki").onclick=()=>urunDashboardAc(urunV2Liste[urunV2Index-1]._id);content.querySelector("#urunSonraki").onclick=()=>urunDashboardAc(urunV2Liste[urunV2Index+1]._id);ac(sekme);
-        } catch(error){errorBox(error);}
+            const [ud, sd, hd] = await Promise.all([api(`/api/tenant/urunler/${id}`), api(`/api/tenant/stok?urunId=${id}`), api(`/api/tenant/stok/hareketler?urunId=${id}`)]);
+            const u = ud.urun, stoklar = sd.stoklar || [], hareketler = hd.hareketler || []; urunV2Index = urunV2Liste.findIndex(x => String(x._id) === String(id)); if (urunV2Index < 0) { urunV2Liste.push(u); urunV2Index = urunV2Liste.length - 1; }
+            const toplam = stoklar.reduce((n, x) => n + Number(x.miktar || 0), 0), maliyet = stoklar.reduce((n, x) => n + Number(x.miktar || 0) * Number(x.maliyet || u.alisFiyati || 0), 0), kritik = toplam <= Number(u.kritikStok || u.minimumStok || 0);
+            setTitle("Ürün Kartı"); content.innerHTML = `<div class="product-hero"><div class="product-identity"><div class="product-avatar">${u.gorsel ? `<img src="${u.gorsel}" alt="${escapeHtml(u.ad)}">` : '📦'}</div><div><span>ÜRÜN KARTI · ${escapeHtml(u.kod)}</span><h2>${escapeHtml(u.ad)}</h2><p>${escapeHtml([u.marka, u.model, u.kategori].filter(Boolean).join(" · ") || "Kategori bilgisi yok")}</p></div></div><div class="supplier-nav"><button id="urunListe">Liste</button><button id="urunOnceki" ${urunV2Index <= 0 ? "disabled" : ""}>← Önceki</button><button id="urunSonraki" ${urunV2Index >= urunV2Liste.length - 1 ? "disabled" : ""}>Sonraki →</button></div></div><div class="dashboard-grid">${card("Mevcut Stok", `${toplam} ${u.birim || "ADET"}`, kritik ? "Kritik stok seviyesinde" : "Stok seviyesi normal")}${card("Stok Değeri", para(maliyet), "Güncel maliyet")}${card("Alış / Satış", `${para(u.alisFiyati)} / ${para(u.satisFiyati)}`, "Standart fiyatlar")}${card("Tahmini Marj", para(Number(u.satisFiyati || 0) - Number(u.alisFiyati || 0)), "Birim brüt fark")}</div><div class="supplier-tabs">${[["ozet", "Özet"], ["stok", "Depo Stokları"], ["hareket", "Stok Hareketleri"], ["duzenle", "Düzenle"]].map(([k, l]) => `<button class="${sekme === k ? "active" : ""}" data-urun-tab="${k}">${l}</button>`).join("")}</div><div id="urunAltPanel"></div>`;
+            const panel = content.querySelector("#urunAltPanel"), ac = k => { if (k === "duzenle") return urunFormAc(u); if (k === "stok") panel.innerHTML = `<div class="dashboard-panel"><h2>Depo Bazlı Stok</h2><div class="table-scroll"><table><thead><tr><th>Depo</th><th>Miktar</th><th>Maliyet</th><th>Stok Değeri</th></tr></thead><tbody>${stoklar.length ? stoklar.map(x => `<tr><td>${escapeHtml(x.depoId?.ad || "-")}</td><td><b>${Number(x.miktar || 0)} ${escapeHtml(u.birim || "")}</b></td><td>${para(x.maliyet)}</td><td>${para(Number(x.miktar || 0) * Number(x.maliyet || 0))}</td></tr>`).join("") : '<tr><td colspan="4">Bu ürün için stok kaydı yok.</td></tr>'}</tbody></table></div></div>`; else if (k === "hareket") panel.innerHTML = `<div class="dashboard-panel"><h2>Stok Hareketleri</h2><div class="table-scroll"><table><thead><tr><th>Tarih</th><th>Tür</th><th>Depo</th><th>Miktar</th><th>Birim Maliyet</th><th>Açıklama</th></tr></thead><tbody>${hareketler.length ? hareketler.map(x => `<tr><td>${tarihKisa(x.tarih || x.createdAt)}</td><td>${escapeHtml(x.tip || "-")}</td><td>${escapeHtml(x.depoId?.ad || "-")}</td><td><b>${Number(x.miktar || 0)}</b></td><td>${para(x.birimMaliyet || x.maliyet)}</td><td>${escapeHtml(x.aciklama || "-")}</td></tr>`).join("") : '<tr><td colspan="6">Stok hareketi bulunmuyor.</td></tr>'}</tbody></table></div></div>`; else panel.innerHTML = `<div class="dashboard-panel"><h2>Ürün Bilgileri</h2><div class="supplier-info"><div><b>Barkod</b><span>${escapeHtml(u.barkod || "-")}</span></div><div><b>Kategori</b><span>${escapeHtml(u.kategori || "-")}</span></div><div><b>Birim / KDV</b><span>${escapeHtml(u.birim || "-")} · %${Number(u.kdv || 0)}</span></div><div><b>Bayi Fiyatı</b><span>${para(u.bayiFiyati)}</span></div><div><b>Perakende Fiyatı</b><span>${para(u.perakendeFiyati || u.satisFiyati)}</span></div><div><b>Durum</b><span>${u.aktif === false ? "Pasif" : "Aktif"}</span></div><div><b>Uyumluluk</b><span>${escapeHtml((u.uyumluluk || []).join(", ") || "-")}</span></div><div><b>Minimum / Kritik</b><span>${Number(u.minimumStok || 0)} / ${Number(u.kritikStok || 0)}</span></div><div><b>Not</b><span>${escapeHtml(u.notlar || "-")}</span></div></div></div>`; };
+            content.querySelectorAll("[data-urun-tab]").forEach(b => b.onclick = () => ac(b.dataset.urunTab)); content.querySelector("#urunListe").onclick = urunlerYukle; content.querySelector("#urunOnceki").onclick = () => urunDashboardAc(urunV2Liste[urunV2Index - 1]._id); content.querySelector("#urunSonraki").onclick = () => urunDashboardAc(urunV2Liste[urunV2Index + 1]._id); ac(sekme);
+        } catch (error) { errorBox(error); }
     }
 
     async function urunExcelPaneli() {
-        const panel=content.querySelector("#urunAltPanel");panel.innerHTML=`<div class="dashboard-panel"><div class="panel-heading"><div><h2>Excel'den Toplu Ürün Yükle</h2><p>Şablondaki “Görsel URL / Base64” alanıyla resimli ürünleri de aktarabilirsiniz.</p></div><button id="urunSablon" class="erp-primary-button">Şablon İndir</button></div><label>Excel Dosyası<input id="urunExcelDosya" type="file" accept=".xlsx,.xls"></label><div id="urunExcelOnizleme"></div></div>`;
-        panel.querySelector("#urunSablon").onclick=()=>{const ws=XLSX.utils.aoa_to_sheet([["Ürün Kodu","Barkod","Ürün Adı","Kategori","Marka","Model","Birim","KDV","Alış Fiyatı","Satış Fiyatı","Bayi Fiyatı","Perakende Fiyatı","Minimum Stok","Kritik Stok","Görsel URL / Base64","Uyumluluk","Not"]]);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Ürünler");XLSX.writeFile(wb,"urun-yukleme-sablonu.xlsx");};
-        panel.querySelector("#urunExcelDosya").onchange=async e=>{try{const file=e.target.files[0];if(!file)return;const wb=XLSX.read(await file.arrayBuffer(),{type:"array"}), rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:""}), map={"Ürün Kodu":"kod","Barkod":"barkod","Ürün Adı":"ad","Kategori":"kategori","Marka":"marka","Model":"model","Birim":"birim","KDV":"kdv","Alış Fiyatı":"alisFiyati","Satış Fiyatı":"satisFiyati","Bayi Fiyatı":"bayiFiyati","Perakende Fiyatı":"perakendeFiyati","Minimum Stok":"minimumStok","Kritik Stok":"kritikStok","Görsel URL / Base64":"gorsel","Uyumluluk":"uyumluluk","Not":"notlar"}, veriler=rows.map(r=>Object.fromEntries(Object.entries(map).map(([a,b])=>[b,r[a]]))), mevcutKod=new Set(urunV2Liste.map(x=>String(x.kod).toUpperCase())), mevcutBarkod=new Set(urunV2Liste.map(x=>String(x.barkod||"")).filter(Boolean)), dosyaKod=new Set(), dosyaBarkod=new Set(), hatalar=[];veriler.forEach((r,i)=>{r.kod=String(r.kod||"").trim().toUpperCase();r.barkod=String(r.barkod||"").trim();if(!r.kod||!r.ad)hatalar.push(`${i+2}. satır: ürün kodu ve adı zorunlu`);else if(mevcutKod.has(r.kod)||dosyaKod.has(r.kod))hatalar.push(`${i+2}. satır: mükerrer ürün kodu`);else dosyaKod.add(r.kod);if(r.barkod&&(mevcutBarkod.has(r.barkod)||dosyaBarkod.has(r.barkod)))hatalar.push(`${i+2}. satır: mükerrer barkod`);else if(r.barkod)dosyaBarkod.add(r.barkod);r.uyumluluk=String(r.uyumluluk||"").split(",").map(x=>x.trim()).filter(Boolean);});const hedef=panel.querySelector("#urunExcelOnizleme");hedef.innerHTML=`<p><b>${veriler.length}</b> satır · <b>${hatalar.length}</b> hata</p>${hatalar.length?`<div class="error">${hatalar.map(escapeHtml).join("<br>")}</div>`:`<button id="urunExcelAktar" class="erp-primary-button">${veriler.length} Ürünü Aktar</button>`}<div class="table-scroll"><table><thead><tr><th>Satır</th><th>Kod</th><th>Barkod</th><th>Ürün</th><th>Kategori</th><th>Satış</th></tr></thead><tbody>${veriler.slice(0,100).map((r,i)=>`<tr><td>${i+2}</td><td>${escapeHtml(r.kod)}</td><td>${escapeHtml(r.barkod)}</td><td>${escapeHtml(r.ad)}</td><td>${escapeHtml(r.kategori)}</td><td>${para(r.satisFiyati)}</td></tr>`).join("")}</tbody></table></div>`;hedef.querySelector("#urunExcelAktar")?.addEventListener("click",async()=>{let eklenen=0;for(const r of veriler){await api("/api/tenant/urunler",{method:"POST",body:JSON.stringify(r)});eklenen++;}alert(`${eklenen} ürün aktarıldı.`);await urunlerYukle();});}catch(error){panel.querySelector("#urunExcelOnizleme").innerHTML=`<div class="error">${escapeHtml(error.message)}</div>`;}};
+        const panel = content.querySelector("#urunAltPanel"); panel.innerHTML = `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Excel'den Toplu Ürün Yükle</h2><p>Şablondaki “Görsel URL / Base64” alanıyla resimli ürünleri de aktarabilirsiniz.</p></div><button id="urunSablon" class="erp-primary-button">Şablon İndir</button></div><label>Excel Dosyası<input id="urunExcelDosya" type="file" accept=".xlsx,.xls"></label><div id="urunExcelOnizleme"></div></div>`;
+        panel.querySelector("#urunSablon").onclick = () => { const ws = XLSX.utils.aoa_to_sheet([["Ürün Kodu", "Barkod", "Ürün Adı", "Kategori", "Marka", "Model", "Birim", "KDV", "Alış Fiyatı", "Satış Fiyatı", "Bayi Fiyatı", "Perakende Fiyatı", "Minimum Stok", "Kritik Stok", "Görsel URL / Base64", "Uyumluluk", "Not"]]); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Ürünler"); XLSX.writeFile(wb, "urun-yukleme-sablonu.xlsx"); };
+        panel.querySelector("#urunExcelDosya").onchange = async e => { try { const file = e.target.files[0]; if (!file) return; const wb = XLSX.read(await file.arrayBuffer(), { type: "array" }), rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" }), map = { "Ürün Kodu": "kod", "Barkod": "barkod", "Ürün Adı": "ad", "Kategori": "kategori", "Marka": "marka", "Model": "model", "Birim": "birim", "KDV": "kdv", "Alış Fiyatı": "alisFiyati", "Satış Fiyatı": "satisFiyati", "Bayi Fiyatı": "bayiFiyati", "Perakende Fiyatı": "perakendeFiyati", "Minimum Stok": "minimumStok", "Kritik Stok": "kritikStok", "Görsel URL / Base64": "gorsel", "Uyumluluk": "uyumluluk", "Not": "notlar" }, veriler = rows.map(r => Object.fromEntries(Object.entries(map).map(([a, b]) => [b, r[a]]))), mevcutKod = new Set(urunV2Liste.map(x => String(x.kod).toUpperCase())), mevcutBarkod = new Set(urunV2Liste.map(x => String(x.barkod || "")).filter(Boolean)), dosyaKod = new Set(), dosyaBarkod = new Set(), hatalar = []; veriler.forEach((r, i) => { r.kod = String(r.kod || "").trim().toUpperCase(); r.barkod = String(r.barkod || "").trim(); if (!r.kod || !r.ad) hatalar.push(`${i + 2}. satır: ürün kodu ve adı zorunlu`); else if (mevcutKod.has(r.kod) || dosyaKod.has(r.kod)) hatalar.push(`${i + 2}. satır: mükerrer ürün kodu`); else dosyaKod.add(r.kod); if (r.barkod && (mevcutBarkod.has(r.barkod) || dosyaBarkod.has(r.barkod))) hatalar.push(`${i + 2}. satır: mükerrer barkod`); else if (r.barkod) dosyaBarkod.add(r.barkod); r.uyumluluk = String(r.uyumluluk || "").split(",").map(x => x.trim()).filter(Boolean); }); const hedef = panel.querySelector("#urunExcelOnizleme"); hedef.innerHTML = `<p><b>${veriler.length}</b> satır · <b>${hatalar.length}</b> hata</p>${hatalar.length ? `<div class="error">${hatalar.map(escapeHtml).join("<br>")}</div>` : `<button id="urunExcelAktar" class="erp-primary-button">${veriler.length} Ürünü Aktar</button>`}<div class="table-scroll"><table><thead><tr><th>Satır</th><th>Kod</th><th>Barkod</th><th>Ürün</th><th>Kategori</th><th>Satış</th></tr></thead><tbody>${veriler.slice(0, 100).map((r, i) => `<tr><td>${i + 2}</td><td>${escapeHtml(r.kod)}</td><td>${escapeHtml(r.barkod)}</td><td>${escapeHtml(r.ad)}</td><td>${escapeHtml(r.kategori)}</td><td>${para(r.satisFiyati)}</td></tr>`).join("")}</tbody></table></div>`; hedef.querySelector("#urunExcelAktar")?.addEventListener("click", async () => { let eklenen = 0; for (const r of veriler) { await api("/api/tenant/urunler", { method: "POST", body: JSON.stringify(r) }); eklenen++; } alert(`${eklenen} ürün aktarıldı.`); await urunlerYukle(); }); } catch (error) { panel.querySelector("#urunExcelOnizleme").innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } };
     }
 
     async function urunKategoriPaneli() {
         const panel = content.querySelector("#urunAltPanel");
         try {
             const data = await api("/api/tenant/urunler/kategoriler");
-            const kategoriler = data.kategoriler || [];
-            panel.innerHTML = `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Ürün Kategorileri</h2><p>Yeni kategori ekleyin; ürün kartlarında seçim olarak kullanın.</p></div></div><form id="urunKategoriForm" class="category-add-form"><label>Kategori Adı<input name="ad" class="erp-input" maxlength="80" required placeholder="Örn. Fren Sistemi"></label><button class="erp-primary-button" type="submit">+ Kategori Ekle</button></form><div id="urunKategoriMesaj"></div><div class="category-chip-list">${kategoriler.length?kategoriler.map(x=>`<span>${escapeHtml(x)}</span>`).join(""):"<p>Henüz kategori bulunmuyor.</p>"}</div></div>`;
+            const kategoriler = data.kategoriKayitlari || [];
+            panel.innerHTML = `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Ürün Kategorileri</h2><p>Yeni kategori ekleyin; kullanılmayan kategorileri güvenle kaldırın.</p></div></div><form id="urunKategoriForm" class="category-add-form"><label>Kategori Adı<input name="ad" class="erp-input" maxlength="80" required placeholder="Örn. Fren Sistemi"></label><button class="erp-primary-button" type="submit">+ Kategori Ekle</button></form><div id="urunKategoriMesaj"></div><div class="category-chip-list">${kategoriler.length ? kategoriler.map(x => `<div class="category-chip"><span>${escapeHtml(x.ad)}</span><small>${x.kullanim} ürün</small><button type="button" class="category-delete" data-kategori-sil="${x._id || ""}" data-kategori-ad="${escapeHtml(x.ad)}" title="Kategoriyi sil" aria-label="${escapeHtml(x.ad)} kategorisini sil">×</button></div>`).join("") : "<p>Henüz kategori bulunmuyor.</p>"}</div></div>`;
             panel.querySelector("#urunKategoriForm").onsubmit = async event => {
                 event.preventDefault();
                 const mesaj = panel.querySelector("#urunKategoriMesaj");
@@ -3656,14 +3940,107 @@ async function dashboardYukle() {
                     await urunKategoriPaneli();
                 } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; }
             };
+            panel.querySelectorAll("[data-kategori-sil]").forEach(button => button.onclick = async () => {
+                if (!confirm(`“${button.dataset.kategoriAd}” kategorisini silmek istiyor musunuz?`)) return;
+                const mesaj = panel.querySelector("#urunKategoriMesaj");
+                try {
+                    const hedef = button.dataset.kategoriSil
+                        ? `/api/tenant/urunler/kategoriler/${button.dataset.kategoriSil}`
+                        : `/api/tenant/urunler/kategoriler?ad=${encodeURIComponent(button.dataset.kategoriAd)}`;
+                    await api(hedef, { method: "DELETE" });
+                    await urunKategoriPaneli();
+                } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; }
+            });
         } catch (error) { panel.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; }
     }
 
+    async function ozelFiyatPaneli() {
+        const panel = content.querySelector("#urunAltPanel");
+        try {
+            const data = await api("/api/tenant/urunler/ozel-fiyatlar"), fiyatlar = data.fiyatlar || [];
+            const secili = new Set(fiyatlar.map(x => String(x.urunId?._id || x.urunId)));
+            const secenekler = urunV2Liste.filter(x => !secili.has(String(x._id)) && x.aktif !== false).map(x => `<option value="${x._id}">${escapeHtml(x.kod)} · ${escapeHtml(x.ad)} (Standart: ${para(x.satisFiyati)})</option>`).join("");
+            panel.innerHTML = `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Özel Fiyat Listesi</h2><p>Bu liste bağımsızdır; standart ürün fiyatları, satış belgeleri ve cari hareketleri değişmez.</p></div></div><form id="ozelFiyatForm" class="category-add-form"><label>Ürün<select name="urunId" class="erp-input" required><option value="">Ürün seçin</option>${secenekler}</select></label><label>Özel Fiyat<input name="fiyat" class="erp-input" type="number" min="0" step="0.01" required></label><label>Açıklama<input name="aciklama" class="erp-input" maxlength="250" placeholder="İsteğe bağlı"></label><button class="erp-primary-button" type="submit" ${secenekler ? "" : "disabled"}>+ Listeye Ekle</button></form><div id="ozelFiyatMesaj"></div><input id="ozelFiyatAra" class="erp-input" placeholder="Kod veya ürün ara..."><div class="table-scroll"><table><thead><tr><th>Kod</th><th>Ürün</th><th>Standart Fiyat</th><th>Özel Fiyat</th><th>Açıklama</th><th>İşlemler</th></tr></thead><tbody>${fiyatlar.length ? fiyatlar.map(x => `<tr data-ozel-fiyat-row><td><b>${escapeHtml(x.urunId?.kod || "-")}</b></td><td>${escapeHtml(x.urunId?.ad || "-")}</td><td>${para(x.urunId?.satisFiyati)}</td><td><input data-fiyat type="number" min="0" step="0.01" value="${Number(x.fiyat || 0)}" style="width:120px"></td><td><input data-aciklama maxlength="250" value="${escapeHtml(x.aciklama || "")}" style="min-width:160px"></td><td><button class="erp-small-button" data-fiyat-guncelle="${x._id}">Fiyatı Güncelle</button> <button class="erp-small-button secondary" data-fiyat-sil="${x._id}" data-urun-ad="${escapeHtml(x.urunId?.ad || "Ürün")}">Listeden Sil</button></td></tr>`).join("") : '<tr><td colspan="6">Özel fiyat listesi boş.</td></tr>'}</tbody></table></div></div>`;
+            panel.querySelector("#ozelFiyatForm").onsubmit = async event => { event.preventDefault(); const mesaj = panel.querySelector("#ozelFiyatMesaj"); try { const fd = new FormData(event.currentTarget); await api("/api/tenant/urunler/ozel-fiyatlar", { method: "POST", body: JSON.stringify({ urunId: fd.get("urunId"), fiyat: Number(fd.get("fiyat")), aciklama: fd.get("aciklama") }) }); await ozelFiyatPaneli(); } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } };
+            panel.querySelectorAll("[data-fiyat-guncelle]").forEach(button => button.onclick = async () => { const row = button.closest("tr"), mesaj = panel.querySelector("#ozelFiyatMesaj"); try { await api(`/api/tenant/urunler/ozel-fiyatlar/${button.dataset.fiyatGuncelle}`, { method: "PATCH", body: JSON.stringify({ fiyat: Number(row.querySelector("[data-fiyat]").value), aciklama: row.querySelector("[data-aciklama]").value }) }); mesaj.innerHTML = '<div class="success">Özel fiyat güncellendi.</div>'; } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } });
+            panel.querySelectorAll("[data-fiyat-sil]").forEach(button => button.onclick = async () => { if (!confirm(`“${button.dataset.urunAd}” yalnızca özel fiyat listesinden kaldırılsın mı?`)) return; try { await api(`/api/tenant/urunler/ozel-fiyatlar/${button.dataset.fiyatSil}`, { method: "DELETE" }); await ozelFiyatPaneli(); } catch (error) { panel.querySelector("#ozelFiyatMesaj").innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } });
+            panel.querySelector("#ozelFiyatAra").oninput = event => { const q = event.target.value.toLocaleLowerCase("tr-TR"); panel.querySelectorAll("[data-ozel-fiyat-row]").forEach(row => row.hidden = !row.textContent.toLocaleLowerCase("tr-TR").includes(q)); };
+        } catch (error) { panel.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; }
+    }
+
+    async function urunlerYukleTemel() {
+        setTitle("Ürünler"); loading(); try { const [ud, sd] = await Promise.all([api("/api/tenant/urunler"), api("/api/tenant/stok")]); urunV2Liste = ud.urunler || []; const stoklar = sd.stoklar || [], stokMap = {}; stoklar.forEach(x => { const id = String(x.urunId?._id || x.urunId); stokMap[id] = (stokMap[id] || 0) + Number(x.miktar || 0); }); const stokToplam = Object.values(stokMap).reduce((a, b) => a + b, 0), kritik = urunV2Liste.filter(u => (stokMap[String(u._id)] || 0) <= Number(u.kritikStok || u.minimumStok || 0)).length, deger = urunV2Liste.reduce((n, u) => n + (stokMap[String(u._id)] || 0) * Number(u.alisFiyati || 0), 0); content.innerHTML = `<div class="welcome-banner product-welcome"><div><div class="eyebrow">ÜRÜNLER V2</div><h2>Ürün Merkezi</h2><p>Ürün kartları, fiyatlar ve depo stoklarını tek merkezden yönetin.</p></div></div><div class="musteri-toolbar"><button class="dashboard-action dashboard-action-blue" id="urunSec">Ürün Seç</button><button class="dashboard-action dashboard-action-green" id="urunYeni">+ Yeni Ürün</button><button class="dashboard-action dashboard-action-purple" id="urunExcel">Excel'den Toplu Yükle</button><button class="dashboard-action shortcut-orange" id="urunKategori">Kategoriler</button></div><div class="dashboard-grid">${card("Ürün Sayısı", urunV2Liste.length, "Kayıtlı ürün")}${card("Toplam Stok", stokToplam, "Tüm depolar")}${card("Stok Değeri", para(deger), "Alış fiyatı üzerinden")}${card("Kritik Ürün", kritik, "Kontrol gereken")}</div><div id="urunAltPanel"></div>`; const panel = content.querySelector("#urunAltPanel"), liste = () => { panel.innerHTML = `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Ürün Seç</h2><p>Kod, barkod, ürün, marka veya kategori ile arayın.</p></div></div><input id="urunAra" class="erp-input" placeholder="Ürün ara veya barkod okut..."><div class="table-scroll"><table><thead><tr><th>Görsel</th><th>Kod / Barkod</th><th>Ürün</th><th>Stok</th><th>Alış</th><th>Satış</th><th>Durum</th></tr></thead><tbody id="urunListeGovde">${urunV2Liste.map(u => `<tr data-urun-id="${u._id}" style="cursor:pointer"><td><div class="product-thumb">${u.gorsel ? `<img src="${u.gorsel}" alt="">` : '📦'}</div></td><td><b>${escapeHtml(u.kod)}</b><small>${escapeHtml(u.barkod || "-")}</small></td><td>${escapeHtml(u.ad)}<small>${escapeHtml([u.marka, u.model, u.kategori].filter(Boolean).join(" · ") || "-")}</small></td><td><b>${stokMap[String(u._id)] || 0} ${escapeHtml(u.birim || "")}</b></td><td>${para(u.alisFiyati)}</td><td>${para(u.satisFiyati)}</td><td>${u.aktif === false ? "Pasif" : "Aktif"}</td></tr>`).join("") || '<tr><td colspan="7">Henüz ürün yok.</td></tr>'}</tbody></table></div></div>`; panel.querySelectorAll("[data-urun-id]").forEach(x => x.onclick = () => urunDashboardAc(x.dataset.urunId)); panel.querySelector("#urunAra").oninput = e => { const q = e.target.value.toLocaleLowerCase("tr-TR"); panel.querySelectorAll("[data-urun-id]").forEach(x => x.hidden = !x.textContent.toLocaleLowerCase("tr-TR").includes(q)); }; }; content.querySelector("#urunSec").onclick = liste; content.querySelector("#urunYeni").onclick = () => urunFormAc(); content.querySelector("#urunExcel").onclick = urunExcelPaneli; content.querySelector("#urunKategori").onclick = urunKategoriPaneli; liste(); } catch (error) { errorBox(error); }
+    }
+
     async function urunlerYukle() {
-        setTitle("Ürünler");loading();try{const [ud,sd]=await Promise.all([api("/api/tenant/urunler"),api("/api/tenant/stok")]);urunV2Liste=ud.urunler||[];const stoklar=sd.stoklar||[], stokMap={};stoklar.forEach(x=>{const id=String(x.urunId?._id||x.urunId);stokMap[id]=(stokMap[id]||0)+Number(x.miktar||0);});const stokToplam=Object.values(stokMap).reduce((a,b)=>a+b,0), kritik=urunV2Liste.filter(u=>(stokMap[String(u._id)]||0)<=Number(u.kritikStok||u.minimumStok||0)).length, deger=urunV2Liste.reduce((n,u)=>n+(stokMap[String(u._id)]||0)*Number(u.alisFiyati||0),0);content.innerHTML=`<div class="welcome-banner product-welcome"><div><div class="eyebrow">ÜRÜNLER V2</div><h2>Ürün Merkezi</h2><p>Ürün kartları, fiyatlar ve depo stoklarını tek merkezden yönetin.</p></div></div><div class="musteri-toolbar"><button class="dashboard-action dashboard-action-blue" id="urunSec">Ürün Seç</button><button class="dashboard-action dashboard-action-green" id="urunYeni">+ Yeni Ürün</button><button class="dashboard-action dashboard-action-purple" id="urunExcel">Excel'den Toplu Yükle</button><button class="dashboard-action shortcut-orange" id="urunKategori">Kategoriler</button></div><div class="dashboard-grid">${card("Ürün Sayısı",urunV2Liste.length,"Kayıtlı ürün")}${card("Toplam Stok",stokToplam,"Tüm depolar")}${card("Stok Değeri",para(deger),"Alış fiyatı üzerinden")}${card("Kritik Ürün",kritik,"Kontrol gereken")}</div><div id="urunAltPanel"></div>`;const panel=content.querySelector("#urunAltPanel"),liste=()=>{panel.innerHTML=`<div class="dashboard-panel"><div class="panel-heading"><div><h2>Ürün Seç</h2><p>Kod, barkod, ürün, marka veya kategori ile arayın.</p></div></div><input id="urunAra" class="erp-input" placeholder="Ürün ara veya barkod okut..."><div class="table-scroll"><table><thead><tr><th>Görsel</th><th>Kod / Barkod</th><th>Ürün</th><th>Stok</th><th>Alış</th><th>Satış</th><th>Durum</th></tr></thead><tbody id="urunListeGovde">${urunV2Liste.map(u=>`<tr data-urun-id="${u._id}" style="cursor:pointer"><td><div class="product-thumb">${u.gorsel?`<img src="${u.gorsel}" alt="">`:'📦'}</div></td><td><b>${escapeHtml(u.kod)}</b><small>${escapeHtml(u.barkod||"-")}</small></td><td>${escapeHtml(u.ad)}<small>${escapeHtml([u.marka,u.model,u.kategori].filter(Boolean).join(" · ")||"-")}</small></td><td><b>${stokMap[String(u._id)]||0} ${escapeHtml(u.birim||"")}</b></td><td>${para(u.alisFiyati)}</td><td>${para(u.satisFiyati)}</td><td>${u.aktif===false?"Pasif":"Aktif"}</td></tr>`).join("")||'<tr><td colspan="7">Henüz ürün yok.</td></tr>'}</tbody></table></div></div>`;panel.querySelectorAll("[data-urun-id]").forEach(x=>x.onclick=()=>urunDashboardAc(x.dataset.urunId));panel.querySelector("#urunAra").oninput=e=>{const q=e.target.value.toLocaleLowerCase("tr-TR");panel.querySelectorAll("[data-urun-id]").forEach(x=>x.hidden=!x.textContent.toLocaleLowerCase("tr-TR").includes(q));};};content.querySelector("#urunSec").onclick=liste;content.querySelector("#urunYeni").onclick=()=>urunFormAc();content.querySelector("#urunExcel").onclick=urunExcelPaneli;content.querySelector("#urunKategori").onclick=urunKategoriPaneli;liste();}catch(error){errorBox(error);}
+        await urunlerYukleTemel();
+        const toolbar = content.querySelector(".musteri-toolbar");
+        if (toolbar && !toolbar.querySelector("#ozelFiyatListesi")) {
+            const button = document.createElement("button");
+            button.id = "ozelFiyatListesi";
+            button.className = "dashboard-action dashboard-action-blue";
+            button.textContent = "Özel Fiyat Listesi";
+            button.onclick = ozelFiyatPaneli;
+            toolbar.appendChild(button);
+        }
+    }
+
+    async function ayarlarYukle() {
+        setTitle("Ayarlar"); loading("Ayarlar hazırlanıyor...");
+        try {
+            const [d, fd] = await Promise.all([api("/api/tenant/ayarlar"), api("/api/tenant/firma")]);
+            const a = d.ayarlar, g = a.genel || {}, b = a.belgeAyari || {}, firma = fd.firmaBilgileri || {};
+            const entegrasyonAdlari = { E_FATURA:"e-Fatura", E_IRSALIYE:"e-İrsaliye", E_POSTA:"E-posta / SMTP", WHATSAPP:"WhatsApp", E_TICARET:"E-Ticaret", KARGO:"Kargo", ODEME:"Ödeme", MUHASEBE:"Muhasebe" };
+            content.innerHTML = `<div class="welcome-banner"><div><div class="eyebrow">SİSTEM YÖNETİMİ</div><h2>Profesyonel Ayarlar</h2><p>Firma, belge tasarımı, güvenlik ve entegrasyonlar tek merkezde.</p></div></div><div class="supplier-tabs">${[["genel","Genel"],["firma","Firma"],["belgeler","Fatura / İrsaliye"],["entegrasyonlar","Entegrasyonlar"],["guvenlik","Güvenlik"]].map(([k,l])=>`<button data-ayar-tab="${k}">${l}</button>`).join("")}</div><div id="ayarPanel"></div>`;
+            const panel = content.querySelector("#ayarPanel"), durum = id => `<div id="${id}" class="full"></div>`;
+            const genel = () => { panel.innerHTML=`<div class="dashboard-panel"><div class="panel-heading"><div><h2>Genel Sistem Ayarları</h2><p>Varsayılan işlem, numara ve güvenlik davranışları</p></div></div><form class="erp-form-grid" id="genelAyarForm"><label>Para Birimi<select name="paraBirimi">${["TRY","USD","EUR","GBP"].map(x=>`<option ${g.paraBirimi===x?"selected":""}>${x}</option>`).join("")}</select></label><label>Dil<select name="dil"><option value="tr-TR">Türkçe</option><option value="en-US" ${g.dil==="en-US"?"selected":""}>English</option></select></label><label>Saat Dilimi<input name="saatDilimi" value="${escapeHtml(g.saatDilimi||"Europe/Istanbul")}"></label><label>Varsayılan KDV %<input name="varsayilanKdv" type="number" min="0" max="100" value="${Number(g.varsayilanKdv??20)}"></label><label>Fatura Serisi<input name="faturaSeri" maxlength="10" value="${escapeHtml(g.faturaSeri||"FTR")}"></label><label>İrsaliye Serisi<input name="irsaliyeSeri" maxlength="10" value="${escapeHtml(g.irsaliyeSeri||"IRS")}"></label><label>Teklif Geçerlilik Günü<input name="teklifGecerlilikGun" type="number" min="1" max="365" value="${Number(g.teklifGecerlilikGun||15)}"></label><label><span><input name="negatifStokEngelle" type="checkbox" ${g.negatifStokEngelle!==false?"checked":""}> Negatif stoğu engelle</span></label><label><span><input name="otomatikYedekleme" type="checkbox" ${g.otomatikYedekleme!==false?"checked":""}> Otomatik yedekleme</span></label><label><span><input name="ikiAsamaliOnay" type="checkbox" ${g.ikiAsamaliOnay?"checked":""}> Kritik işlemlerde çift onay</span></label>${durum("genelMesaj")}<div class="full"><button class="erp-primary-button">Ayarları Kaydet</button></div></form></div>`; panel.querySelector("form").onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,body=Object.fromEntries(new FormData(f));["varsayilanKdv","teklifGecerlilikGun"].forEach(k=>body[k]=Number(body[k]));["negatifStokEngelle","otomatikYedekleme","ikiAsamaliOnay"].forEach(k=>body[k]=f.elements[k].checked);try{await api("/api/tenant/ayarlar/genel",{method:"PATCH",body:JSON.stringify(body)});panel.querySelector("#genelMesaj").innerHTML='<div class="success">Ayarlar kaydedildi.</div>';}catch(err){panel.querySelector("#genelMesaj").innerHTML=`<div class="error">${escapeHtml(err.message)}</div>`;}}; };
+            const firmaAc = () => { panel.innerHTML=`<div class="dashboard-panel"><h2>Firma ve Resmî Bilgiler</h2><form class="erp-form-grid">${[["unvan","Firma Ünvanı"],["yetkili","Yetkili"],["vergiDairesi","Vergi Dairesi"],["vergiNo","Vergi / T.C. No"],["telefon","Telefon"],["web","Web Sitesi"],["il","İl"],["ilce","İlçe"],["postaKodu","Posta Kodu"]].map(([k,l])=>`<label>${l}<input name="${k}" value="${escapeHtml(firma[k]||"")}"></label>`).join("")}<label class="full">Adres<textarea name="adres">${escapeHtml(firma.adres||"")}</textarea></label>${durum("firmaMesaj")}<div class="full"><button class="erp-primary-button">Firma Bilgilerini Kaydet</button></div></form></div>`;panel.querySelector("form").onsubmit=async e=>{e.preventDefault();try{await api("/api/tenant/firma",{method:"PATCH",body:JSON.stringify(Object.fromEntries(new FormData(e.currentTarget)))});panel.querySelector("#firmaMesaj").innerHTML='<div class="success">Firma bilgileri kaydedildi.</div>';}catch(err){panel.querySelector("#firmaMesaj").innerHTML=`<div class="error">${escapeHtml(err.message)}</div>`;}}; };
+            const belgeler = () => { panel.innerHTML=`<div class="dashboard-panel"><div class="panel-heading"><div><h2>Fatura ve İrsaliye Tasarımcısı</h2><p>Seçimler kullanıcı hesabınıza özel saklanır.</p></div></div><form><h3>Fatura Şablonu</h3><div class="settings-template-grid">${a.hazirSablonlar.map(x=>`<label class="settings-template-card"><input type="radio" name="faturaSablonu" value="${x.id}" ${b.faturaSablonu===x.id?"checked":""}><span class="template-mini template-mini-${x.id}"><b>${x.ad}</b><small>${x.aciklama}</small></span></label>`).join("")}</div><div class="erp-form-grid"><label>İrsaliye Şablonu<select name="irsaliyeSablonu">${a.hazirSablonlar.map(x=>`<option value="${x.id}" ${b.irsaliyeSablonu===x.id?"selected":""}>${x.ad}</option>`).join("")}</select></label><label>Ana Renk<input name="anaRenk" type="color" value="${escapeHtml(b.anaRenk||"#2563eb")}"></label><label>Vurgu Rengi<input name="vurguRengi" type="color" value="${escapeHtml(b.vurguRengi||"#0f172a")}"></label><label>Belge Başlığı<input name="belgeBasligi" maxlength="100" value="${escapeHtml(b.belgeBasligi||"")}"></label><label class="full">Logo URL<input name="logo" value="${escapeHtml(b.logo||"")}" placeholder="https://..."></label><label class="full">Dipnot<textarea name="dipnot" maxlength="500">${escapeHtml(b.dipnot||"")}</textarea></label>${["bankaBilgisiGoster","vergiBilgisiGoster","imzaAlaniGoster"].map((k,i)=>`<label><span><input name="${k}" type="checkbox" ${b[k]!==false?"checked":""}> ${["Banka bilgilerini göster","Vergi bilgilerini göster","İmza alanı göster"][i]}</span></label>`).join("")}${durum("belgeMesaj")}<div class="full"><button class="erp-primary-button">Kişisel Şablonumu Kaydet</button></div></div></form></div>`;panel.querySelector("form").onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,body=Object.fromEntries(new FormData(f));["bankaBilgisiGoster","vergiBilgisiGoster","imzaAlaniGoster"].forEach(k=>body[k]=f.elements[k].checked);try{await api("/api/tenant/ayarlar/belgeler",{method:"PATCH",body:JSON.stringify(body)});panel.querySelector("#belgeMesaj").innerHTML='<div class="success">Şablonunuz kaydedildi.</div>';}catch(err){panel.querySelector("#belgeMesaj").innerHTML=`<div class="error">${escapeHtml(err.message)}</div>`;}}; };
+            const entegrasyonlar = () => { panel.innerHTML=`<div class="settings-integration-grid">${a.entegrasyonlar.map(x=>`<form class="dashboard-panel integration-card" data-ent="${x.tip}"><div class="panel-heading"><div><h3>${entegrasyonAdlari[x.tip]}</h3><p>${x.aktif?"Aktif":"Yapılandırılmadı"}${x.gizliAnahtarKayitli?" · Anahtar kayıtlı":""}</p></div><input name="aktif" type="checkbox" ${x.aktif?"checked":""}></div><label>Sağlayıcı<input name="saglayici" value="${escapeHtml(x.saglayici)}"></label><label>HTTPS API Adresi<input name="apiUrl" value="${escapeHtml(x.apiUrl)}" placeholder="https://api..."></label><label>Hesap / Firma Kodu<input name="hesapKodu" value="${escapeHtml(x.hesapKodu)}"></label><label>API Anahtarı<input name="gizliAnahtar" type="password" autocomplete="new-password" placeholder="${x.gizliAnahtarKayitli?"Kayıtlı — değiştirmek için yazın":"Gizli anahtar"}"></label><div data-ent-mesaj></div><button class="erp-primary-button">Kaydet</button></form>`).join("")}</div>`;panel.querySelectorAll("[data-ent]").forEach(f=>f.onsubmit=async e=>{e.preventDefault();const body=Object.fromEntries(new FormData(f));body.aktif=f.elements.aktif.checked;try{await api(`/api/tenant/ayarlar/entegrasyonlar/${f.dataset.ent}`,{method:"PATCH",body:JSON.stringify(body)});f.querySelector("[data-ent-mesaj]").innerHTML='<div class="success">Kaydedildi.</div>';}catch(err){f.querySelector("[data-ent-mesaj]").innerHTML=`<div class="error">${escapeHtml(err.message)}</div>`;}}); };
+            const guvenlik = () => { panel.innerHTML=`<div class="dashboard-grid">${card("Tenant İzolasyonu","Aktif","Firma verileri ayrıdır")}${card("Gizli Anahtarlar","AES-256-GCM","API yanıtında gösterilmez")}${card("Kişisel Şablon","Aktif","Kullanıcı bazında tasarım")}${card("Yedekleme",g.otomatikYedekleme!==false?"Açık":"Kapalı","Genel ayarlardan yönetilir")}</div><div class="dashboard-panel"><h2>Güvenlik Kontrolü</h2><p>API anahtarlarını düzenli yenileyin, yalnızca HTTPS servisleri kullanın ve kritik işlemler için çift onayı etkinleştirin.</p></div>`; };
+            const ac=key=>{content.querySelectorAll("[data-ayar-tab]").forEach(x=>x.classList.toggle("active",x.dataset.ayarTab===key));({genel,firma:firmaAc,belgeler,entegrasyonlar,guvenlik}[key]||genel)();};content.querySelectorAll("[data-ayar-tab]").forEach(x=>x.onclick=()=>ac(x.dataset.ayarTab));ac("genel");
+        } catch(error) { errorBox(error); }
     }
 
     let sayfaYuklemeNo = 0;
+
+    async function oturumuKapat() {
+        try { await api("/api/auth/logout", { method: "POST" }); } catch (_) {}
+        ["tenantToken", "token", "accessToken"].forEach(key => localStorage.removeItem(key));
+        sessionStorage.removeItem("bmCsrfToken");
+        window.location.replace("/erp/login.html");
+    }
+
+    async function hesabimYukle() {
+        setTitle("Hesabım");
+        loading("Hesap bilgileriniz yükleniyor...");
+        try {
+            const data = await api("/api/auth/profil"), k = data.kullanici || {}, t = data.firma || {}, f = t.firmaBilgileri || {};
+            const accountButton = document.getElementById("accountButton");
+            if (accountButton) accountButton.querySelector(".account-avatar").textContent = String(k.adSoyad || "H").trim().charAt(0).toLocaleUpperCase("tr-TR");
+            content.innerHTML = `<div class="welcome-banner"><div><div class="eyebrow">HESAP MERKEZİ</div><h2>${escapeHtml(k.adSoyad || "Kullanıcı")}</h2><p>Kişisel bilgilerinizi, şirket kayıtlarını ve hesap güvenliğini tek yerden yönetin.</p></div></div><div class="account-summary"><div><span>Rol</span><strong>${escapeHtml(k.rol || "-")}</strong></div><div><span>Paket</span><strong>${escapeHtml(t.plan || "-")}</strong></div><div><span>Hesap Durumu</span><strong>${escapeHtml(t.status || "-")}</strong></div><div><span>Son Giriş</span><strong>${k.sonGirisTarihi ? new Date(k.sonGirisTarihi).toLocaleString("tr-TR") : "İlk giriş"}</strong></div></div><div class="account-tabs"><button class="erp-small-button active" data-account-tab="profil">Kullanıcı Bilgileri</button><button class="erp-small-button" data-account-tab="firma">Şirket ve Vergi</button><button class="erp-small-button" data-account-tab="guvenlik">Parola ve Güvenlik</button><button class="erp-small-button" data-account-tab="sil">Hesabı Kapat</button></div><div id="accountPanel"></div>`;
+            const panel = content.querySelector("#accountPanel");
+            const profil = () => {
+                panel.innerHTML = `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Kullanıcı Bilgileri</h2><p>Size ait iletişim ve görev bilgileri</p></div></div><form id="accountProfileForm" class="erp-form-grid"><label>Ad Soyad<input name="adSoyad" required minlength="2" value="${escapeHtml(k.adSoyad || "")}"></label><label>E-posta<input name="email" type="email" required value="${escapeHtml(k.email || "")}"></label><label>Telefon<input name="telefon" type="tel" value="${escapeHtml(k.telefon || "")}" placeholder="05xx xxx xx xx"></label><label>Görev / Ünvan<input name="unvan" value="${escapeHtml(k.unvan || "")}" placeholder="Örn. İşletme sahibi"></label><label>Yetki Rolü<input value="${escapeHtml(k.rol || "-")}" disabled></label><label>Kayıt Tarihi<input value="${k.createdAt ? new Date(k.createdAt).toLocaleDateString("tr-TR") : "-"}" disabled></label><div id="accountProfileMessage" class="full"></div><div class="full"><button class="erp-primary-button">Bilgilerimi Kaydet</button></div></form></div>`;
+                panel.querySelector("form").onsubmit = async event => { event.preventDefault(); const mesaj = panel.querySelector("#accountProfileMessage"); try { const result = await api("/api/auth/profil", { method: "PATCH", body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))) }); mesaj.innerHTML = `<div class="success">${escapeHtml(result.mesaj)}</div>`; } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } };
+            };
+            const firma = () => {
+                panel.innerHTML = `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Şirket ve Resmî Kayıtlar</h2><p>Fatura, ekstre ve resmî belgelerde kullanılacak bilgiler</p></div></div><form class="erp-form-grid"><label>Firma Ünvanı<input name="unvan" required value="${escapeHtml(f.unvan || t.name || "")}"></label><label>Yetkili<input name="yetkili" value="${escapeHtml(f.yetkili || "")}"></label><label>Vergi Dairesi<input name="vergiDairesi" value="${escapeHtml(f.vergiDairesi || "")}"></label><label>Vergi / T.C. No<input name="vergiNo" inputmode="numeric" value="${escapeHtml(f.vergiNo || "")}"></label><label>MERSİS No<input name="mersisNo" inputmode="numeric" value="${escapeHtml(f.mersisNo || "")}"></label><label>Ticaret Sicil No<input name="ticaretSicilNo" value="${escapeHtml(f.ticaretSicilNo || "")}"></label><label>Telefon<input name="telefon" type="tel" value="${escapeHtml(f.telefon || "")}"></label><label>Kurumsal E-posta<input name="email" type="email" value="${escapeHtml(f.email || "")}"></label><label class="full">IBAN<input name="iban" value="${escapeHtml(f.iban || "")}" placeholder="TR..."></label><label>İl<input name="il" value="${escapeHtml(f.il || "")}"></label><label>İlçe<input name="ilce" value="${escapeHtml(f.ilce || "")}"></label><label>Posta Kodu<input name="postaKodu" value="${escapeHtml(f.postaKodu || "")}"></label><label>Web Sitesi<input name="web" value="${escapeHtml(f.web || "")}"></label><label><span><input name="eFaturaMukellefi" type="checkbox" ${f.eFaturaMukellefi ? "checked" : ""}> E-Fatura mükellefi</span></label><label class="full">Açık Adres<textarea name="adres">${escapeHtml(f.adres || "")}</textarea></label><div id="accountCompanyMessage" class="full"></div><div class="full"><button class="erp-primary-button">Şirket Bilgilerini Kaydet</button></div></form></div>`;
+                panel.querySelector("form").onsubmit = async event => { event.preventDefault(); const form = event.currentTarget, body = Object.fromEntries(new FormData(form)); body.eFaturaMukellefi = form.elements.eFaturaMukellefi.checked; const mesaj = panel.querySelector("#accountCompanyMessage"); try { const result = await api("/api/tenant/firma", { method: "PATCH", body: JSON.stringify(body) }); mesaj.innerHTML = `<div class="success">${escapeHtml(result.mesaj)}</div>`; } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } };
+            };
+            const guvenlik = () => {
+                panel.innerHTML = `<div class="dashboard-panel"><h2>Parola ve Güvenlik</h2><p>En az 8 karakterli, benzersiz bir parola kullanın. Parola değişiminden sonra yeniden giriş gerekir.</p><form class="erp-form-grid"><label>Mevcut Parola<input name="mevcutSifre" type="password" autocomplete="current-password" required></label><label>Yeni Parola<input name="yeniSifre" type="password" autocomplete="new-password" minlength="8" required></label><label>Yeni Parola Tekrar<input name="yeniSifreTekrar" type="password" autocomplete="new-password" minlength="8" required></label><div id="accountPasswordMessage" class="full"></div><div class="full"><button class="erp-primary-button">Parolamı Değiştir</button></div></form></div>`;
+                panel.querySelector("form").onsubmit = async event => { event.preventDefault(); const fd = new FormData(event.currentTarget), mesaj = panel.querySelector("#accountPasswordMessage"); if (fd.get("yeniSifre") !== fd.get("yeniSifreTekrar")) return mesaj.innerHTML = '<div class="error">Yeni parolalar eşleşmiyor.</div>'; try { const result = await api("/api/auth/sifre-degistir", { method: "POST", body: JSON.stringify({ mevcutSifre: fd.get("mevcutSifre"), yeniSifre: fd.get("yeniSifre") }) }); mesaj.innerHTML = `<div class="success">${escapeHtml(result.mesaj)}</div>`; setTimeout(oturumuKapat, 1200); } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } };
+            };
+            const sil = () => {
+                panel.innerHTML = `<div class="dashboard-panel danger-zone"><h2>Hesabı Kalıcı Olarak Kapat</h2><p>Bu işlem kişisel bilgilerinizi anonimleştirir ve girişinizi kalıcı olarak kapatır. Geçmiş muhasebe kayıtlarının bütünlüğü korunur.</p><form class="erp-form-grid"><label>Parolanız<input name="sifre" type="password" autocomplete="current-password" required></label><label>Onay için “HESABIMI SİL” yazın<input name="onay" required></label><div id="accountDeleteMessage" class="full"></div><div class="full"><button class="erp-primary-button danger-button">Hesabımı Kalıcı Olarak Kapat</button></div></form></div>`;
+                panel.querySelector("form").onsubmit = async event => { event.preventDefault(); if (!confirm("Bu hesabı kapatmak istediğinizden emin misiniz? Bu işlem geri alınamaz.")) return; const mesaj = panel.querySelector("#accountDeleteMessage"); try { const result = await api("/api/auth/hesap", { method: "DELETE", body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))) }); mesaj.innerHTML = `<div class="success">${escapeHtml(result.mesaj)}</div>`; setTimeout(oturumuKapat, 1200); } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } };
+            };
+            const ac = key => { content.querySelectorAll("[data-account-tab]").forEach(x => x.classList.toggle("active", x.dataset.accountTab === key)); ({ profil, firma, guvenlik, sil }[key] || profil)(); };
+            content.querySelectorAll("[data-account-tab]").forEach(button => button.onclick = () => ac(button.dataset.accountTab));
+            ac("profil");
+        } catch (error) { errorBox(error); }
+    }
 
     async function sayfaYukle(page) {
         const buYukleme = ++sayfaYuklemeNo;
@@ -3694,6 +4071,30 @@ async function dashboardYukle() {
         if (page === "urunler") {
             if (buYukleme !== sayfaYuklemeNo) return;
             await urunlerYukle();
+            return;
+        }
+
+        if (page === "ayarlar") {
+            if (buYukleme !== sayfaYuklemeNo) return;
+            await ayarlarYukle();
+            return;
+        }
+
+        if (page === "hesabim") {
+            if (buYukleme !== sayfaYuklemeNo) return;
+            await hesabimYukle();
+            return;
+        }
+
+        if (page === "stok") {
+            if (buYukleme !== sayfaYuklemeNo) return;
+            await stokMerkeziYukle();
+            return;
+        }
+
+        if (page === "alis") {
+            if (buYukleme !== sayfaYuklemeNo) return;
+            await alisMerkeziYukle();
             return;
         }
 
@@ -3763,6 +4164,11 @@ async function dashboardYukle() {
     }
 
     document.addEventListener("click", event => {
+        const cariIslem = event.target.closest("[data-cari-islem]");
+        if (cariIslem) {
+            cariManuelHareketFormu(cariIslem.dataset.cariIslem);
+            return;
+        }
         const ekstre = event.target.closest("[data-cari-ekstre]");
         if (ekstre) {
             cariEkstreAc(ekstre.dataset.cariTip, ekstre.dataset.cariEkstre);
@@ -3776,6 +4182,9 @@ async function dashboardYukle() {
     window.cariYukle = cariYukle;
     window.cariEkstreAc = cariEkstreAc;
 
+    document.getElementById("accountButton")?.addEventListener("click", () => sayfaYukle("hesabim"));
+    document.getElementById("logoutButton")?.addEventListener("click", oturumuKapat);
+
     // Menü butonlarında data-page kullanılıyorsa otomatik bağla.
     document.querySelectorAll("[data-page]").forEach(button => {
         button.addEventListener("click", () => {
@@ -3786,23 +4195,6 @@ async function dashboardYukle() {
     // Başlangıç.
     anaSayfa();
 })();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

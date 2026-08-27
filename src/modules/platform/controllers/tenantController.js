@@ -177,6 +177,15 @@ async function kullaniciOlustur(req, res, next) {
             });
         }
 
+        const izinliRoller = ["OWNER", "ADMIN", "MANAGER", "SALES", "CASHIER", "ACCOUNTING", "SATIS", "DEPO", "MUHASEBE", "ETICARET"];
+        const guvenliRol = String(rol || "ADMIN").trim().toUpperCase();
+        if (!izinliRoller.includes(guvenliRol)) {
+            return res.status(400).json({ basarili: false, mesaj: "Desteklenmeyen kullanıcı rolü." });
+        }
+        if (String(sifre).length < 8) {
+            return res.status(400).json({ basarili: false, mesaj: "Parola en az 8 karakter olmalıdır." });
+        }
+
         const mevcut = await Kullanici.findOne({
             email: String(email).trim().toLowerCase()
         });
@@ -194,7 +203,7 @@ async function kullaniciOlustur(req, res, next) {
             adSoyad: String(adSoyad).trim(),
             email: String(email).trim().toLowerCase(),
             sifre: hash,
-            rol: rol || "ADMIN",
+            rol: guvenliRol,
             tenantId: tenant._id,
             aktif: true
         });

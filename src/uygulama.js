@@ -9,18 +9,38 @@ const morgan = require("morgan");
 const hataYonetici = require("./middleware/hataYonetici");
 const saglikRotasi = require("./routes/saglikRotasi");
 const authRotasi = require("./modules/auth/routes/authRotasi");
+const { rateLimit, istekKimligi, girdiTemizleme, httpsZorunlulugu } = require("./middleware/guvenlikKatmani");
+const auditMiddleware = require("./middleware/auditMiddleware");
+const { csrfKontrol } = require("./services/oturumGuvenligi");
 
 const uygulama = express();
+if (process.env.NODE_ENV === "production") uygulama.set("trust proxy", 1);
 
 uygulama.get(["/", "/giris", "/login"], (req, res) => {
     res.redirect(302, "/erp/login.html");
 });
 
-uygulama.use(helmet());
-uygulama.use(cors());
+uygulama.use(helmet({ crossOriginResourcePolicy: { policy: "same-origin" } }));
+uygulama.use(istekKimligi);
+uygulama.use(auditMiddleware);
+const corsIzinleri = String(process.env.CORS_ORIGINS || "").split(",").map(x => x.trim()).filter(Boolean);
+uygulama.use(cors({
+    credentials: true,
+    origin(origin, callback) {
+        const yerel = !origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+        if (yerel || corsIzinleri.includes(origin)) return callback(null, true);
+        return callback(Object.assign(new Error("CORS erişimi reddedildi."), { status: 403 }));
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Authorization", "Content-Type", "X-Request-Id", "X-CSRF-Token"]
+}));
 uygulama.use(express.json({ limit: "10mb" }));
 uygulama.use(express.urlencoded({ extended: true }));
-uygulama.use(morgan("dev"));
+uygulama.use(girdiTemizleme);
+uygulama.use(csrfKontrol);
+uygulama.use(httpsZorunlulugu);
+uygulama.use(rateLimit({ pencereMs: 15 * 60 * 1000, limit: 500, anahtar: req => `api:${req.ip}` }));
+uygulama.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev", { skip: req => req.path === "/api/saglik" }));
 
 const publicKlasoru = path.join(__dirname, "..", "public");
 uygulama.use(express.static(publicKlasoru));
@@ -41,9 +61,11 @@ uygulama.use("/api/tenant/tedarikciler", tedarikciRotasi);
 
 const urunRotasi = require("./routes/urunRotasi");
 const stokRotasi = require("./routes/stokRotasi");
+const ayarRotasi = require("./routes/ayarRotasi");
 
 uygulama.use("/api/tenant/urunler", urunRotasi);
 uygulama.use("/api/tenant/stok", stokRotasi);
+uygulama.use("/api/tenant/ayarlar", ayarRotasi);
 
 const alisRotasi = require("./routes/alisRotasi");
 uygulama.use("/api/tenant/alis", alisRotasi);

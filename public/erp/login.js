@@ -27,23 +27,27 @@
                 })
             });
 
-            const data = await response.json();
+            let data = await response.json();
 
-            if (!response.ok || !data.token) {
+            if (response.ok && data.ikiFaktorGerekli) {
+                const kod = window.prompt("Kimlik doğrulama uygulamanızdaki 6 haneli kodu veya kurtarma kodunu girin:");
+                if (!kod) throw new Error("İki faktörlü doğrulama gerekli.");
+                const ikinci = await fetch("/api/auth/2fa-dogrula", { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify({ challengeToken: data.challengeToken, kod }) });
+                data = await ikinci.json();
+                if (!ikinci.ok) throw new Error(data.mesaj || "İki faktörlü doğrulama başarısız.");
+            }
+
+            if (!response.ok || !data.basarili) {
                 throw new Error(
                     data.mesaj || "Giriş başarısız."
                 );
             }
 
-            localStorage.setItem(
-                "tenantToken",
-                data.token
-            );
+            localStorage.removeItem("tenantToken");
+            localStorage.removeItem("token");
+            localStorage.removeItem("accessToken");
 
-            localStorage.setItem(
-                "token",
-                data.token
-            );
+            if (data.csrfToken) sessionStorage.setItem("bmCsrfToken", data.csrfToken);
 
             window.location.replace("/erp/");
 

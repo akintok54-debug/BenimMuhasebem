@@ -3,6 +3,7 @@
 const kimlikKontrol = require("../middleware/kimlikKontrol");
 const tenantKontrol = require("../middleware/tenantKontrol");
 const controller = require("../controllers/alisController");
+const { yetkiKontrol } = require("../middleware/yetkiKontrol");
 
 const router = express.Router();
 
@@ -11,10 +12,10 @@ router.use(tenantKontrol);
 
 router.get("/", controller.listele);
 router.get("/iade", controller.iadeleriListele);
-router.post("/iade", controller.iadeOlustur);
+router.post("/iade", yetkiKontrol("purchase.write"), controller.iadeOlustur);
 router.get("/siparis", controller.siparisleriListele);
-router.post("/siparis", controller.siparisOlustur);
+router.post("/siparis", yetkiKontrol("purchase.write"), controller.siparisOlustur);
 router.get("/:id", controller.detay);
-router.post("/", controller.olustur);
+router.post("/", yetkiKontrol("purchase.write"), controller.olustur);
 
 module.exports = router;

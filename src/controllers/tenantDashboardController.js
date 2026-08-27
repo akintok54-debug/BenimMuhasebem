@@ -109,6 +109,12 @@ async function firmaGuncelle(req, res, next) {
                 body.telefon ?? ""
             ).trim(),
 
+            email: String(body.email ?? "").trim().toLowerCase(),
+            mersisNo: String(body.mersisNo ?? "").trim(),
+            ticaretSicilNo: String(body.ticaretSicilNo ?? "").trim(),
+            iban: String(body.iban ?? "").trim().toUpperCase(),
+            eFaturaMukellefi: body.eFaturaMukellefi === true,
+
             adres: String(
                 body.adres ?? ""
             ).trim(),

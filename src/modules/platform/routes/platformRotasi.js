@@ -3,6 +3,7 @@
 const kimlikKontrol = require("../../../middleware/kimlikKontrol");
 const superAdminKontrol = require("../middleware/superAdmin");
 const tenantController = require("../controllers/tenantController");
+const guvenlikController = require("../controllers/guvenlikController");
 
 const router = express.Router();
 
@@ -22,6 +23,8 @@ router.post("/tenants", tenantController.olustur);
 router.patch("/tenants/:id/status", tenantController.durumDegistir);
 router.patch("/tenants/:id/modules", tenantController.modulGuncelle);
 router.post("/tenants/:id/users", tenantController.kullaniciOlustur);
+router.get("/guvenlik-merkezi", guvenlikController.merkez);
+router.get("/audit-kayitlari", guvenlikController.auditKayitlari);
 
 /* PLATFORM DURUMU */
 router.get("/durum", (req, res) => {

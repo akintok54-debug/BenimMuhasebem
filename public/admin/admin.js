@@ -60,7 +60,7 @@ function loginEkrani(mesaj = "") {
                         id="adminEmail"
                         type="email"
                         autocomplete="username"
-                        value="bahadir_akin@hotmail.com"
+                        value=""
                         required
                         style="
                             width:100%;
@@ -149,9 +149,17 @@ function loginEkrani(mesaj = "") {
                 })
             });
 
-            const data = await response.json();
+            let data = await response.json();
 
-            if (!response.ok || !data.basarili || !data.token) {
+            if (response.ok && data.ikiFaktorGerekli) {
+                const kod = window.prompt("6 haneli doğrulama kodunu veya kurtarma kodunu girin:");
+                if (!kod) throw new Error("İki faktörlü doğrulama gerekli.");
+                const ikinci = await fetch("/api/auth/2fa-dogrula", { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify({ challengeToken: data.challengeToken, kod }) });
+                data = await ikinci.json();
+                if (!ikinci.ok) throw new Error(data.mesaj || "İki faktörlü doğrulama başarısız.");
+            }
+
+            if (!response.ok || !data.basarili) {
                 throw new Error(
                     data.mesaj ||
                     data.message ||
@@ -167,7 +175,8 @@ function loginEkrani(mesaj = "") {
                 throw new Error("Bu panel yalnızca SUPER_ADMIN içindir.");
             }
 
-            setAdminToken(data.token);
+            clearAdminToken();
+            if (data.csrfToken) sessionStorage.setItem("bmCsrfToken", data.csrfToken);
 
             window.location.reload();
 
@@ -179,8 +188,10 @@ function loginEkrani(mesaj = "") {
     });
 }
 
-function logoutAdmin() {
+async function logoutAdmin() {
+    try { await fetch("/api/auth/logout", { method: "POST", headers: { "X-CSRF-Token": sessionStorage.getItem("bmCsrfToken") || "" } }); } catch (_) {}
     clearAdminToken();
+    sessionStorage.removeItem("bmCsrfToken");
     window.location.reload();
 }
 
@@ -193,17 +204,10 @@ const eskiApiGet = apiGet;
 async function apiGetAuth(url) {
     const token = getAdminToken();
 
-    if (!token) {
-        loginEkrani("Oturum açmanız gerekiyor.");
-        throw new Error("Yetkilendirme tokenı gerekli.");
-    }
-
     const headers = {
-        "Accept": "application/json",
-        "Authorization": token.startsWith("Bearer ")
-            ? token
-            : "Bearer " + token
+        "Accept": "application/json"
     };
+    if (token) headers.Authorization = token.startsWith("Bearer ") ? token : "Bearer " + token;
 
     const response = await fetch(url, {
         method: "GET",
@@ -637,6 +641,26 @@ async function tenants() {
     }
 }
 
+async function securityCenter() {
+    pageTitle.textContent = "Güvenlik Merkezi";
+    loading();
+    try {
+        const data = await apiGet("/api/platform/guvenlik-merkezi");
+        const map = Object.fromEntries((data.ozet || []).map(x => [x._id, x]));
+        const kart = (baslik, kategori) => `<div class="card stat-card"><div class="stat-label">${escapeHtml(baslik)}</div><div class="stat-value">${escapeHtml(map[kategori]?.toplam || 0)}</div><div class="stat-info">Başarısız: ${escapeHtml(map[kategori]?.basarisiz || 0)}</div></div>`;
+        content.innerHTML = `<div class="stats">${kart("Başarısız Girişler", "GIRIS")}${kart("Şüpheli Girişler", "SUPHELI_GIRIS")}${kart("Yetkisiz Denemeler", "YETKISIZ_ERISIM")}${kart("Kritik API Hataları", "API_HATASI")}${kart("Banka Entegrasyonu", "BANKA_ENTEGRASYON")}</div><div class="card"><div class="card-title">Son Güvenlik Olayları</div><div style="overflow:auto"><table class="tenant-table"><thead><tr><th>TARİH</th><th>KATEGORİ</th><th>İŞLEM</th><th>IP</th><th>SONUÇ</th><th>HTTP</th></tr></thead><tbody>${(data.olaylar || []).map(x => `<tr><td>${new Date(x.createdAt).toLocaleString("tr-TR")}</td><td>${escapeHtml(x.category)}</td><td>${escapeHtml(x.action)}</td><td>${escapeHtml(x.ip || "-")}</td><td><span class="badge ${x.success ? "green" : "red"}">${x.success ? "Başarılı" : "Başarısız"}</span></td><td>${escapeHtml(x.httpStatus || "-")}</td></tr>`).join("") || '<tr><td colspan="6">Henüz güvenlik olayı yok.</td></tr>'}</tbody></table></div></div>`;
+    } catch (error) { hataGoster(error); }
+}
+
+async function auditPage() {
+    pageTitle.textContent = "Audit Kayıtları";
+    loading();
+    try {
+        const data = await apiGet("/api/platform/audit-kayitlari?limit=100");
+        content.innerHTML = `<div class="card"><div class="card-title">Değiştirilemez İşlem Kayıtları</div><div style="overflow:auto"><table class="tenant-table"><thead><tr><th>TARİH</th><th>İŞLEM</th><th>KAYNAK</th><th>FİRMA</th><th>SONUÇ</th></tr></thead><tbody>${(data.kayitlar || []).map(x => `<tr><td>${new Date(x.createdAt).toLocaleString("tr-TR")}</td><td>${escapeHtml(x.action)}</td><td>${escapeHtml(x.resource)}</td><td>${escapeHtml(x.tenantId || "Sistem")}</td><td>${x.success ? "Başarılı" : "Başarısız"}</td></tr>`).join("") || '<tr><td colspan="5">Kayıt yok.</td></tr>'}</tbody></table></div></div>`;
+    } catch (error) { hataGoster(error); }
+}
+
 function simplePage(title, description) {
 
     pageTitle.textContent = title;
@@ -725,10 +749,11 @@ async function sayfaAc(page) {
     }
 
     if (page === "audit") {
-        return simplePage(
-            "Audit Kayıtları",
-            "Platform üzerinde gerçekleştirilen kritik işlemler burada izlenecek."
-        );
+        return auditPage();
+    }
+
+    if (page === "security") {
+        return securityCenter();
     }
 
     if (page === "system") {

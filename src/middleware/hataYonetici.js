@@ -1,8 +1,8 @@
 ﻿function hataYonetici(err, req, res, next) {
-    console.error("API HATASI:", err);
+    console.error("API_HATASI", { requestId: req.id, method: req.method, path: req.originalUrl?.split("?")[0], name: err.name, message: err.message });
 
     let status = err.status || 500;
-    let mesaj = err.message || "Sunucu hatası.";
+    let mesaj = status >= 500 ? "İşlem sırasında beklenmeyen bir hata oluştu." : (err.message || "İstek işlenemedi.");
 
     if (err.name === "CastError") {
         status = 400;
@@ -16,7 +16,8 @@
 
     res.status(status).json({
         basarili: false,
-        mesaj
+        mesaj,
+        requestId: req.id
     });
 }
 
