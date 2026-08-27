@@ -21,5 +21,8 @@ router.patch("/musteri/:musteriId/bakiye", yetkiKontrol("accounting.write"), con
 router.post("/musteri/hareket", yetkiKontrol("accounting.write"), controller.musteriManuelHareket);
 router.post("/musteri/:musteriId/ekstre-paylas", controller.ekstrePaylas);
 router.post("/tedarikci/odeme", yetkiKontrol("accounting.write", "cash.write"), controller.tedarikciOdeme);
+router.post("/tedarikci/tahsilat", yetkiKontrol("accounting.write", "cash.write"), controller.tedarikciTahsilat);
+router.post("/tedarikci/hareket", yetkiKontrol("accounting.write"), controller.tedarikciManuelHareket);
+router.patch("/tedarikci/:tedarikciId/bakiye", yetkiKontrol("accounting.write"), controller.tedarikciBakiyeDuzelt);
 
 module.exports = router;

@@ -3341,7 +3341,7 @@
                             </thead>
                             <tbody>
                                 ${list.length ? list.map(item => `
-                                    <tr ${aktif === "musteri" ? `data-cari-musteri-ac="${item._id}" class="cari-clickable-row"` : ""}>
+                                    <tr ${aktif === "musteri" ? `data-cari-musteri-ac="${item._id}"` : `data-cari-tedarikci-ac="${item._id}"`} class="cari-clickable-row">
                                         <td><strong>${escapeHtml(item.kod || "-")}</strong></td>
                                         <td>${escapeHtml(item.unvan || item.adSoyad || "-")}</td>
                                         <td>${escapeHtml(item.whatsapp || item.telefon || "-")}</td>
@@ -3355,18 +3355,12 @@
                                                         data-cari-tip="${aktif}">
                                                     Ekstre
                                                 </button>
-                                                ${aktif === "musteri"
-                        ? `<button type="button" class="erp-small-button" data-cari-islem="${item._id}">Cari İşlem</button>
-                           <button type="button" class="erp-small-button" data-cari-tahsilat="${item._id}">Tahsilat Al</button>
-                           <button type="button" class="erp-small-button" data-cari-musteri-odeme="${item._id}">Müşteriye Öde</button>
-                           <button type="button" class="erp-small-button" data-cari-bakiye="${item._id}">Bakiye Düzelt</button>
-                           <button type="button" class="erp-small-button" data-cari-durum="${item._id}" data-cari-aktif="${item.aktif !== false}">${item.aktif === false ? "Aktif Et" : "Pasife Al"}</button>
-                           <button type="button" class="erp-small-button danger-button" data-cari-sil="${item._id}">Sil</button>`
-                        : `<button type="button"
-                                                               class="erp-small-button"
-                                                               data-cari-odeme="${item._id}">
-                                                           Ödeme
-                                                       </button>`}
+                                                <button type="button" class="erp-small-button" data-cari-islem="${item._id}" data-cari-tip="${aktif}">Cari İşlem</button>
+                                                <button type="button" class="erp-small-button" data-cari-tahsilat="${item._id}" data-cari-tip="${aktif}">${aktif === "musteri" ? "Tahsilat Al" : "Tedarikçiden Tahsilat"}</button>
+                                                <button type="button" class="erp-small-button" data-cari-odeme-yap="${item._id}" data-cari-tip="${aktif}">${aktif === "musteri" ? "Müşteriye Öde" : "Tedarikçiye Öde"}</button>
+                                                <button type="button" class="erp-small-button" data-cari-bakiye="${item._id}" data-cari-tip="${aktif}">Bakiye Düzelt</button>
+                                                <button type="button" class="erp-small-button" data-cari-durum="${item._id}" data-cari-tip="${aktif}" data-cari-aktif="${item.aktif !== false}">${item.aktif === false ? "Aktif Et" : "Pasife Al"}</button>
+                                                <button type="button" class="erp-small-button danger-button" data-cari-sil="${item._id}" data-cari-tip="${aktif}">Sil</button>
                                             </div>
                                         </td>
                                     </tr>
@@ -3405,10 +3399,11 @@
         }
     }
 
-    function cariManuelHareketFormu(musteriId) {
+    function cariManuelHareketFormu(id, tip = "musteri") {
+        const musteriMi = tip === "musteri", taraf = musteriMi ? "Müşteri" : "Tedarikçi";
         const overlay = document.createElement("div");
         overlay.className = "erp-modal-overlay";
-        overlay.innerHTML = `<div class="erp-modal"><div class="erp-modal-header"><div><h2>Manuel Cari İşlem</h2><p>Borç, alacak veya müşteriye yansıtılacak masraf girin.</p></div><button class="erp-modal-close" aria-label="Kapat">×</button></div><form id="cariManuelForm"><div class="erp-form-grid"><label>İşlem Türü<select name="tip" required><option value="BORC">Borçlandır</option><option value="ALACAK">Alacaklandır</option><option value="MASRAF">Masraf Ekle (Kargo vb.)</option></select></label><label>Tutar<input name="tutar" type="number" min="0.01" step="0.01" required></label><label>Tarih<input name="tarih" type="date" value="${new Date().toISOString().slice(0, 10)}" required></label><label>Belge No (isteğe bağlı)<input name="belgeNo"></label><label class="full">Açıklama<input name="aciklama" placeholder="Örn. Kargo ücreti"></label><div id="cariManuelMesaj" class="full"></div></div><div class="erp-modal-footer"><button class="erp-primary-button" type="submit">Hareketi Kaydet</button></div></form></div>`;
+        overlay.innerHTML = `<div class="erp-modal"><div class="erp-modal-header"><div><h2>${taraf} Cari İşlemi</h2><p>Borç, alacak veya hesaba yansıtılacak masraf girin.</p></div><button class="erp-modal-close" aria-label="Kapat">×</button></div><form id="cariManuelForm"><div class="erp-form-grid"><label>İşlem Türü<select name="tip" required><option value="BORC">Borçlandır</option><option value="ALACAK">Alacaklandır</option><option value="MASRAF">Masraf Ekle</option></select></label><label>Tutar<input name="tutar" type="number" min="0.01" step="0.01" required></label><label>Tarih<input name="tarih" type="date" value="${new Date().toISOString().slice(0, 10)}" required></label><label>Belge No (isteğe bağlı)<input name="belgeNo"></label><label class="full">Açıklama<input name="aciklama" placeholder="İşlem açıklaması"></label><div id="cariManuelMesaj" class="full"></div></div><div class="erp-modal-footer"><button class="erp-primary-button" type="submit">Hareketi Kaydet</button></div></form></div>`;
         document.body.appendChild(overlay);
         overlay.querySelector(".erp-modal-close").onclick = () => overlay.remove();
         overlay.querySelector("#cariManuelForm").onsubmit = async event => {
@@ -3416,30 +3411,30 @@
             const fd = new FormData(event.currentTarget);
             const mesaj = overlay.querySelector("#cariManuelMesaj");
             try {
-                const result = await api("/api/tenant/cari/musteri/hareket", { method: "POST", body: JSON.stringify({ musteriId, tip: fd.get("tip"), tutar: Number(fd.get("tutar")), tarih: fd.get("tarih"), belgeNo: fd.get("belgeNo"), aciklama: fd.get("aciklama") }) });
+                const result = await api(`/api/tenant/cari/${tip}/hareket`, { method: "POST", body: JSON.stringify({ [musteriMi ? "musteriId" : "tedarikciId"]: id, tip: fd.get("tip"), tutar: Number(fd.get("tutar")), tarih: fd.get("tarih"), belgeNo: fd.get("belgeNo"), aciklama: fd.get("aciklama") }) });
                 mesaj.innerHTML = `<div class="success">${escapeHtml(result.mesaj)}</div>`;
-                setTimeout(() => { overlay.remove(); cariEkstreAc("musteri", musteriId); }, 500);
+                setTimeout(() => { overlay.remove(); cariEkstreAc(tip, id); }, 500);
             } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; }
         };
     }
 
-    async function cariMusteriOdemeFormu(musteriId, tur) {
+    async function cariOdemeFormu(id, tur, tip = "musteri") {
         try {
             const [detay, finans] = await Promise.all([
-                api(`/api/tenant/musteriler/${encodeURIComponent(musteriId)}`),
+                api(`/api/tenant/${tip === "musteri" ? "musteriler" : "tedarikciler"}/${encodeURIComponent(id)}`),
                 api("/api/tenant/finans/ozet")
             ]);
-            const musteri = detay.musteri, tahsilat = tur === "tahsilat";
+            const musteri = detay[tip === "musteri" ? "musteri" : "tedarikci"], tahsilat = tur === "tahsilat", musteriMi = tip === "musteri", tarafAdi = musteriMi ? "Müşteri" : "Tedarikçi";
             const overlay = document.createElement("div");
             overlay.className = "erp-modal-overlay";
-            overlay.innerHTML = `<div class="erp-modal"><div class="erp-modal-header"><div><h2>${tahsilat ? "Müşteriden Tahsilat Al" : "Müşteriye Ödeme Yap"}</h2><p>${escapeHtml(musteri.kod)} · ${escapeHtml(musteri.unvan || musteri.adSoyad)} · Bakiye ${para(musteri.bakiye)}</p></div><button class="erp-modal-close" type="button">×</button></div>
+            overlay.innerHTML = `<div class="erp-modal"><div class="erp-modal-header"><div><h2>${tahsilat ? `${tarafAdi}den Tahsilat Al` : `${tarafAdi}ye Ödeme Yap`}</h2><p>${escapeHtml(musteri.kod)} · ${escapeHtml(musteri.unvan || musteri.adSoyad)} · Bakiye ${para(musteri.bakiye)}</p></div><button class="erp-modal-close" type="button">×</button></div>
                 <form><div class="erp-form-grid">
                     <label>Ödeme Yöntemi<select name="odemeYontemi" required><option value="NAKIT">Nakit</option><option value="KREDI_KARTI">Kredi Kartı</option><option value="SENET">Senet</option><option value="CEK">Çek</option></select></label>
                     <label data-hesap-label>Hesap<select name="hesapId"></select></label>
                     <label>Tutar<input name="tutar" type="number" min="0.01" step="0.01" ${tahsilat && Number(musteri.bakiye) > 0 ? `max="${Number(musteri.bakiye)}"` : ""} required></label>
                     <label>Tarih<input name="tarih" type="date" value="${new Date().toISOString().slice(0, 10)}" required></label>
                     <label>Belge No<input name="belgeNo" placeholder="Makbuz / senet / çek no"></label>
-                    <label class="full">Açıklama<input name="aciklama" value="${tahsilat ? "Müşteri tahsilatı" : "Müşteriye ödeme"}"></label>
+                    <label class="full">Açıklama<input name="aciklama" value="${tahsilat ? `${tarafAdi} tahsilatı` : `${tarafAdi} ödemesi`}"></label>
                     <div class="full" data-mesaj></div>
                 </div><div class="erp-modal-footer"><button class="erp-primary-button" type="submit">${tahsilat ? "Tahsilatı Kaydet" : "Ödemeyi Kaydet"}</button></div></form></div>`;
             document.body.appendChild(overlay);
@@ -3455,8 +3450,8 @@
             form.onsubmit = async event => {
                 event.preventDefault(); const fd = new FormData(form), mesaj = overlay.querySelector("[data-mesaj]");
                 try {
-                    const sonuc = await api(tahsilat ? "/api/tenant/cari/musteri/tahsilat" : "/api/tenant/cari/musteri/odeme", {
-                        method: "POST", body: JSON.stringify({ musteriId, odemeYontemi: fd.get("odemeYontemi"), hesapId: fd.get("hesapId"), tutar: Number(fd.get("tutar")), tarih: fd.get("tarih"), belgeNo: fd.get("belgeNo"), aciklama: fd.get("aciklama") })
+                    const sonuc = await api(`/api/tenant/cari/${tip}/${tahsilat ? "tahsilat" : "odeme"}`, {
+                        method: "POST", body: JSON.stringify({ [musteriMi ? "musteriId" : "tedarikciId"]: id, odemeYontemi: fd.get("odemeYontemi"), hesapTipi: fd.get("odemeYontemi") === "NAKIT" ? "KASA" : "BANKA", hesapId: fd.get("hesapId"), tutar: Number(fd.get("tutar")), tarih: fd.get("tarih"), belgeNo: fd.get("belgeNo"), aciklama: fd.get("aciklama") })
                     });
                     mesaj.innerHTML = `<div class="success">${escapeHtml(sonuc.mesaj)}</div>`;
                     setTimeout(() => { overlay.remove(); cariYukle(); }, 450);
@@ -3465,24 +3460,24 @@
         } catch (error) { alert(error.message); }
     }
 
-    async function cariBakiyeDuzeltFormu(musteriId) {
+    async function cariBakiyeDuzeltFormu(id, tip = "musteri") {
         try {
-            const { musteri } = await api(`/api/tenant/musteriler/${encodeURIComponent(musteriId)}`);
+            const detay = await api(`/api/tenant/${tip === "musteri" ? "musteriler" : "tedarikciler"}/${encodeURIComponent(id)}`), musteri = detay[tip === "musteri" ? "musteri" : "tedarikci"];
             const overlay = document.createElement("div"); overlay.className = "erp-modal-overlay";
             overlay.innerHTML = `<div class="erp-modal"><div class="erp-modal-header"><div><h2>Cari Bakiye Düzeltme</h2><p>${escapeHtml(musteri.kod)} · Mevcut bakiye ${para(musteri.bakiye)}</p></div><button class="erp-modal-close">×</button></div><form><div class="erp-form-grid"><label>Yeni Bakiye<input name="yeniBakiye" type="number" step="0.01" value="${Number(musteri.bakiye || 0)}" required></label><label>Tarih<input name="tarih" type="date" value="${new Date().toISOString().slice(0, 10)}" required></label><label>Belge No<input name="belgeNo"></label><label class="full">Düzeltme Gerekçesi<input name="aciklama" required placeholder="Sayım, devir veya mutabakat açıklaması"></label><div class="full" data-mesaj></div></div><div class="erp-modal-footer"><button class="erp-primary-button">Bakiyeyi Düzelt</button></div></form></div>`;
             document.body.appendChild(overlay); overlay.querySelector(".erp-modal-close").onclick = () => overlay.remove();
-            overlay.querySelector("form").onsubmit = async event => { event.preventDefault(); const fd = new FormData(event.currentTarget), mesaj = overlay.querySelector("[data-mesaj]"); try { const sonuc = await api(`/api/tenant/cari/musteri/${encodeURIComponent(musteriId)}/bakiye`, { method: "PATCH", body: JSON.stringify({ yeniBakiye: Number(fd.get("yeniBakiye")), tarih: fd.get("tarih"), belgeNo: fd.get("belgeNo"), aciklama: fd.get("aciklama") }) }); mesaj.innerHTML = `<div class="success">${escapeHtml(sonuc.mesaj)}</div>`; setTimeout(() => { overlay.remove(); cariYukle(); }, 450); } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } };
+            overlay.querySelector("form").onsubmit = async event => { event.preventDefault(); const fd = new FormData(event.currentTarget), mesaj = overlay.querySelector("[data-mesaj]"); try { const sonuc = await api(`/api/tenant/cari/${tip}/${encodeURIComponent(id)}/bakiye`, { method: "PATCH", body: JSON.stringify({ yeniBakiye: Number(fd.get("yeniBakiye")), tarih: fd.get("tarih"), belgeNo: fd.get("belgeNo"), aciklama: fd.get("aciklama") }) }); mesaj.innerHTML = `<div class="success">${escapeHtml(sonuc.mesaj)}</div>`; setTimeout(() => { overlay.remove(); cariYukle(); }, 450); } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } };
         } catch (error) { alert(error.message); }
     }
 
-    async function cariMusteriDurumDegistir(id, aktif) {
-        await api(`/api/tenant/musteriler/${encodeURIComponent(id)}/durum`, { method: "PATCH", body: JSON.stringify({ aktif: !aktif }) });
+    async function cariDurumDegistir(id, aktif, tip = "musteri") {
+        await api(`/api/tenant/${tip === "musteri" ? "musteriler" : "tedarikciler"}/${encodeURIComponent(id)}/durum`, { method: "PATCH", body: JSON.stringify({ aktif: !aktif }) });
         await cariYukle();
     }
 
-    async function cariMusteriSil(id) {
+    async function cariSil(id, tip = "musteri") {
         if (!confirm("Bu cari kaydı kalıcı olarak silinsin mi? Bakiyesi veya hareketi olan kayıtlar muhasebe güvenliği nedeniyle silinmez.")) return;
-        try { await api(`/api/tenant/musteriler/${encodeURIComponent(id)}`, { method: "DELETE" }); await cariYukle(); }
+        try { await api(`/api/tenant/${tip === "musteri" ? "musteriler" : "tedarikciler"}/${encodeURIComponent(id)}`, { method: "DELETE" }); await cariYukle(); }
         catch (error) { alert(error.message); }
     }
 
@@ -4297,18 +4292,18 @@
 
     document.addEventListener("click", event => {
         const tahsilat = event.target.closest("[data-cari-tahsilat]");
-        if (tahsilat) { cariMusteriOdemeFormu(tahsilat.dataset.cariTahsilat, "tahsilat"); return; }
-        const musteriOdeme = event.target.closest("[data-cari-musteri-odeme]");
-        if (musteriOdeme) { cariMusteriOdemeFormu(musteriOdeme.dataset.cariMusteriOdeme, "odeme"); return; }
+        if (tahsilat) { cariOdemeFormu(tahsilat.dataset.cariTahsilat, "tahsilat", tahsilat.dataset.cariTip); return; }
+        const odeme = event.target.closest("[data-cari-odeme-yap]");
+        if (odeme) { cariOdemeFormu(odeme.dataset.cariOdemeYap, "odeme", odeme.dataset.cariTip); return; }
         const bakiye = event.target.closest("[data-cari-bakiye]");
-        if (bakiye) { cariBakiyeDuzeltFormu(bakiye.dataset.cariBakiye); return; }
+        if (bakiye) { cariBakiyeDuzeltFormu(bakiye.dataset.cariBakiye, bakiye.dataset.cariTip); return; }
         const durum = event.target.closest("[data-cari-durum]");
-        if (durum) { cariMusteriDurumDegistir(durum.dataset.cariDurum, durum.dataset.cariAktif === "true").catch(error => alert(error.message)); return; }
+        if (durum) { cariDurumDegistir(durum.dataset.cariDurum, durum.dataset.cariAktif === "true", durum.dataset.cariTip).catch(error => alert(error.message)); return; }
         const sil = event.target.closest("[data-cari-sil]");
-        if (sil) { cariMusteriSil(sil.dataset.cariSil); return; }
+        if (sil) { cariSil(sil.dataset.cariSil, sil.dataset.cariTip); return; }
         const cariIslem = event.target.closest("[data-cari-islem]");
         if (cariIslem) {
-            cariManuelHareketFormu(cariIslem.dataset.cariIslem);
+            cariManuelHareketFormu(cariIslem.dataset.cariIslem, cariIslem.dataset.cariTip);
             return;
         }
         const ekstre = event.target.closest("[data-cari-ekstre]");
@@ -4318,6 +4313,8 @@
         }
         const musteriSatiri = event.target.closest("[data-cari-musteri-ac]");
         if (musteriSatiri && !event.target.closest("button,a,input,select")) musteriAnaSayfaAc(musteriSatiri.dataset.cariMusteriAc);
+        const tedarikciSatiri = event.target.closest("[data-cari-tedarikci-ac]");
+        if (tedarikciSatiri && !event.target.closest("button,a,input,select")) tedarikciDashboardAc(tedarikciSatiri.dataset.cariTedarikciAc);
     });
 
     // Mevcut menü yapılarıyla uyumlu global fonksiyonlar.

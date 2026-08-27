@@ -24,7 +24,12 @@ test("Cari yönetim rotaları kimliksiz erişimi reddeder", async () => {
     const kontroller = [
         ["POST", "/api/tenant/cari/musteri/odeme"],
         ["PATCH", `/api/tenant/cari/musteri/${id}/bakiye`],
-        ["DELETE", `/api/tenant/musteriler/${id}`]
+        ["DELETE", `/api/tenant/musteriler/${id}`],
+        ["POST", "/api/tenant/cari/tedarikci/odeme"],
+        ["POST", "/api/tenant/cari/tedarikci/tahsilat"],
+        ["POST", "/api/tenant/cari/tedarikci/hareket"],
+        ["PATCH", `/api/tenant/cari/tedarikci/${id}/bakiye`],
+        ["DELETE", `/api/tenant/tedarikciler/${id}`]
     ];
     for (const [method, path] of kontroller) {
         const response = await istek(path, { method, body: "{}" });
