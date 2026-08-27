@@ -23,12 +23,17 @@ uygulama.get(["/", "/giris", "/login"], (req, res) => {
 uygulama.use(helmet({ crossOriginResourcePolicy: { policy: "same-origin" } }));
 uygulama.use(istekKimligi);
 uygulama.use(auditMiddleware);
-const corsIzinleri = String(process.env.CORS_ORIGINS || "").split(",").map(x => x.trim()).filter(Boolean);
+const corsIzinleri = new Set([
+    ...String(process.env.CORS_ORIGINS || "").split(","),
+    process.env.PUBLIC_APP_URL,
+    "https://benimmuhasebe.com",
+    "https://www.benimmuhasebe.com"
+].map(x => String(x || "").trim().replace(/\/$/, "")).filter(Boolean));
 uygulama.use(cors({
     credentials: true,
     origin(origin, callback) {
         const yerel = !origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
-        if (yerel || corsIzinleri.includes(origin)) return callback(null, true);
+        if (yerel || corsIzinleri.has(String(origin).replace(/\/$/, ""))) return callback(null, true);
         return callback(Object.assign(new Error("CORS erişimi reddedildi."), { status: 403 }));
     },
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
