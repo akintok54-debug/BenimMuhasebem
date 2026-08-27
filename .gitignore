@@ -8,3 +8,5 @@ server-err.log
 uploads/
 *.SNAPSHOT-*
 *.bak
+.vercel
+.env*
