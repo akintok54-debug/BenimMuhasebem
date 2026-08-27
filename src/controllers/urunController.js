@@ -1,5 +1,6 @@
 ﻿const mongoose = require("mongoose");
 const Urun = require("../models/Urun");
+const UrunKategori = require("../models/UrunKategori");
 
 const SAYISAL_ALANLAR = ["kdv", "alisFiyati", "satisFiyati", "bayiFiyati", "perakendeFiyati", "minimumStok", "kritikStok"];
 
@@ -9,8 +10,8 @@ function metin(value) {
 
 function gorselDogrula(value) {
     if (!value) return "";
-    if (typeof value !== "string" || !/^data:image\/(jpeg|png|webp);base64,/i.test(value)) {
-        const error = new Error("Ürün görseli JPG, PNG veya WebP olmalıdır.");
+    if (typeof value !== "string" || !(/^(https?:\/\/)/i.test(value) || /^data:image\/(jpeg|png|webp);base64,/i.test(value))) {
+        const error = new Error("Ürün görseli geçerli bir HTTPS adresi veya JPG, PNG, WebP görseli olmalıdır.");
         error.status = 400;
         throw error;
     }
@@ -20,6 +21,28 @@ function gorselDogrula(value) {
         throw error;
     }
     return value;
+}
+
+async function kategorileriListele(req, res, next) {
+    try {
+        const tId = tenantId(req);
+        const [kayitli, urunKategorileri] = await Promise.all([
+            UrunKategori.find({ tenantId: tId, aktif: true }).sort({ ad: 1 }).lean(),
+            Urun.distinct("kategori", { tenantId: tId, kategori: { $ne: "" } })
+        ]);
+        const adlar = [...new Set([...kayitli.map(x => x.ad), ...urunKategorileri].filter(Boolean))]
+            .sort((a, b) => a.localeCompare(b, "tr"));
+        res.json({ basarili: true, kategoriler: adlar });
+    } catch (error) { next(error); }
+}
+
+async function kategoriOlustur(req, res, next) {
+    try {
+        const ad = metin(req.body?.ad);
+        if (!ad) return res.status(400).json({ basarili: false, mesaj: "Kategori adı zorunludur." });
+        const kategori = await UrunKategori.create({ tenantId: tenantId(req), ad });
+        res.status(201).json({ basarili: true, kategori });
+    } catch (error) { next(error); }
 }
 
 async function benzersizAlanlariDogrula(tId, body, haricId = null) {
@@ -224,6 +247,8 @@ async function guncelle(req, res, next) {
 }
 
 module.exports = {
+    kategorileriListele,
+    kategoriOlustur,
     listele,
     detay,
     olustur,
