@@ -1,6 +1,55 @@
 ﻿const mongoose = require("mongoose");
 const Urun = require("../models/Urun");
 
+const SAYISAL_ALANLAR = ["kdv", "alisFiyati", "satisFiyati", "bayiFiyati", "perakendeFiyati", "minimumStok", "kritikStok"];
+
+function metin(value) {
+    return String(value ?? "").trim();
+}
+
+function gorselDogrula(value) {
+    if (!value) return "";
+    if (typeof value !== "string" || !/^data:image\/(jpeg|png|webp);base64,/i.test(value)) {
+        const error = new Error("Ürün görseli JPG, PNG veya WebP olmalıdır.");
+        error.status = 400;
+        throw error;
+    }
+    if (value.length > 2_800_000) {
+        const error = new Error("Ürün görseli en fazla 2 MB olabilir.");
+        error.status = 400;
+        throw error;
+    }
+    return value;
+}
+
+async function benzersizAlanlariDogrula(tId, body, haricId = null) {
+    const kosullar = [];
+    const kod = metin(body.kod).toUpperCase();
+    const barkod = metin(body.barkod);
+    if (kod) kosullar.push({ kod });
+    if (barkod) kosullar.push({ barkod });
+    if (!kosullar.length) return;
+    const filter = { tenantId: tId, $or: kosullar };
+    if (haricId) filter._id = { $ne: haricId };
+    const mevcut = await Urun.findOne(filter).select("kod barkod").lean();
+    if (!mevcut) return;
+    const error = new Error(mevcut.kod === kod ? "Bu ürün kodu zaten kullanılıyor." : "Bu barkod zaten kullanılıyor.");
+    error.status = 409;
+    throw error;
+}
+
+function sayilariDogrula(body) {
+    for (const alan of SAYISAL_ALANLAR) {
+        if (body[alan] === undefined) continue;
+        const deger = Number(body[alan]);
+        if (!Number.isFinite(deger) || deger < 0) {
+            const error = new Error(`${alan} sıfır veya daha büyük bir sayı olmalıdır.`);
+            error.status = 400;
+            throw error;
+        }
+    }
+}
+
 function tenantId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
 }
@@ -12,6 +61,10 @@ async function listele(req, res, next) {
         };
 
         const arama = String(req.query.arama || "").trim();
+
+        if (req.query.aktif === "true") filter.aktif = true;
+        if (req.query.aktif === "false") filter.aktif = false;
+        if (req.query.kategori) filter.kategori = String(req.query.kategori).trim();
 
         if (arama) {
             filter.$or = [
@@ -72,6 +125,9 @@ async function olustur(req, res, next) {
             });
         }
 
+        sayilariDogrula(body);
+        await benzersizAlanlariDogrula(tId, body);
+
         const urun = await Urun.create({
             tenantId: tId,
             kod: String(body.kod).trim().toUpperCase(),
@@ -87,6 +143,9 @@ async function olustur(req, res, next) {
             kdv: Number(body.kdv ?? 20),
             alisFiyati: Number(body.alisFiyati || 0),
             satisFiyati: Number(body.satisFiyati || 0),
+            bayiFiyati: Number(body.bayiFiyati || 0),
+            perakendeFiyati: Number(body.perakendeFiyati ?? body.satisFiyati ?? 0),
+            gorsel: gorselDogrula(body.gorsel),
             minimumStok: Number(body.minimumStok || 0),
             kritikStok: Number(body.kritikStok || 0),
             aktif: body.aktif !== false,
@@ -128,19 +187,29 @@ async function guncelle(req, res, next) {
             "kdv",
             "alisFiyati",
             "satisFiyati",
+            "bayiFiyati",
+            "perakendeFiyati",
+            "gorsel",
             "minimumStok",
             "kritikStok",
             "aktif",
             "notlar"
         ];
 
+        sayilariDogrula(req.body || {});
+        await benzersizAlanlariDogrula(tenantId(req), req.body || {}, urun._id);
+
         for (const alan of alanlar) {
             if (req.body[alan] !== undefined) {
-                urun[alan] =
-                    alan === "kod"
-                        ? String(req.body[alan]).trim().toUpperCase()
-                        : req.body[alan];
+                if (alan === "kod") urun[alan] = metin(req.body[alan]).toUpperCase();
+                else if (alan === "gorsel") urun[alan] = gorselDogrula(req.body[alan]);
+                else if (SAYISAL_ALANLAR.includes(alan)) urun[alan] = Number(req.body[alan]);
+                else urun[alan] = req.body[alan];
             }
+        }
+
+        if (!metin(urun.kod) || !metin(urun.ad)) {
+            return res.status(400).json({ basarili: false, mesaj: "Ürün kodu ve ürün adı zorunludur." });
         }
 
         await urun.save();

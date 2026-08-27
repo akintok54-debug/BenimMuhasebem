@@ -23,6 +23,22 @@
 .tedarikci-kalem select,.tedarikci-kalem input { width:100%; min-width:90px; padding:9px; border:1px solid #d7dee9; border-radius:8px; }
 .supplier-document-total { margin-top:14px; padding:14px 16px; border-radius:11px; background:#ecfdf5; color:#065f46; text-align:right; font-size:16px; }
 .supplier-document-total strong { margin-left:8px; font-size:21px; }
+
+.product-welcome { background:linear-gradient(135deg,#1d4ed8,#6d28d9); }
+.product-hero { display:flex;justify-content:space-between;align-items:center;gap:18px;padding:24px;margin-bottom:18px;border-radius:18px;color:#fff;background:linear-gradient(135deg,#1e3a8a,#6d28d9);box-shadow:0 16px 36px rgba(79,70,229,.2); }
+.product-identity { display:flex;align-items:center;gap:16px;min-width:0; }
+.product-identity span { color:#bfdbfe;font-size:12px;font-weight:800;letter-spacing:1px; }
+.product-identity h2 { margin:5px 0;font-size:27px; }
+.product-identity p { margin:0;color:#ddd6fe; }
+.product-avatar,.product-photo,.product-thumb { display:grid;place-items:center;overflow:hidden;background:#fff;color:#4f46e5;flex:none; }
+.product-avatar { width:82px;height:82px;border-radius:18px;font-size:36px; }
+.product-avatar img,.product-photo img,.product-thumb img { width:100%;height:100%;object-fit:cover; }
+.product-thumb { width:46px;height:46px;border-radius:10px;font-size:22px;border:1px solid #e2e8f0; }
+.product-form-layout { display:grid;grid-template-columns:180px 1fr;gap:22px;padding:20px; }
+.product-photo-editor { display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;color:#64748b; }
+.product-photo { width:160px;height:160px;border-radius:18px;border:2px dashed #cbd5e1;font-size:48px; }
+.product-modal { max-width:1050px; }
+table td small { display:block;margin-top:4px;color:#64748b; }
 #tedarikciV2Mesaj,#tedBelgeMesaj,#tedOdemeMesaj { padding:0 24px; }
 
 @media (max-width:760px) {
@@ -30,6 +46,8 @@
     .supplier-info { grid-template-columns:1fr; }
     .supplier-tabs { overflow-x:auto; flex-wrap:nowrap; }
     .supplier-tabs button { white-space:nowrap; }
+    .product-hero { align-items:flex-start;flex-direction:column; }
+    .product-form-layout { grid-template-columns:1fr; }
 }
 
 /* 2026 profesyonel ana sayfa */

@@ -75,6 +75,23 @@ const UrunSchema = new mongoose.Schema(
             min: 0
         },
 
+        bayiFiyati: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
+
+        perakendeFiyati: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
+
+        gorsel: {
+            type: String,
+            default: ""
+        },
+
         minimumStok: {
             type: Number,
             default: 0,
