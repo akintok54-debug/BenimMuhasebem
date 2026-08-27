@@ -45,9 +45,10 @@ async function listele(req, res, next) {
     try {
         const tenantId = tenantObjectId(req);
 
-        const alislar = await Alis.find({
-            tenantId
-        })
+        const filter = { tenantId };
+        if (req.query.tedarikciId) filter.tedarikciId = req.query.tedarikciId;
+
+        const alislar = await Alis.find(filter)
             .populate("tedarikciId", "kod unvan adSoyad")
             .populate("depoId", "kod ad")
             .sort({ tarih: -1, createdAt: -1 })
