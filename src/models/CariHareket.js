@@ -58,6 +58,16 @@ const CariHareketSchema = new mongoose.Schema(
 
         belgeNo: { type: String, trim: true, default: "" },
 
+        odemeYontemi: {
+            type: String,
+            enum: ["NAKIT", "KREDI_KARTI", "SENET", "CEK", null],
+            default: null
+        },
+
+        bakiyeDegisimi: { type: Number, default: null },
+        oncekiBakiye: { type: Number, default: null },
+        sonrakiBakiye: { type: Number, default: null },
+
         kullaniciId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Kullanici",

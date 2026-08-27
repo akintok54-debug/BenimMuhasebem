@@ -39,6 +39,14 @@ async function hesapBul(req, hesapTipi, hesapId) {
     });
 }
 
+function odemeBilgisi(body) {
+    const yontem = String(body.odemeYontemi || (body.hesapTipi === "BANKA" ? "KREDI_KARTI" : "NAKIT")).toUpperCase();
+    if (!["NAKIT", "KREDI_KARTI", "SENET", "CEK"].includes(yontem)) return null;
+    if (yontem === "NAKIT") return { yontem, hesapTipi: "KASA" };
+    if (yontem === "KREDI_KARTI") return { yontem, hesapTipi: "BANKA" };
+    return { yontem, hesapTipi: null };
+}
+
 async function ozet(req, res, next) {
     try {
         const tId = tenantId(req);
@@ -226,10 +234,11 @@ async function musteriTahsilat(req, res, next) {
             });
         }
 
-        if (!["KASA", "BANKA"].includes(body.hesapTipi)) {
+        const odeme = odemeBilgisi(body);
+        if (!odeme) {
             return res.status(400).json({
                 basarili: false,
-                mesaj: "Tahsilat hesabı KASA veya BANKA olmalıdır."
+                mesaj: "Ödeme yöntemi nakit, kredi kartı, senet veya çek olmalıdır."
             });
         }
 
@@ -252,13 +261,9 @@ async function musteriTahsilat(req, res, next) {
             });
         }
 
-        const hesap = await hesapBul(
-            req,
-            body.hesapTipi,
-            body.hesapId
-        );
+        const hesap = odeme.hesapTipi ? await hesapBul(req, odeme.hesapTipi, body.hesapId) : null;
 
-        if (!hesap) {
+        if (odeme.hesapTipi && !hesap) {
             return res.status(404).json({
                 basarili: false,
                 mesaj: "Tahsilat hesabı bulunamadı."
@@ -266,10 +271,10 @@ async function musteriTahsilat(req, res, next) {
         }
 
         musteri.bakiye -= tutar;
-        hesap.bakiye += tutar;
+        if (hesap) hesap.bakiye += tutar;
 
         await musteri.save();
-        await hesap.save();
+        if (hesap) await hesap.save();
 
         const cariHareket = await CariHareket.create({
             tenantId: tId,
@@ -279,6 +284,11 @@ async function musteriTahsilat(req, res, next) {
             tutar,
             aciklama: body.aciklama || "Müşteri tahsilatı",
             kaynak: "TAHSILAT",
+            belgeNo: String(body.belgeNo || "").trim(),
+            odemeYontemi: odeme.yontem,
+            oncekiBakiye: Number(musteri.bakiye) + tutar,
+            sonrakiBakiye: Number(musteri.bakiye),
+            bakiyeDegisimi: -tutar,
             tarih: body.tarih || new Date(),
             kullaniciId:
                 req.kullanici?._id ||
@@ -286,9 +296,9 @@ async function musteriTahsilat(req, res, next) {
                 null
         });
 
-        const paraHareket = await ParaHareket.create({
+        const paraHareket = hesap ? await ParaHareket.create({
             tenantId: tId,
-            hesapTipi: body.hesapTipi,
+            hesapTipi: odeme.hesapTipi,
             hesapId: hesap._id,
             tip: "GIRIS",
             tutar,
@@ -299,7 +309,7 @@ async function musteriTahsilat(req, res, next) {
                 req.kullanici?._id ||
                 req.user?._id ||
                 null
-        });
+        }) : null;
 
         return res.status(201).json({
             basarili: true,
@@ -312,6 +322,71 @@ async function musteriTahsilat(req, res, next) {
     } catch (error) {
         next(error);
     }
+}
+
+async function musteriOdeme(req, res, next) {
+    try {
+        const tId = tenantId(req), body = req.body || {}, tutar = Number(body.tutar || 0);
+        const odeme = odemeBilgisi(body);
+        if (!mongoose.Types.ObjectId.isValid(String(body.musteriId || "")) || !Number.isFinite(tutar) || tutar <= 0 || !odeme) {
+            return res.status(400).json({ basarili: false, mesaj: "Müşteri, pozitif tutar ve geçerli ödeme yöntemi zorunludur." });
+        }
+        const musteri = await Musteri.findOne({ _id: body.musteriId, tenantId: tId });
+        if (!musteri) return res.status(404).json({ basarili: false, mesaj: "Müşteri bulunamadı." });
+        const hesap = odeme.hesapTipi ? await hesapBul(req, odeme.hesapTipi, body.hesapId) : null;
+        if (odeme.hesapTipi && !hesap) return res.status(404).json({ basarili: false, mesaj: "Ödeme hesabı bulunamadı." });
+        if (hesap && Number(hesap.bakiye || 0) < tutar) return res.status(409).json({ basarili: false, mesaj: "Ödeme hesabında yeterli bakiye yok." });
+
+        const oncekiBakiye = Number(musteri.bakiye || 0);
+        musteri.bakiye = oncekiBakiye + tutar;
+        if (hesap) hesap.bakiye -= tutar;
+        await musteri.save();
+        if (hesap) await hesap.save();
+
+        try {
+            const cariHareket = await CariHareket.create({
+                tenantId: tId, tarafTipi: "MUSTERI", tarafId: musteri._id, tip: "ODEME", tutar,
+                aciklama: String(body.aciklama || "Müşteriye ödeme").trim(), kaynak: "MUSTERI_ODEME",
+                belgeNo: String(body.belgeNo || "").trim(), odemeYontemi: odeme.yontem,
+                oncekiBakiye, sonrakiBakiye: musteri.bakiye, bakiyeDegisimi: tutar,
+                tarih: body.tarih || new Date(), kullaniciId: req.kullanici?._id || req.user?._id || null
+            });
+            const paraHareket = hesap ? await ParaHareket.create({
+                tenantId: tId, hesapTipi: odeme.hesapTipi, hesapId: hesap._id, tip: "CIKIS", tutar,
+                aciklama: String(body.aciklama || "Müşteriye ödeme").trim(), kaynak: "MUSTERI_ODEME",
+                kaynakId: cariHareket._id, belgeNo: String(body.belgeNo || "").trim(), tarih: body.tarih || new Date(),
+                kullaniciId: req.kullanici?._id || req.user?._id || null
+            }) : null;
+            return res.status(201).json({ basarili: true, mesaj: "Müşteri ödemesi kaydedildi.", musteriBakiye: musteri.bakiye, cariHareket, paraHareket });
+        } catch (error) {
+            musteri.bakiye = oncekiBakiye; await musteri.save();
+            if (hesap) { hesap.bakiye += tutar; await hesap.save(); }
+            throw error;
+        }
+    } catch (error) { next(error); }
+}
+
+async function musteriBakiyeDuzelt(req, res, next) {
+    try {
+        const tId = tenantId(req), body = req.body || {}, yeniBakiye = Number(body.yeniBakiye);
+        if (!mongoose.Types.ObjectId.isValid(String(req.params.musteriId || "")) || !Number.isFinite(yeniBakiye)) {
+            return res.status(400).json({ basarili: false, mesaj: "Geçerli müşteri ve yeni bakiye zorunludur." });
+        }
+        const musteri = await Musteri.findOne({ _id: req.params.musteriId, tenantId: tId });
+        if (!musteri) return res.status(404).json({ basarili: false, mesaj: "Müşteri bulunamadı." });
+        const oncekiBakiye = Number(musteri.bakiye || 0), fark = yeniBakiye - oncekiBakiye;
+        if (Math.abs(fark) < 0.000001) return res.status(409).json({ basarili: false, mesaj: "Yeni bakiye mevcut bakiyeyle aynı." });
+        musteri.bakiye = yeniBakiye; await musteri.save();
+        try {
+            const hareket = await CariHareket.create({
+                tenantId: tId, tarafTipi: "MUSTERI", tarafId: musteri._id, tip: "DUZELTME", tutar: Math.abs(fark),
+                aciklama: String(body.aciklama || "Yetkili cari bakiye düzeltmesi").trim(), kaynak: "BAKIYE_DUZELTME",
+                belgeNo: String(body.belgeNo || "").trim(), bakiyeDegisimi: fark, oncekiBakiye, sonrakiBakiye: yeniBakiye,
+                tarih: body.tarih || new Date(), kullaniciId: req.kullanici?._id || req.user?._id || null
+            });
+            return res.json({ basarili: true, mesaj: "Cari bakiye düzeltildi.", oncekiBakiye, musteriBakiye: yeniBakiye, fark, hareket });
+        } catch (error) { musteri.bakiye = oncekiBakiye; await musteri.save(); throw error; }
+    } catch (error) { next(error); }
 }
 
 async function tedarikciOdeme(req, res, next) {
@@ -429,6 +504,8 @@ module.exports = {
     ozet,
     hareketler,
     musteriTahsilat,
+    musteriOdeme,
+    musteriBakiyeDuzelt,
     tedarikciOdeme,
     musteriManuelHareket,
     ekstrePaylas,

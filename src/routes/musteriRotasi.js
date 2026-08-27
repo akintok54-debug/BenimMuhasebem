@@ -15,5 +15,6 @@ router.get("/:id", musteriController.detay);
 router.post("/", yetkiKontrol("party.write"), musteriController.olustur);
 router.patch("/:id", yetkiKontrol("party.write"), musteriController.guncelle);
 router.patch("/:id/durum", yetkiKontrol("party.write"), musteriController.durumDegistir);
+router.delete("/:id", yetkiKontrol("party.write"), musteriController.sil);
 
 module.exports = router;

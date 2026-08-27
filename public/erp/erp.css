@@ -829,6 +829,10 @@ th {
     background: #fee2e2;
 }
 
+.cari-clickable-row { cursor:pointer; transition:background .15s ease; }
+.cari-clickable-row:hover { background:#eff6ff; }
+.danger-button { color:#b91c1c !important; border-color:#fecaca !important; background:#fff7f7 !important; }
+
 /* MODAL */
 
 .erp-modal-overlay {

@@ -1,5 +1,6 @@
 ﻿const mongoose = require("mongoose");
 const Musteri = require("../models/Musteri");
+const CariHareket = require("../models/CariHareket");
 
 function tenantObjectId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
@@ -222,11 +223,33 @@ async function durumDegistir(req, res, next) {
     }
 }
 
+async function sil(req, res, next) {
+    try {
+        const tenantId = tenantObjectId(req);
+        const musteri = await Musteri.findOne({ _id: req.params.id, tenantId });
+        if (!musteri) return res.status(404).json({ basarili: false, mesaj: "Müşteri bulunamadı." });
+
+        const hareketVar = await CariHareket.exists({ tenantId, tarafTipi: "MUSTERI", tarafId: musteri._id });
+        if (Math.abs(Number(musteri.bakiye || 0)) > 0.000001 || hareketVar) {
+            return res.status(409).json({
+                basarili: false,
+                mesaj: "Bakiyesi veya muhasebe hareketi olan cari silinemez. Muhasebe geçmişini korumak için müşteriyi pasife alın."
+            });
+        }
+
+        await Musteri.deleteOne({ _id: musteri._id, tenantId });
+        return res.json({ basarili: true, mesaj: "Cari kaydı silindi." });
+    } catch (error) {
+        next(error);
+    }
+}
+
 module.exports = {
     listele,
     detay,
     olustur,
     guncelle,
-    durumDegistir
+    durumDegistir,
+    sil
 };
 
