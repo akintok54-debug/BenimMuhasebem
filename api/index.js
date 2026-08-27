@@ -1,3 +1,26 @@
 const uygulama = require("../src/uygulama");
+const mongoose = require("mongoose");
+const veritabaniBaglan = require("../src/database/veritabani");
 
-module.exports = uygulama;
+let baglantiSozu = null;
+
+async function veritabaniHazirla() {
+    if (mongoose.connection.readyState === 1) return;
+    if (!baglantiSozu) {
+        baglantiSozu = veritabaniBaglan().catch(error => {
+            baglantiSozu = null;
+            throw error;
+        });
+    }
+    await baglantiSozu;
+}
+
+module.exports = async function handler(req, res) {
+    try {
+        await veritabaniHazirla();
+        return uygulama(req, res);
+    } catch (error) {
+        console.error("VERCEL_MONGODB_BAGLANTI_HATASI", { message: error.message });
+        return res.status(503).json({ basarili: false, mesaj: "Veritabanı bağlantısı geçici olarak kullanılamıyor." });
+    }
+};
