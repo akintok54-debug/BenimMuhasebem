@@ -750,6 +750,33 @@ th {
 .sales-actions { display:grid; grid-template-columns:repeat(6,minmax(130px,1fr)); gap:10px; margin:16px 0; }
 .sales-actions button { padding:13px 10px; background:#fff; color:#1e293b; border:1px solid #dbeafe; box-shadow:0 7px 18px rgba(15,23,42,.07); }
 .sales-actions button:hover { color:#1d4ed8; border-color:#60a5fa; }
+.sales-pos { display:grid; grid-template-columns:minmax(0,2fr) minmax(310px,.8fr); gap:16px; margin:16px 0; align-items:start; }
+.sales-catalog,.sales-cart { padding:20px; border:1px solid #dbeafe; border-radius:20px; background:#fff; box-shadow:0 10px 28px rgba(15,23,42,.07); }
+.sales-product-grid { display:grid; grid-template-columns:repeat(3,minmax(150px,1fr)); gap:12px; max-height:540px; overflow:auto; padding:2px; }
+.sales-product-card { display:flex; flex-direction:column; align-items:flex-start; min-height:168px; padding:16px; text-align:left; color:#0f172a; background:linear-gradient(145deg,#fff,#f8fafc); border:1px solid #dbeafe; border-radius:16px; }
+.sales-product-card:hover { transform:translateY(-2px); border-color:#3b82f6; box-shadow:0 10px 22px rgba(37,99,235,.13); }
+.sales-product-card:disabled { opacity:.55; cursor:not-allowed; transform:none; box-shadow:none; }
+.sales-product-card span { color:#2563eb; font-size:11px; font-weight:900; letter-spacing:.06em; }
+.sales-product-card b { margin:8px 0 4px; font-size:15px; }
+.sales-product-card small { color:#64748b; }
+.sales-product-card strong { margin-top:auto; padding-top:12px; font-size:19px; color:#0f172a; }
+.sales-product-card em { margin-top:7px; color:#15803d; font-size:12px; font-style:normal; font-weight:800; }
+.sales-cart { position:sticky; top:16px; background:linear-gradient(180deg,#eff6ff,#fff 38%); }
+.sales-cart>div>span { color:#2563eb; font-size:11px; font-weight:900; letter-spacing:.08em; }
+.sales-cart h2 { margin:5px 0 16px; }
+.sales-cart-items { display:grid; gap:9px; max-height:360px; overflow:auto; }
+.sales-cart-row { display:grid; grid-template-columns:1fr auto 28px; gap:8px; align-items:center; padding:10px; border:1px solid #e2e8f0; border-radius:12px; background:#fff; }
+.sales-cart-row small { display:block; margin-top:3px; color:#64748b; }
+.sales-cart-quantity { display:flex; align-items:center; gap:6px; }
+.sales-cart-quantity button,.sales-cart-remove { display:grid; place-items:center; width:28px; height:28px; padding:0; border-radius:8px; }
+.sales-cart-quantity button { color:#1d4ed8; background:#dbeafe; }
+.sales-cart-remove { color:#b91c1c; background:#fee2e2; }
+.sales-cart-total { display:flex; justify-content:space-between; align-items:end; margin:16px 0; padding-top:14px; border-top:2px solid #dbeafe; }
+.sales-cart-total span { color:#64748b!important; }
+.sales-cart-total strong { font-size:23px; color:#1d4ed8; }
+.sales-cart>.erp-primary-button { width:100%; background:linear-gradient(135deg,#16a34a,#059669); }
+.sales-cart>.erp-primary-button:disabled { opacity:.45; cursor:not-allowed; }
+.sales-cart>small { display:block; margin-top:10px; color:#64748b; text-align:center; }
 .sales-kpis { display:grid; grid-template-columns:repeat(5,minmax(170px,1fr)); gap:14px; margin-bottom:16px; }
 .sales-kpis article { padding:20px; border:1px solid #e2e8f0; border-radius:18px; background:#fff; box-shadow:0 9px 24px rgba(15,23,42,.06); }
 .sales-kpis span,.sales-kpis small { display:block; color:#64748b; }
@@ -764,8 +791,8 @@ th {
 .sales-reps { display:grid; gap:10px; }.sales-reps article { position:relative; display:grid; grid-template-columns:42px 1fr auto; gap:12px; align-items:center; padding:12px; border:1px solid #e2e8f0; border-radius:14px; overflow:hidden; }.sales-reps article>span { position:absolute; bottom:0; left:0; height:3px; width:var(--score); background:linear-gradient(90deg,#2563eb,#06b6d4); }.sales-reps small { display:block; color:#64748b; }.sales-rep-avatar { display:grid; place-items:center; width:42px; height:42px; border-radius:13px; color:#fff; background:linear-gradient(135deg,#2563eb,#7c3aed); font-weight:900; }
 .sales-summary>div { display:flex; justify-content:space-between; padding:12px 0; border-bottom:1px solid #eef2f7; }.sales-customer-picker { max-width:720px; width:95%; }.sales-customer-list { display:grid; gap:8px; max-height:55vh; overflow:auto; margin-top:12px; }.sales-customer-list button { display:flex; justify-content:space-between; align-items:center; text-align:left; background:#fff; color:#0f172a; border:1px solid #e2e8f0; }.sales-customer-list small { display:block; color:#64748b; margin-top:4px; }
 .sales-payment-box { display:grid; grid-template-columns:1.2fr repeat(4,1fr); gap:12px; align-items:end; margin:16px 0; padding:16px; border-radius:16px; background:#eff6ff; border:1px solid #bfdbfe; }.sales-payment-box>div span { display:block; color:#64748b; }.sales-payment-box>div strong { display:block; font-size:25px; color:#1d4ed8; margin-top:5px; }.sales-payment-box label { margin:0; }
-@media(max-width:1100px){.sales-actions{grid-template-columns:repeat(3,1fr)}.sales-kpis{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:760px){.sales-hero{align-items:flex-start;flex-direction:column;padding:22px}.sales-primary-cta{width:100%}.sales-actions{grid-template-columns:repeat(2,1fr)}.sales-kpis{grid-template-columns:1fr}.sales-layout{grid-template-columns:1fr}.sales-reps article{grid-template-columns:42px 1fr}.sales-reps article>strong{grid-column:2}.sales-payment-box{grid-template-columns:1fr}}
+@media(max-width:1100px){.sales-actions{grid-template-columns:repeat(3,1fr)}.sales-kpis{grid-template-columns:repeat(2,1fr)}.sales-product-grid{grid-template-columns:repeat(2,minmax(150px,1fr))}}
+@media(max-width:760px){.sales-hero{align-items:flex-start;flex-direction:column;padding:22px}.sales-primary-cta{width:100%}.sales-actions{grid-template-columns:repeat(2,1fr)}.sales-kpis{grid-template-columns:1fr}.sales-layout,.sales-pos{grid-template-columns:1fr}.sales-product-grid{grid-template-columns:repeat(2,minmax(130px,1fr));max-height:none}.sales-product-card{min-height:155px}.sales-cart{position:static}.sales-reps article{grid-template-columns:42px 1fr}.sales-reps article>strong{grid-column:2}.sales-payment-box{grid-template-columns:1fr}}
 
 .erp-input {
     width: 100%;
