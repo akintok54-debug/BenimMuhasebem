@@ -56,6 +56,8 @@ const CariHareketSchema = new mongoose.Schema(
             default: null
         },
 
+        belgeNo: { type: String, trim: true, default: "" },
+
         kullaniciId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Kullanici",

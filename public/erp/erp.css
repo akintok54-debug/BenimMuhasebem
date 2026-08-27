@@ -5,6 +5,31 @@
     background: #f5f7fb;
 }
 
+/* Tedarikçiler V2 */
+.supplier-hero { display:flex; justify-content:space-between; align-items:center; gap:18px; padding:24px; margin-bottom:18px; border-radius:18px; color:#fff; background:linear-gradient(135deg,#0f766e,#0f172a); box-shadow:0 16px 36px rgba(15,118,110,.18); }
+.supplier-hero span { color:#99f6e4; font-size:12px; font-weight:800; letter-spacing:1px; }
+.supplier-hero h2 { margin:5px 0; font-size:27px; }
+.supplier-hero p { margin:0; color:#ccfbf1; }
+.supplier-nav,.supplier-tabs { display:flex; gap:8px; flex-wrap:wrap; }
+.supplier-nav button,.supplier-tabs button { border:1px solid rgba(255,255,255,.2); border-radius:10px; padding:9px 12px; cursor:pointer; font-weight:700; }
+.supplier-nav button { background:rgba(255,255,255,.12); color:#fff; }
+.supplier-nav button:disabled { opacity:.45; cursor:not-allowed; }
+.supplier-tabs { margin:0 0 18px; padding:10px; background:#fff; border:1px solid #e2e8f0; border-radius:14px; }
+.supplier-tabs button { background:#f8fafc; color:#334155; border-color:#e2e8f0; }
+.supplier-tabs button:hover,.supplier-tabs button.active { background:#0f766e; border-color:#0f766e; color:#fff; }
+.supplier-info { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:18px; }
+.supplier-info div { display:flex; flex-direction:column; gap:6px; padding:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:11px; }
+.supplier-info span { color:#64748b; overflow-wrap:anywhere; }
+.tedarikci-kalem select,.tedarikci-kalem input { width:100%; min-width:90px; padding:9px; border:1px solid #d7dee9; border-radius:8px; }
+#tedarikciV2Mesaj,#tedBelgeMesaj,#tedOdemeMesaj { padding:0 24px; }
+
+@media (max-width:760px) {
+    .supplier-hero { align-items:flex-start; flex-direction:column; }
+    .supplier-info { grid-template-columns:1fr; }
+    .supplier-tabs { overflow-x:auto; flex-wrap:nowrap; }
+    .supplier-tabs button { white-space:nowrap; }
+}
+
 /* 2026 profesyonel ana sayfa */
 .dashboard-hero-actions { display:flex; gap:9px; flex-wrap:wrap; justify-content:flex-end; }
 .dashboard-action { border:0; border-radius:10px; color:#fff; padding:10px 14px; font-weight:800; cursor:pointer; box-shadow:0 8px 20px rgba(0,0,0,.16); transition:transform .18s ease; }

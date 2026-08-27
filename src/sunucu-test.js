@@ -1,23 +1,23 @@
 ﻿require("dotenv").config();
 
+const test = require("node:test");
+const assert = require("node:assert/strict");
 const uygulama = require("./uygulama");
 
-const PORT = Number(process.env.PORT) || 5000;
-const HOST = "127.0.0.1";
+test("BAHADIR ERP sağlık endpointi çalışır", async () => {
+    const server = await new Promise((resolve, reject) => {
+        const instance = uygulama.listen(0, "127.0.0.1", () => resolve(instance));
+        instance.once("error", reject);
+    });
 
-console.log("BAHADIR ERP V2 uygulama testi başlıyor...");
-
-const server = uygulama.listen(PORT, HOST, () => {
-    console.log("");
-    console.log("====================================");
-    console.log(" BAHADIR ERP V2");
-    console.log("====================================");
-    console.log(`Sunucu: http://${HOST}:${PORT}`);
-    console.log(`Sağlık: http://${HOST}:${PORT}/api/saglik`);
-    console.log("====================================");
-});
-
-server.on("error", (error) => {
-    console.error("SUNUCU ERROR:");
-    console.error(error);
+    try {
+        const address = server.address();
+        const response = await fetch(`http://127.0.0.1:${address.port}/api/saglik`);
+        const data = await response.json();
+        assert.equal(response.status, 200);
+        assert.equal(data.basarili, true);
+        assert.equal(data.durum, "CALISIYOR");
+    } finally {
+        await new Promise(resolve => server.close(resolve));
+    }
 });

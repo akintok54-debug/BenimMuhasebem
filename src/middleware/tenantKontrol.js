@@ -17,13 +17,17 @@ function tenantKontrol(req, res, next) {
             ""
         ).toUpperCase();
 
-        // Süper admin / platform yöneticisi tenant zorunluluğundan muaftır.
+        // Platform yöneticileri tenant API'lerine bağlamsız giremez.
+        // Tenant işlemleri platform rotaları üzerinden yürütülür.
         if (
             rol === "SUPER_ADMIN" ||
             rol === "SUPERADMIN" ||
             rol === "PLATFORM_ADMIN"
         ) {
-            return next();
+            return res.status(403).json({
+                basarili: false,
+                mesaj: "Süper yönetici tenant işlemleri için platform panelini kullanmalıdır."
+            });
         }
 
         if (!kullanici.tenantId) {

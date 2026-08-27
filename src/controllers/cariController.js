@@ -281,6 +281,8 @@ async function tedarikciOdeme(req, res, next) {
             tutar,
             aciklama: body.aciklama || "Tedarikçi ödemesi",
             kaynak: "ODEME",
+            belgeNo: body.belgeNo || "",
+            tarih: body.tarih || new Date(),
             kullaniciId:
                 req.kullanici?._id ||
                 req.user?._id ||
@@ -296,6 +298,8 @@ async function tedarikciOdeme(req, res, next) {
             aciklama: body.aciklama || "Tedarikçi ödemesi",
             kaynak: "ODEME",
             kaynakId: cariHareket._id,
+            belgeNo: body.belgeNo || "",
+            tarih: body.tarih || new Date(),
             kullaniciId:
                 req.kullanici?._id ||
                 req.user?._id ||

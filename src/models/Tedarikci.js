@@ -101,6 +101,10 @@ const TedarikciSchema = new mongoose.Schema(
             min: 0
         },
 
+        iban: { type: String, trim: true, default: "" },
+        banka: { type: String, trim: true, default: "" },
+        grup: { type: String, trim: true, default: "Genel" },
+
         bakiye: {
             type: Number,
             default: 0

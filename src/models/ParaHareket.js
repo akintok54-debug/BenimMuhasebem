@@ -53,6 +53,8 @@ const ParaHareketSchema = new mongoose.Schema(
             default: null
         },
 
+        belgeNo: { type: String, trim: true, default: "" },
+
         karsiHesapTipi: {
             type: String,
             enum: ["KASA", "BANKA", null],

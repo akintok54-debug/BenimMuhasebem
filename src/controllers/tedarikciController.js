@@ -19,7 +19,8 @@ async function listele(req, res, next) {
                 { unvan: { $regex: arama, $options: "i" } },
                 { yetkili: { $regex: arama, $options: "i" } },
                 { telefon: { $regex: arama, $options: "i" } },
-                { whatsapp: { $regex: arama, $options: "i" } }
+                { whatsapp: { $regex: arama, $options: "i" } },
+                { vergiNo: { $regex: arama, $options: "i" } }
             ];
         }
 
@@ -112,6 +113,9 @@ async function olustur(req, res, next) {
             postaKodu: body.postaKodu || "",
             vadeGun: Number(body.vadeGun || 0),
             limit: Number(body.limit || 0),
+            iban: body.iban || "",
+            banka: body.banka || "",
+            grup: body.grup || "Genel",
             bakiye: 0,
             notlar: body.notlar || "",
             aktif: body.aktif !== false
@@ -159,6 +163,9 @@ async function guncelle(req, res, next) {
             "postaKodu",
             "vadeGun",
             "limit",
+            "iban",
+            "banka",
+            "grup",
             "notlar",
             "aktif"
         ];
