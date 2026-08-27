@@ -276,22 +276,12 @@ async function olustur(req, res, next) {
             genelToplam += kalem.toplam;
         }
 
-        const odemeTipi =
-            body.odemeTipi || "ACIK_HESAP";
-
-        let odemeDurumu =
-            body.odemeDurumu || "ACIK";
-
-        let odenenTutar =
-            Number(body.odenenTutar || 0);
-
-        if (odemeDurumu === "ACIK") {
-            odenenTutar = 0;
+        const odemeTipi = String(body.odemeTipi || "ACIK_HESAP").toUpperCase();
+        if (!["ACIK_HESAP", "NAKIT", "KART", "CEK", "SENET"].includes(odemeTipi)) {
+            return res.status(400).json({ basarili: false, mesaj: "Ödeme yöntemi açık hesap, nakit, kredi kartı, çek veya senet olmalıdır." });
         }
-
-        if (odemeDurumu === "ODENDI") {
-            odenenTutar = genelToplam;
-        }
+        const odemeDurumu = odemeTipi === "ACIK_HESAP" ? "ACIK" : "ODENDI";
+        const odenenTutar = odemeTipi === "ACIK_HESAP" ? 0 : genelToplam;
 
         if (
             odenenTutar < 0 ||
@@ -300,19 +290,6 @@ async function olustur(req, res, next) {
             return res.status(400).json({
                 basarili: false,
                 mesaj: "Ödenen tutar satış toplamını aşamaz."
-            });
-        }
-
-        if (
-            odemeDurumu === "KISMI" &&
-            (
-                odenenTutar <= 0 ||
-                odenenTutar >= genelToplam
-            )
-        ) {
-            return res.status(400).json({
-                basarili: false,
-                mesaj: "Kısmi ödemede ödenen tutar toplamdan küçük olmalıdır."
             });
         }
 

@@ -124,6 +124,8 @@ const SatisSchema = new mongoose.Schema(
                 "NAKIT",
                 "BANKA",
                 "KART",
+                "CEK",
+                "SENET",
                 "DIGER"
             ],
             default: "ACIK_HESAP"
