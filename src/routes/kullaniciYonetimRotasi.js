@@ -1,0 +1,10 @@
+const express = require("express");
+const kimlikKontrol = require("../middleware/kimlikKontrol");
+const tenantKontrol = require("../middleware/tenantKontrol");
+const { yetkiKontrol } = require("../middleware/yetkiKontrol");
+const controller = require("../controllers/kullaniciYonetimController");
+const router = express.Router();
+router.use(kimlikKontrol, tenantKontrol, yetkiKontrol("tenant.users"));
+router.get("/", controller.listele);
+router.patch("/:id/yetkiler", controller.yetkiGuncelle);
+module.exports = router;

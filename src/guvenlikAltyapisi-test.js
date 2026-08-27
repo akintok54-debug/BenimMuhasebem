@@ -27,6 +27,9 @@ test("Eski ve yeni roller geriye uyumlu izinlere çevrilir", () => {
     assert.equal(izinVar("ADMIN", "cash.write"), true);
     assert.equal(izinVar("MUHASEBE", "accounting.write"), true);
     assert.equal(izinVar("SATIS", "sales.write"), true);
+    assert.equal(izinVar("MUHASEBE", "balance.adjust"), false);
+    assert.equal(izinVar("SATIS", "balance.adjust"), false);
+    assert.equal(izinVar("ADMIN", "balance.adjust"), true);
     assert.equal(izinVar("CASHIER", "tenant.settings"), false);
 });
 

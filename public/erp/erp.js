@@ -3233,15 +3233,17 @@
         loading();
 
         try {
-            const [ozetData, musteriData, tedarikciData] =
+            const [ozetData, musteriData, tedarikciData, profilData] =
                 await Promise.all([
                     api("/api/tenant/cari/ozet"),
                     api("/api/tenant/musteriler"),
-                    api("/api/tenant/tedarikciler")
+                    api("/api/tenant/tedarikciler"),
+                    api("/api/auth/profil")
                 ]);
 
             const musteriler = musteriData.musteriler || [];
             const tedarikciler = tedarikciData.tedarikciler || [];
+            const oturumKullanici = profilData.kullanici || {}, bakiyeDuzeltYetkisi = ["OWNER", "ADMIN", "SUPER_ADMIN"].includes(oturumKullanici.rol) || (oturumKullanici.ozelYetkiler || []).includes("balance.adjust");
 
             content.innerHTML = `
                 <div class="dashboard-panel">
@@ -3358,7 +3360,7 @@
                                                 <button type="button" class="erp-small-button" data-cari-islem="${item._id}" data-cari-tip="${aktif}">Cari İşlem</button>
                                                 <button type="button" class="erp-small-button" data-cari-tahsilat="${item._id}" data-cari-tip="${aktif}">${aktif === "musteri" ? "Tahsilat Al" : "Tedarikçiden Tahsilat"}</button>
                                                 <button type="button" class="erp-small-button" data-cari-odeme-yap="${item._id}" data-cari-tip="${aktif}">${aktif === "musteri" ? "Müşteriye Öde" : "Tedarikçiye Öde"}</button>
-                                                <button type="button" class="erp-small-button" data-cari-bakiye="${item._id}" data-cari-tip="${aktif}">Bakiye Düzelt</button>
+                                                ${bakiyeDuzeltYetkisi ? `<button type="button" class="erp-small-button" data-cari-bakiye="${item._id}" data-cari-tip="${aktif}">Bakiye Düzelt</button>` : ""}
                                                 <button type="button" class="erp-small-button" data-cari-durum="${item._id}" data-cari-tip="${aktif}" data-cari-aktif="${item.aktif !== false}">${item.aktif === false ? "Aktif Et" : "Pasife Al"}</button>
                                                 <button type="button" class="erp-small-button danger-button" data-cari-sil="${item._id}" data-cari-tip="${aktif}">Sil</button>
                                             </div>
@@ -4063,6 +4065,15 @@
         }
     }
 
+    async function kullanicilarYukle() {
+        setTitle("Kullanıcılar ve Yetkiler"); loading();
+        try {
+            const data = await api("/api/tenant/kullanicilar"), kullanicilar = data.kullanicilar || [];
+            content.innerHTML = `<div class="welcome-banner"><div><div class="eyebrow">YETKİ YÖNETİMİ</div><h2>Kullanıcılar ve Kritik İşlem Yetkileri</h2><p>Bakiye düzeltme gibi muhasebe geçmişini etkileyen işlemleri yalnızca açıkça yetkilendirdiğiniz çalışanlar yapabilir.</p></div></div><div class="dashboard-panel"><div class="panel-heading"><div><h2>Kullanıcı Yetkileri</h2><p>Yönetici yetkileri kalıcıdır. Satış ve muhasebe çalışanlarına ihtiyaç halinde özel yetki verin.</p></div></div><div class="table-scroll"><table><thead><tr><th>Kullanıcı</th><th>Rol / Departman</th><th>Durum</th><th>Son Giriş</th><th>Bakiye Düzeltme</th></tr></thead><tbody>${kullanicilar.map(k => { const yonetici = ["OWNER", "ADMIN"].includes(k.rol), yetkili = yonetici || (k.ozelYetkiler || []).includes("balance.adjust"); return `<tr><td><b>${escapeHtml(k.adSoyad)}</b><small>${escapeHtml(k.email)}</small></td><td>${escapeHtml(k.rol)}</td><td><span class="durum-badge ${k.aktif ? "aktif" : "pasif"}">${k.aktif ? "Aktif" : "Pasif"}</span></td><td>${k.sonGirisTarihi ? new Date(k.sonGirisTarihi).toLocaleString("tr-TR") : "Henüz giriş yok"}</td><td><label class="permission-toggle"><input type="checkbox" data-balance-permission="${k._id || k.id}" ${yetkili ? "checked" : ""} ${yonetici || !k.aktif ? "disabled" : ""}><span>${yonetici ? "Yönetici — zorunlu" : yetkili ? "Yetkili" : "Yetkisiz"}</span></label></td></tr>`; }).join("") || '<tr><td colspan="5">Kullanıcı bulunamadı.</td></tr>'}</tbody></table></div><div id="permissionMessage"></div></div>`;
+            content.querySelectorAll("[data-balance-permission]").forEach(input => input.onchange = async () => { const mesaj = content.querySelector("#permissionMessage"); input.disabled = true; try { const sonuc = await api(`/api/tenant/kullanicilar/${encodeURIComponent(input.dataset.balancePermission)}/yetkiler`, { method: "PATCH", body: JSON.stringify({ ozelYetkiler: input.checked ? ["balance.adjust"] : [] }) }); input.nextElementSibling.textContent = input.checked ? "Yetkili" : "Yetkisiz"; mesaj.innerHTML = `<div class="success">${escapeHtml(sonuc.mesaj)} Değişiklik anında geçerlidir.</div>`; } catch (error) { input.checked = !input.checked; mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } finally { input.disabled = false; } });
+        } catch (error) { errorBox(error); }
+    }
+
     async function ayarlarYukle() {
         setTitle("Ayarlar"); loading("Ayarlar hazırlanıyor...");
         try {
@@ -4204,6 +4215,12 @@
         if (page === "ayarlar") {
             if (buYukleme !== sayfaYuklemeNo) return;
             await ayarlarYukle();
+            return;
+        }
+
+        if (page === "kullanicilar") {
+            if (buYukleme !== sayfaYuklemeNo) return;
+            await kullanicilarYukle();
             return;
         }
 

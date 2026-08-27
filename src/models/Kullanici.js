@@ -53,6 +53,11 @@ const KullaniciSchema = new mongoose.Schema(
             type: Boolean,
             default: true
         },
+        ozelYetkiler: {
+            type: [String],
+            enum: ["balance.adjust"],
+            default: []
+        },
 
         sonGirisTarihi: { type: Date, default: null },
         sifreSifirlama: {

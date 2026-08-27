@@ -1,4 +1,5 @@
 const ROL_ESLEME = { SATIS: "SALES", MUHASEBE: "ACCOUNTING", ETICARET: "ECOMMERCE", DEPO: "WAREHOUSE" };
+const Kullanici = require("../models/Kullanici");
 const YETKILER = {
     SUPER_ADMIN: ["*"], OWNER: ["*"], ADMIN: ["*"],
     MANAGER: ["sales.*", "purchase.*", "stock.*", "party.*", "reports.read"],
@@ -16,9 +17,14 @@ function izinVar(rol, gerekli) {
 }
 
 function yetkiKontrol(...gerekliYetkiler) {
-    return (req, res, next) => {
+    return async (req, res, next) => {
         const rol = req.kullanici?.rol || req.user?.rol;
         if (gerekliYetkiler.some(izin => izinVar(rol, izin))) return next();
+        const kullaniciId = req.kullanici?.kullaniciId || req.user?.kullaniciId;
+        if (kullaniciId) {
+            const kullanici = await Kullanici.findOne({ _id: kullaniciId, aktif: true }).select("ozelYetkiler").lean();
+            if (gerekliYetkiler.some(izin => (kullanici?.ozelYetkiler || []).includes(izin))) return next();
+        }
         res.locals.guvenlikOlayi = { kategori: "YETKISIZ_ERISIM", seviye: "UYARI" };
         return res.status(403).json({ basarili: false, mesaj: "Bu işlem için yetkiniz bulunmuyor." });
     };

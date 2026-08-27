@@ -10,7 +10,7 @@ const ikiFaktor = require("../../../services/ikiFaktorServisi");
 const { sifreSifirlamaEpostasiGonder } = require("../../../services/epostaServisi");
 
 function kullaniciId(req) { return req.kullanici?.kullaniciId || req.user?.kullaniciId; }
-function guvenliKullanici(k) { return { id: k._id, adSoyad: k.adSoyad, email: k.email, telefon: k.telefon || "", unvan: k.unvan || "", rol: k.rol, tenantId: k.tenantId, ikiFaktorEtkin: !!k.ikiFaktor?.etkin, sonGirisTarihi: k.sonGirisTarihi, createdAt: k.createdAt }; }
+function guvenliKullanici(k) { return { id: k._id, adSoyad: k.adSoyad, email: k.email, telefon: k.telefon || "", unvan: k.unvan || "", rol: k.rol, tenantId: k.tenantId, ozelYetkiler: k.ozelYetkiler || [], ikiFaktorEtkin: !!k.ikiFaktor?.etkin, sonGirisTarihi: k.sonGirisTarihi, createdAt: k.createdAt }; }
 async function oturumAc(req, res, k) { k.sonGirisTarihi = new Date(); await k.save(); const p = { kullaniciId: k._id.toString(), email: k.email, rol: k.rol, tenantId: k.tenantId?.toString() || null }; const token = tokenOlustur(p), csrfToken = oturumCookieYaz(res, token); req.user = p; return res.json({ basarili: true, mesaj: "Giriş başarılı.", csrfToken, token: process.env.JWT_ALLOW_LEGACY === "false" ? undefined : token, kullanici: { ...guvenliKullanici(k), aktif: k.aktif } }); }
 
 async function login(req, res) {

@@ -91,6 +91,7 @@ const personelRotasi = require("./routes/personelRotasi");
 const raporRotasi = require("./routes/raporRotasi");
 
 uygulama.use("/api/tenant/personeller", personelRotasi);
+uygulama.use("/api/tenant/kullanicilar", require("./routes/kullaniciYonetimRotasi"));
 uygulama.use("/api/tenant/raporlar", raporRotasi);
 
 const eticaretRotasi = require("./routes/eticaretRotasi");
