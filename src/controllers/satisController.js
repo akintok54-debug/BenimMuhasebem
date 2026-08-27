@@ -11,9 +11,15 @@ const Banka = require("../models/Banka");
 const ParaHareket = require("../models/ParaHareket");
 const CariHareket = require("../models/CariHareket");
 const SatisIade = require("../models/SatisIade");
+const Siparis = require("../models/Siparis");
+const Teklif = require("../models/Teklif");
 
 function tenantObjectId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
+}
+
+function islemKullaniciId(req) {
+    return req.kullanici?._id || req.kullanici?.kullaniciId || req.user?._id || req.user?.kullaniciId || null;
 }
 
 function hesaplaKalem(kalem) {
@@ -48,6 +54,7 @@ async function listele(req, res, next) {
             .populate("musteriId", "kod unvan adSoyad")
             .populate("depoId", "kod ad")
             .populate("kalemler.urunId", "kod ad birim")
+            .populate("kullaniciId", "adSoyad email")
             .sort({ tarih: -1, createdAt: -1 })
             .lean();
 
@@ -59,6 +66,51 @@ async function listele(req, res, next) {
     } catch (error) {
         next(error);
     }
+}
+
+async function panel(req, res, next) {
+    try {
+        const tenantId = tenantObjectId(req);
+        const simdi = new Date();
+        const bugun = new Date(simdi.getFullYear(), simdi.getMonth(), simdi.getDate());
+        const ayBasi = new Date(simdi.getFullYear(), simdi.getMonth(), 1);
+        const [satislar, acikSiparis, aktifTeklif, iadeler] = await Promise.all([
+            Satis.find({ tenantId, tarih: { $gte: ayBasi } })
+                .populate("musteriId", "kod unvan adSoyad bakiye")
+                .populate("kalemler.urunId", "kod ad birim alisFiyati")
+                .populate("kullaniciId", "adSoyad email")
+                .sort({ tarih: -1, createdAt: -1 }).lean(),
+            Siparis.countDocuments({ tenantId, durum: { $nin: ["TAMAMLANDI", "IPTAL"] } }),
+            Teklif.countDocuments({ tenantId, durum: { $nin: ["ONAYLANDI", "REDDEDILDI", "IPTAL"] } }),
+            SatisIade.find({ tenantId, tarih: { $gte: ayBasi } }).select("genelToplam tarih").lean()
+        ]);
+        const bugunSatis = satislar.filter(x => new Date(x.tarih) >= bugun);
+        const toplam = liste => liste.reduce((n, x) => n + Number(x.genelToplam || 0), 0);
+        const tahsilat = liste => liste.reduce((n, x) => n + Number(x.odenenTutar || 0), 0);
+        const acikBakiye = satislar.reduce((n, x) => n + Number(x.kalanTutar || 0), 0);
+        const iadeToplam = toplam(iadeler);
+        const urunMap = new Map(), temsilciMap = new Map();
+        for (const satis of satislar) {
+            const temsilci = satis.kullaniciId?.adSoyad || satis.kullaniciId?.email || "Atanmamış";
+            const t = temsilciMap.get(temsilci) || { temsilci, belge: 0, ciro: 0, tahsilat: 0 };
+            t.belge++; t.ciro += Number(satis.genelToplam || 0); t.tahsilat += Number(satis.odenenTutar || 0); temsilciMap.set(temsilci, t);
+            for (const k of satis.kalemler || []) {
+                const id = String(k.urunId?._id || k.urunId || "");
+                const u = urunMap.get(id) || { urunId: id, kod: k.urunId?.kod || "-", ad: k.urunId?.ad || "Ürün", miktar: 0, ciro: 0, kar: 0 };
+                u.miktar += Number(k.miktar || 0); u.ciro += Number(k.toplam || 0);
+                u.kar += (Number(k.birimFiyat || 0) - Number(k.urunId?.alisFiyati || 0)) * Number(k.miktar || 0);
+                urunMap.set(id, u);
+            }
+        }
+        res.json({ basarili: true, panel: {
+            bugun: { ciro: toplam(bugunSatis), tahsilat: tahsilat(bugunSatis), belge: bugunSatis.length },
+            ay: { ciro: toplam(satislar), tahsilat: tahsilat(satislar), belge: satislar.length, iade: iadeToplam, netCiro: toplam(satislar) - iadeToplam },
+            acikBakiye, acikSiparis, aktifTeklif,
+            sonSatislar: satislar.slice(0, 12),
+            enCokSatanlar: [...urunMap.values()].sort((a, b) => b.ciro - a.ciro).slice(0, 8),
+            temsilciler: [...temsilciMap.values()].sort((a, b) => b.ciro - a.ciro)
+        }});
+    } catch (error) { next(error); }
 }
 
 async function iadeleriListele(req, res, next) {
@@ -370,10 +422,7 @@ async function olustur(req, res, next) {
             hesapTipi,
             hesapId,
             notlar: body.notlar || "",
-            kullaniciId:
-                req.kullanici?._id ||
-                req.user?._id ||
-                null
+            kullaniciId: islemKullaniciId(req)
         });
 
         // SATIŞ -> STOK ÇIKIŞI
@@ -399,10 +448,7 @@ async function olustur(req, res, next) {
                 kaynak: "SATIS",
                 kaynakId: satis._id,
                 aciklama: `Satış ${belgeNo}`,
-                kullaniciId:
-                    req.kullanici?._id ||
-                    req.user?._id ||
-                    null
+                kullaniciId: islemKullaniciId(req)
             });
         }
 
@@ -426,7 +472,7 @@ async function olustur(req, res, next) {
                 kaynak: "SATIS",
                 kaynakId: satis._id,
                 tarih: body.tarih || new Date(),
-                kullaniciId: req.kullanici?._id || req.user?._id || null
+                kullaniciId: islemKullaniciId(req)
             });
         }
 
@@ -467,10 +513,7 @@ async function olustur(req, res, next) {
                 tarih:
                     body.tarih || new Date(),
 
-                kullaniciId:
-                    req.kullanici?._id ||
-                    req.user?._id ||
-                    null
+                kullaniciId: islemKullaniciId(req)
             });
         }
 
@@ -537,6 +580,7 @@ async function guncelle(req, res, next) {
 
 module.exports = {
     listele,
+    panel,
     detay,
     olustur,
     iadeAl,

@@ -2051,9 +2051,13 @@
     }
 
     async function musteriBelgeFormu(tur, musteri, mevcut = null) {
-        const [urunData, stokData] = await Promise.all([api("/api/tenant/urunler"), api("/api/tenant/stok/depolar")]);
+        const [urunData, stokData, finansData] = await Promise.all([api("/api/tenant/urunler"), api("/api/tenant/stok/depolar"), tur === "satis" ? api("/api/tenant/finans/ozet") : Promise.resolve({})]);
         const urunler = (urunData.urunler || []).filter(x => x.aktif !== false);
         const depolar = (stokData.depolar || []).filter(x => x.aktif !== false);
+        const satisHesaplari = [
+            ...(finansData.kasalar || []).filter(x => x.aktif !== false).map(x => ({ id: x._id, tip: "KASA", ad: `${x.kod || ""} ${x.ad || "Kasa"}` })),
+            ...(finansData.bankalar || []).filter(x => x.aktif !== false).map(x => ({ id: x._id, tip: "BANKA", ad: `${x.kod || ""} ${x.bankaAdi || "Banka"}` }))
+        ];
         const ayar = {
             satis: { baslik: "Satış Yap", no: "Belge No", endpoint: "/api/tenant/satis", noAlan: "belgeNo", depo: true },
             iade: { baslik: "İade Al", no: "İade Belge No", endpoint: "/api/tenant/satis/iade", noAlan: "belgeNo", depo: true },
@@ -2070,14 +2074,18 @@
         const satirHtml = (k = {}) => { const uid = String(k.urunId?._id || k.urunId || ""); const opts = urunler.map(x => `<option value="${x._id}" data-fiyat="${Number(x.satisFiyati || 0)}" data-kdv="${Number(x.kdv ?? 20)}" ${String(x._id) === uid ? "selected" : ""}>${escapeHtml(x.kod)} · ${escapeHtml(x.ad)}</option>`).join(""); return `<tr class="belge-kalem"><td><select name="urunId" required style="min-width:220px"><option value="">Ürün seçin</option>${opts}</select></td><td><input name="miktar" type="number" min="0.0001" step="0.0001" value="${Number(k.miktar || 1)}" required style="width:90px"></td><td><input name="birimFiyat" type="number" min="0" step="0.01" value="${k.birimFiyat ?? ""}" required style="width:110px"></td><td><input name="kdv" type="number" min="0" step="0.01" value="${Number(k.kdv ?? 20)}" style="width:75px"></td><td><input name="iskonto" type="number" min="0" max="100" step="0.01" value="${Number(k.iskonto || 0)}" style="width:75px"></td><td><button type="button" class="erp-small-button secondary kalem-sil">Sil</button></td></tr>`; };
         const ilkSatirlar = mevcut?.kalemler?.length ? mevcut.kalemler.map(satirHtml).join("") : satirHtml();
         const belgeTarihi = new Date(mevcut?.tarih || Date.now()).toISOString().slice(0, 10);
-        overlay.innerHTML = `<div class="erp-modal" style="max-width:1100px;width:98%"><div class="erp-modal-header"><div><h2>${mevcut ? `${ayar.baslik} - Düzenle` : ayar.baslik}</h2><p>${escapeHtml(musteri.kod)} · ${escapeHtml(musteri.unvan || musteri.adSoyad)} · Bakiye ${para(musteri.bakiye)}</p></div><button type="button" class="erp-modal-close">×</button></div><form id="musteriBelgeForm"><div class="erp-form-grid"><label>${ayar.no}<input name="no" value="${escapeHtml(no)}" required></label><label>Tarih<input name="tarih" type="date" value="${belgeTarihi}" required></label>${ayar.depo ? `<label class="full">Depo<select name="depoId" required><option value="">Depo seçin</option>${depolar.map(x => `<option value="${x._id}" ${String(x._id) === String(mevcut?.depoId?._id || mevcut?.depoId || "") ? "selected" : ""}>${escapeHtml(x.kod)} · ${escapeHtml(x.ad)}</option>`).join("")}</select></label>` : `<label>Geçerlilik Tarihi<input name="gecerlilikTarihi" type="date" value="${mevcut?.gecerlilikTarihi ? new Date(mevcut.gecerlilikTarihi).toISOString().slice(0, 10) : ""}"></label>`}</div><div class="panel-heading" style="margin-top:16px"><div><h3>Belge Kalemleri</h3><p>Ürünleri aynı tabloya satır olarak ekleyin.</p></div><button type="button" id="kalemEkle" class="erp-primary-button">+ Kalem Ekle</button></div><div class="table-scroll"><table><thead><tr><th>Ürün</th><th>Miktar</th><th>Birim Fiyat</th><th>KDV %</th><th>İskonto %</th><th></th></tr></thead><tbody id="belgeKalemler">${ilkSatirlar}</tbody></table></div><label style="display:block;margin-top:12px">Notlar<textarea name="notlar" style="width:100%">${escapeHtml(mevcut?.notlar || "")}</textarea></label><div id="belgeMesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button secondary" data-kapat>Vazgeç</button><button type="submit" class="erp-primary-button">${mevcut ? "Değişiklikleri Kaydet" : tur === "iade" ? "İadeyi Kaydet" : "Kaydet"}</button></div></form></div>`;
+        const odemeHtml = tur === "satis" && !mevcut ? `<div class="sales-payment-box"><div><span>Belge Toplamı</span><strong id="salesDocumentTotal">₺0,00</strong></div><label>Ödeme Durumu<select name="odemeDurumu"><option value="ACIK">Açık Hesap</option><option value="ODENDI">Tam Ödendi</option><option value="KISMI">Kısmi Ödeme</option></select></label><label>Ödeme Yöntemi<select name="odemeTipi"><option value="ACIK_HESAP">Açık Hesap</option><option value="NAKIT">Nakit</option><option value="KART">Kredi Kartı</option><option value="BANKA">Banka / Havale</option></select></label><label data-sales-paid hidden>Ödenen Tutar<input name="odenenTutar" type="number" min="0" step="0.01" value="0"></label><label data-sales-account hidden>Kasa / Banka<select name="hesap"><option value="">Hesap seçin</option>${satisHesaplari.map(x => `<option value="${x.tip}|${x.id}" data-hesap-tipi="${x.tip}">${escapeHtml(x.tip)} · ${escapeHtml(x.ad)}</option>`).join("")}</select></label></div>` : "";
+        overlay.innerHTML = `<div class="erp-modal" style="max-width:1100px;width:98%"><div class="erp-modal-header"><div><h2>${mevcut ? `${ayar.baslik} - Düzenle` : ayar.baslik}</h2><p>${escapeHtml(musteri.kod)} · ${escapeHtml(musteri.unvan || musteri.adSoyad)} · Bakiye ${para(musteri.bakiye)}</p></div><button type="button" class="erp-modal-close">×</button></div><form id="musteriBelgeForm"><div class="erp-form-grid"><label>${ayar.no}<input name="no" value="${escapeHtml(no)}" required></label><label>Tarih<input name="tarih" type="date" value="${belgeTarihi}" required></label>${ayar.depo ? `<label class="full">Depo<select name="depoId" required><option value="">Depo seçin</option>${depolar.map(x => `<option value="${x._id}" ${String(x._id) === String(mevcut?.depoId?._id || mevcut?.depoId || "") ? "selected" : ""}>${escapeHtml(x.kod)} · ${escapeHtml(x.ad)}</option>`).join("")}</select></label>` : `<label>Geçerlilik Tarihi<input name="gecerlilikTarihi" type="date" value="${mevcut?.gecerlilikTarihi ? new Date(mevcut.gecerlilikTarihi).toISOString().slice(0, 10) : ""}"></label>`}</div><div class="panel-heading" style="margin-top:16px"><div><h3>Belge Kalemleri</h3><p>Ürünleri aynı tabloya satır olarak ekleyin.</p></div><button type="button" id="kalemEkle" class="erp-primary-button">+ Kalem Ekle</button></div><div class="table-scroll"><table><thead><tr><th>Ürün</th><th>Miktar</th><th>Birim Fiyat</th><th>KDV %</th><th>İskonto %</th><th></th></tr></thead><tbody id="belgeKalemler">${ilkSatirlar}</tbody></table></div>${odemeHtml}<label style="display:block;margin-top:12px">Notlar<textarea name="notlar" style="width:100%">${escapeHtml(mevcut?.notlar || "")}</textarea></label><div id="belgeMesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button secondary" data-kapat>Vazgeç</button><button type="submit" class="erp-primary-button">${mevcut ? "Değişiklikleri Kaydet" : tur === "iade" ? "İadeyi Kaydet" : "Kaydet"}</button></div></form></div>`;
         document.body.appendChild(overlay);
         const kalemlerEl = document.getElementById("belgeKalemler");
+        const belgeToplami = () => [...kalemlerEl.querySelectorAll(".belge-kalem")].reduce((n, x) => { const miktar = Number(x.querySelector("[name=miktar]").value || 0), fiyat = Number(x.querySelector("[name=birimFiyat]").value || 0), kdv = Number(x.querySelector("[name=kdv]").value || 0), iskonto = Number(x.querySelector("[name=iskonto]").value || 0); return n + miktar * fiyat * (1 - iskonto / 100) * (1 + kdv / 100); }, 0);
+        const toplamGuncelle = () => { const el = overlay.querySelector("#salesDocumentTotal"); if (el) el.textContent = para(belgeToplami()); };
         const bagla = root => {
             root.querySelector("select[name=urunId]").addEventListener("change", e => {
-                const opt = e.target.selectedOptions[0]; root.querySelector("input[name=birimFiyat]").value = opt?.dataset.fiyat || 0; root.querySelector("input[name=kdv]").value = opt?.dataset.kdv || 20;
+                const opt = e.target.selectedOptions[0]; root.querySelector("input[name=birimFiyat]").value = opt?.dataset.fiyat || 0; root.querySelector("input[name=kdv]").value = opt?.dataset.kdv || 20; toplamGuncelle();
             });
-            root.querySelector(".kalem-sil").addEventListener("click", () => { if (kalemlerEl.children.length > 1) root.remove(); });
+            root.querySelectorAll("input").forEach(x => x.addEventListener("input", toplamGuncelle));
+            root.querySelector(".kalem-sil").addEventListener("click", () => { if (kalemlerEl.children.length > 1) { root.remove(); toplamGuncelle(); } });
         };
         [...kalemlerEl.children].forEach(bagla);
         overlay.querySelector("#kalemEkle").addEventListener("click", event => {
@@ -2087,10 +2095,16 @@
             kalemlerEl.lastElementChild.querySelector("select")?.focus();
         });
         overlay.querySelectorAll(".erp-modal-close,[data-kapat]").forEach(x => x.addEventListener("click", musteriModalKapat));
+        if (tur === "satis" && !mevcut) {
+            const form = overlay.querySelector("form"), durum = form.elements.odemeDurumu, tip = form.elements.odemeTipi, paid = overlay.querySelector("[data-sales-paid]"), account = overlay.querySelector("[data-sales-account]");
+            const odemeGuncelle = () => { const acik = durum.value === "ACIK", kismi = durum.value === "KISMI"; tip.disabled = acik; if (acik) tip.value = "ACIK_HESAP"; else if (tip.value === "ACIK_HESAP") tip.value = "NAKIT"; paid.hidden = !kismi; account.hidden = acik; form.elements.hesap.required = !acik; form.elements.odenenTutar.value = acik ? 0 : kismi ? form.elements.odenenTutar.value : belgeToplami().toFixed(2); [...form.elements.hesap.options].forEach(o => { if (!o.value) return; o.hidden = tip.value === "NAKIT" ? o.dataset.hesapTipi !== "KASA" : o.dataset.hesapTipi !== "BANKA"; }); };
+            durum.onchange = odemeGuncelle; tip.onchange = odemeGuncelle; odemeGuncelle(); toplamGuncelle();
+        }
         overlay.querySelector("form").addEventListener("submit", async event => {
             event.preventDefault(); const fd = new FormData(event.currentTarget); const mesaj = document.getElementById("belgeMesaj");
             const kalemler = [...kalemlerEl.querySelectorAll(".belge-kalem")].map(x => ({ urunId: x.querySelector("[name=urunId]").value, miktar: Number(x.querySelector("[name=miktar]").value), birimFiyat: Number(x.querySelector("[name=birimFiyat]").value), kdv: Number(x.querySelector("[name=kdv]").value), iskonto: Number(x.querySelector("[name=iskonto]").value) }));
             const body = { musteriId: musteri._id, tarih: fd.get("tarih"), depoId: fd.get("depoId") || undefined, gecerlilikTarihi: fd.get("gecerlilikTarihi") || undefined, notlar: fd.get("notlar"), kalemler }; body[ayar.noAlan] = fd.get("no");
+            if (tur === "satis" && !mevcut) { const [hesapTipi, hesapId] = String(fd.get("hesap") || "|").split("|"); Object.assign(body, { odemeDurumu: fd.get("odemeDurumu"), odemeTipi: fd.get("odemeTipi"), odenenTutar: Number(fd.get("odenenTutar") || 0), hesapTipi: hesapTipi || null, hesapId: hesapId || null }); }
             try { const endpoint = mevcut ? `${ayar.endpoint}/${encodeURIComponent(mevcut._id)}` : ayar.endpoint; await api(endpoint, { method: mevcut ? "PATCH" : "POST", body: JSON.stringify(body) }); musteriModalKapat(); await musteriAnaSayfaAc(musteri._id); }
             catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; }
         });
@@ -4111,6 +4125,40 @@
         } catch (error) { errorBox(error); }
     }
 
+    async function satisMusteriSec(tur = "satis") {
+        const data = await api("/api/tenant/musteriler");
+        const musteriler = (data.musteriler || []).filter(x => x.aktif !== false);
+        musteriModalKapat();
+        const overlay = document.createElement("div"); overlay.id = "musteriIslemOverlay"; overlay.className = "erp-modal-overlay";
+        overlay.innerHTML = `<div class="erp-modal sales-customer-picker"><div class="erp-modal-header"><div><h2>Müşteri Seç</h2><p>Satış işlemine başlamak için müşteri arayın.</p></div><button class="erp-modal-close">×</button></div><input id="salesCustomerSearch" class="erp-input" placeholder="Kod, ünvan, telefon veya vergi no ara..." autofocus><div class="sales-customer-list">${musteriler.map(m => `<button type="button" data-sales-customer="${m._id}"><span><b>${escapeHtml(m.unvan || m.adSoyad)}</b><small>${escapeHtml(m.kod)} · ${escapeHtml(m.telefon || m.whatsapp || "Telefon yok")}</small></span><span class="${Number(m.bakiye || 0) > 0 ? "sales-debt" : "sales-clear"}">${para(m.bakiye)}</span></button>`).join("") || '<div class="empty-state">Aktif müşteri bulunamadı.</div>'}</div><div class="erp-modal-footer"><button id="salesNewCustomer" class="erp-small-button">+ Yeni Müşteri</button></div></div>`;
+        document.body.appendChild(overlay);
+        overlay.querySelector(".erp-modal-close").onclick = musteriModalKapat;
+        overlay.querySelector("#salesNewCustomer").onclick = () => { musteriModalKapat(); yeniMusteriPaneli(); };
+        overlay.querySelector("#salesCustomerSearch").oninput = e => { const q = e.target.value.toLocaleLowerCase("tr-TR"); overlay.querySelectorAll("[data-sales-customer]").forEach(x => x.hidden = !x.textContent.toLocaleLowerCase("tr-TR").includes(q)); };
+        overlay.querySelectorAll("[data-sales-customer]").forEach(btn => btn.onclick = () => { const m = musteriler.find(x => String(x._id) === btn.dataset.salesCustomer); musteriBelgeFormu(tur, m).catch(error => alert(error.message)); });
+    }
+
+    async function satisPaneliYukle() {
+        setTitle("Satış Merkezi"); loading();
+        try {
+            const data = await api("/api/tenant/satis/panel"), p = data.panel || {};
+            const son = p.sonSatislar || [], urunler = p.enCokSatanlar || [], temsilciler = p.temsilciler || [];
+            const durum = x => x === "ODENDI" ? '<span class="sales-status paid">Ödendi</span>' : x === "KISMI" ? '<span class="sales-status partial">Kısmi</span>' : '<span class="sales-status open">Açık</span>';
+            content.innerHTML = `<div class="sales-hero"><div><div class="eyebrow">SATIŞ OPERASYON MERKEZİ</div><h2>Satışın her adımı tek ekranda</h2><p>Müşteri, stok, cari, tahsilat, teklif ve sipariş süreçlerini kesintisiz yönetin.</p></div><button id="salesNew" class="sales-primary-cta">+ Yeni Satış</button></div>
+            <div class="sales-actions"><button id="salesQuick">⚡ Hızlı Satış</button><button data-sales-page="teklifler">📝 Yeni Teklif</button><button data-sales-page="siparisler">📦 Siparişler</button><button id="salesReturn">↩ Satış İadesi</button><button data-sales-page="musteriler">👥 Müşteriler</button><button data-sales-page="cari">₺ Cari / Tahsilat</button></div>
+            <div class="sales-kpis"><article><span>Bugünkü Ciro</span><strong>${para(p.bugun?.ciro)}</strong><small>${Number(p.bugun?.belge || 0)} satış belgesi</small></article><article><span>Bugünkü Tahsilat</span><strong>${para(p.bugun?.tahsilat)}</strong><small>Nakit, kart ve banka</small></article><article><span>Aylık Net Ciro</span><strong>${para(p.ay?.netCiro)}</strong><small>${para(p.ay?.iade)} iade düşüldü</small></article><article class="warning"><span>Açık Satış Bakiyesi</span><strong>${para(p.acikBakiye)}</strong><small>Tahsilat bekleyen tutar</small></article><article><span>Satış Hunisi</span><strong>${Number(p.aktifTeklif || 0)} / ${Number(p.acikSiparis || 0)}</strong><small>Aktif teklif / açık sipariş</small></article></div>
+            <div class="sales-layout"><section class="dashboard-panel sales-wide"><div class="panel-heading"><div><h2>Son Satışlar</h2><p>Belge, müşteri veya temsilci ile anında arayın.</p></div><input id="salesSearch" class="erp-input" placeholder="Satış ara..."></div><div class="table-scroll"><table><thead><tr><th>Tarih / Belge</th><th>Müşteri</th><th>Temsilci</th><th>Ödeme</th><th>Toplam</th><th>Kalan</th></tr></thead><tbody>${son.map(s => `<tr data-sales-row="${s._id}" style="cursor:pointer"><td><b>${escapeHtml(s.belgeNo)}</b><small>${tarihKisa(s.tarih)}</small></td><td>${escapeHtml(s.musteriId?.unvan || s.musteriId?.adSoyad || "-")}<small>${escapeHtml(s.musteriId?.kod || "")}</small></td><td>${escapeHtml(s.kullaniciId?.adSoyad || s.kullaniciId?.email || "Atanmamış")}</td><td>${durum(s.odemeDurumu)}<small>${escapeHtml(s.odemeTipi || "")}</small></td><td><b>${para(s.genelToplam)}</b></td><td class="${Number(s.kalanTutar || 0) > 0 ? "sales-debt" : "sales-clear"}">${para(s.kalanTutar)}</td></tr>`).join("") || '<tr><td colspan="6">Henüz satış yok.</td></tr>'}</tbody></table></div></section>
+            <aside class="dashboard-panel"><h2>En Çok Satanlar</h2><div class="sales-ranking">${urunler.map((u, i) => `<div><span>${i + 1}</span><p><b>${escapeHtml(u.ad)}</b><small>${escapeHtml(u.kod)} · ${Number(u.miktar || 0)} adet</small></p><strong>${para(u.ciro)}</strong></div>`).join("") || '<div class="empty-state">Bu ay veri yok.</div>'}</div></aside></div>
+            <div class="sales-layout"><section class="dashboard-panel sales-wide"><div class="panel-heading"><div><h2>Satış Temsilcisi Performansı</h2><p>Aylık ciro, tahsilat ve belge üretimi.</p></div></div><div class="sales-reps">${temsilciler.map((r, i) => `<article><div class="sales-rep-avatar">${escapeHtml(String(r.temsilci || "?").slice(0, 2).toUpperCase())}</div><div><b>${escapeHtml(r.temsilci)}</b><small>${Number(r.belge || 0)} belge · Tahsilat ${para(r.tahsilat)}</small></div><strong>${para(r.ciro)}</strong><span style="--score:${Math.max(8, 100 - i * 15)}%"></span></article>`).join("") || '<div class="empty-state">Temsilci satış verisi yok.</div>'}</div></section><aside class="dashboard-panel sales-summary"><h2>Aylık Özet</h2><div><span>Brüt satış</span><b>${para(p.ay?.ciro)}</b></div><div><span>İade</span><b>${para(p.ay?.iade)}</b></div><div><span>Net satış</span><b>${para(p.ay?.netCiro)}</b></div><div><span>Tahsilat</span><b>${para(p.ay?.tahsilat)}</b></div><div><span>Belge</span><b>${Number(p.ay?.belge || 0)}</b></div></aside></div>`;
+            content.querySelector("#salesNew").onclick = () => satisMusteriSec("satis");
+            content.querySelector("#salesQuick").onclick = () => satisMusteriSec("satis");
+            content.querySelector("#salesReturn").onclick = () => satisMusteriSec("iade");
+            content.querySelectorAll("[data-sales-page]").forEach(x => x.onclick = () => sayfaYukle(x.dataset.salesPage));
+            content.querySelector("#salesSearch").oninput = e => { const q = e.target.value.toLocaleLowerCase("tr-TR"); content.querySelectorAll("[data-sales-row]").forEach(x => x.hidden = !x.textContent.toLocaleLowerCase("tr-TR").includes(q)); };
+            content.querySelectorAll("[data-sales-row]").forEach(row => row.onclick = () => { const s = son.find(x => String(x._id) === row.dataset.salesRow); musteriBelgeMerkeziAc("SATIS", s, s.musteriId || {}).catch(error => alert(error.message)); });
+        } catch (error) { errorBox(error); }
+    }
+
     async function sayfaYukle(page) {
         const buYukleme = ++sayfaYuklemeNo;
         if (page === "dashboard" || page === "anaSayfa" || !page) {
@@ -4140,6 +4188,11 @@
         if (page === "urunler") {
             if (buYukleme !== sayfaYuklemeNo) return;
             await urunlerYukle();
+            return;
+        }
+
+        if (page === "satis") {
+            await satisPaneliYukle();
             return;
         }
 
@@ -4277,6 +4330,3 @@
     // Başlangıç.
     anaSayfa();
 })();
-
-
-

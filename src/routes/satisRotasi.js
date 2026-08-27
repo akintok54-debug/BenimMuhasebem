@@ -11,6 +11,7 @@ router.use(kimlikKontrol);
 router.use(tenantKontrol);
 
 router.get("/", controller.listele);
+router.get("/panel", controller.panel);
 router.get("/iade", controller.iadeleriListele);
 router.post("/iade", yetkiKontrol("sales.write"), controller.iadeAl);
 router.get("/:id", controller.detay);
