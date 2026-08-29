@@ -262,7 +262,7 @@ async function olustur(req, res, next) {
                     urun.satisFiyati ??
                     0,
                 kdv: item.kdv ?? urun.kdv ?? 20,
-                iskonto: item.iskonto || 0
+                iskonto: item.iskonto ?? urun.iskonto ?? 0
             });
 
             kalemler.push(kalem);
@@ -519,7 +519,7 @@ async function iadeAl(req, res, next) {
         const kalemler = []; let genelToplam = 0;
         for (const item of body.kalemler) {
             const urun = await Urun.findOne({ _id: item.urunId, tenantId });
-            const miktar = Number(item.miktar || 0), birimFiyat = Number(item.birimFiyat ?? urun?.satisFiyati ?? 0), kdv = Number(item.kdv ?? urun?.kdv ?? 20), iskonto = Number(item.iskonto || 0);
+            const miktar = Number(item.miktar || 0), birimFiyat = Number(item.birimFiyat ?? urun?.satisFiyati ?? 0), kdv = Number(item.kdv ?? urun?.kdv ?? 20), iskonto = Number(item.iskonto ?? urun?.iskonto ?? 0);
             if (!urun || miktar <= 0 || birimFiyat < 0) return res.status(400).json({ basarili: false, mesaj: "İade kalemi geçersiz." });
             const ara = miktar * birimFiyat * (1 - iskonto / 100); const toplam = ara * (1 + kdv / 100);
             kalemler.push({ urunId: urun._id, miktar, birimFiyat, kdv, iskonto, toplam }); genelToplam += toplam;
@@ -545,7 +545,7 @@ async function guncelle(req, res, next) {
         if(!Array.isArray(body.kalemler)||!body.kalemler.length)return res.status(400).json({basarili:false,mesaj:"En az bir satış kalemi gerekir."});
         const depoId=body.depoId||satis.depoId; if(String(depoId)!==String(satis.depoId))return res.status(409).json({basarili:false,mesaj:"Kayıtlı satışın deposu değiştirilemez."});
         const yeniKalemler=[];let araToplam=0,toplamKdv=0,genelToplam=0;const ihtiyac=new Map();
-        for(const item of body.kalemler){const urun=await Urun.findOne({_id:item.urunId,tenantId});if(!urun)return res.status(404).json({basarili:false,mesaj:"Ürün bulunamadı."});const k=hesaplaKalem({urunId:urun._id,miktar:item.miktar,birimFiyat:item.birimFiyat??urun.satisFiyati,kdv:item.kdv??urun.kdv,iskonto:item.iskonto});if(k.miktar<=0)return res.status(400).json({basarili:false,mesaj:"Miktar geçersiz."});yeniKalemler.push(k);araToplam+=k.araToplam;toplamKdv+=k.kdvTutari;genelToplam+=k.toplam;ihtiyac.set(String(urun._id),(ihtiyac.get(String(urun._id))||0)+k.miktar);}
+        for(const item of body.kalemler){const urun=await Urun.findOne({_id:item.urunId,tenantId});if(!urun)return res.status(404).json({basarili:false,mesaj:"Ürün bulunamadı."});const k=hesaplaKalem({urunId:urun._id,miktar:item.miktar,birimFiyat:item.birimFiyat??urun.satisFiyati,kdv:item.kdv??urun.kdv,iskonto:item.iskonto??urun.iskonto??0});if(k.miktar<=0)return res.status(400).json({basarili:false,mesaj:"Miktar geçersiz."});yeniKalemler.push(k);araToplam+=k.araToplam;toplamKdv+=k.kdvTutari;genelToplam+=k.toplam;ihtiyac.set(String(urun._id),(ihtiyac.get(String(urun._id))||0)+k.miktar);}
         const eski=new Map();for(const k of satis.kalemler)eski.set(String(k.urunId),(eski.get(String(k.urunId))||0)+Number(k.miktar||0));
         for(const [urunId,miktar] of ihtiyac){const stok=await Stok.findOne({tenantId,urunId,depoId});const kullanilabilir=Number(stok?.miktar||0)+Number(eski.get(urunId)||0);if(kullanilabilir<miktar)return res.status(409).json({basarili:false,mesaj:`Düzeltme için yetersiz stok: ${urunId}`});}
         for(const [urunId,miktar] of eski){let stok=await Stok.findOne({tenantId,urunId,depoId});if(!stok)stok=new Stok({tenantId,urunId,depoId,miktar:0,maliyet:0});stok.miktar+=miktar;await stok.save();}

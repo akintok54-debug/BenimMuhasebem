@@ -2,9 +2,12 @@
 const Urun = require("../models/Urun");
 const UrunKategori = require("../models/UrunKategori");
 const OzelFiyat = require("../models/OzelFiyat");
+const Depo = require("../models/Depo");
+const Stok = require("../models/Stok");
+const StokHareket = require("../models/StokHareket");
 
-const SAYISAL_ALANLAR = ["kdv", "alisFiyati", "satisFiyati", "bayiFiyati", "perakendeFiyati", "minimumStok", "kritikStok"];
-const TOPLU_ALANLAR = ["kod", "barkod", "ad", "kategori", "marka", "model", "uyumluluk", "birim", "kdv", "alisFiyati", "satisFiyati", "bayiFiyati", "perakendeFiyati", "paraBirimi", "gorsel", "minimumStok", "kritikStok", "aktif", "notlar"];
+const SAYISAL_ALANLAR = ["kdv", "alisFiyati", "satisFiyati", "bayiFiyati", "perakendeFiyati", "iskonto", "minimumStok", "kritikStok"];
+const TOPLU_ALANLAR = ["kod", "barkod", "ad", "kategori", "marka", "model", "uyumluluk", "birim", "kdv", "alisFiyati", "satisFiyati", "bayiFiyati", "perakendeFiyati", "iskonto", "paraBirimi", "gorsel", "minimumStok", "kritikStok", "aktif", "notlar"];
 
 function metin(value) {
     return String(value ?? "").trim();
@@ -116,6 +119,11 @@ function sayilariDogrula(body) {
             error.status = 400;
             throw error;
         }
+    }
+    if (body.iskonto !== undefined && Number(body.iskonto) > 100) {
+        const error = new Error("İskonto oranı 0 ile 100 arasında olmalıdır.");
+        error.status = 400;
+        throw error;
     }
 }
 
@@ -278,6 +286,7 @@ async function olustur(req, res, next) {
             satisFiyati: Number(body.satisFiyati || 0),
             bayiFiyati: Number(body.bayiFiyati || 0),
             perakendeFiyati: Number(body.perakendeFiyati ?? body.satisFiyati ?? 0),
+            iskonto: Number(body.iskonto || 0),
             paraBirimi: paraBirimiDogrula(body.paraBirimi),
             gorsel: gorselDogrula(body.gorsel),
             minimumStok: Number(body.minimumStok || 0),
@@ -323,6 +332,7 @@ async function guncelle(req, res, next) {
             "satisFiyati",
             "bayiFiyati",
             "perakendeFiyati",
+            "iskonto",
             "paraBirimi",
             "gorsel",
             "minimumStok",
@@ -367,9 +377,20 @@ async function topluAktar(req, res, next) {
 
         const tId = tenantId(req);
         const mevcutlar = await Urun.find({ tenantId: tId });
+        const stokAktarilacak = satirlar.some(x => x?.stokMiktari !== undefined && x?.stokMiktari !== "");
+        let depolar = await Depo.find({ tenantId: tId }).sort({ aktif: -1, createdAt: 1 });
+        if (stokAktarilacak && !depolar.some(x => x.aktif !== false)) {
+            let anaDepo = depolar.find(x => metin(x.kod).toUpperCase() === "ANA");
+            if (anaDepo) { anaDepo.aktif = true; await anaDepo.save(); }
+            else anaDepo = await Depo.create({ tenantId: tId, kod: "ANA", ad: "Ana Depo", aktif: true });
+            depolar = [anaDepo, ...depolar.filter(x => String(x._id) !== String(anaDepo._id))];
+        }
+        const aktifDepolar = depolar.filter(x => x.aktif !== false);
+        const depoMap = new Map(aktifDepolar.map(x => [metin(x.kod).toUpperCase(), x]));
+        const varsayilanDepo = aktifDepolar[0] || null;
         const kodMap = new Map(mevcutlar.map(x => [metin(x.kod).toUpperCase(), x]));
         const barkodMap = new Map(mevcutlar.filter(x => metin(x.barkod)).map(x => [metin(x.barkod), x]));
-        const sonuc = { eklenen: 0, guncellenen: 0, atlanan: 0, hatalar: [] };
+        const sonuc = { eklenen: 0, guncellenen: 0, stokGuncellenen: 0, atlanan: 0, hatalar: [] };
 
         for (let index = 0; index < satirlar.length; index++) {
             try {
@@ -378,6 +399,12 @@ async function topluAktar(req, res, next) {
                 const barkod = metin(kaynak.barkod);
                 const ad = metin(kaynak.ad);
                 if (!kod || !ad) throw Object.assign(new Error("Ürün kodu ve ürün adı zorunludur."), { status: 400 });
+                const stokVar = kaynak.stokMiktari !== undefined && kaynak.stokMiktari !== "";
+                const stokMiktari = stokVar ? Number(kaynak.stokMiktari) : null;
+                if (stokVar && (!Number.isFinite(stokMiktari) || stokMiktari < 0)) throw Object.assign(new Error("Stok miktarı sıfır veya daha büyük olmalıdır."), { status: 400 });
+                const depoKodu = metin(kaynak.depoKodu).toUpperCase();
+                const depo = stokVar ? (depoKodu ? depoMap.get(depoKodu) : varsayilanDepo) : null;
+                if (stokVar && !depo) throw Object.assign(new Error(depoKodu ? `Depo bulunamadı: ${depoKodu}` : "Stok aktarımı için aktif depo bulunamadı."), { status: 400 });
 
                 const kodEslesmesi = kodMap.get(kod);
                 const barkodEslesmesi = barkod ? barkodMap.get(barkod) : null;
@@ -402,6 +429,23 @@ async function topluAktar(req, res, next) {
                 }
 
                 await urun.save();
+                if (stokVar) {
+                    const mevcutStok = await Stok.findOne({ tenantId: tId, urunId: urun._id, depoId: depo._id });
+                    const oncekiMiktar = Number(mevcutStok?.miktar || 0), fark = stokMiktari - oncekiMiktar;
+                    await Stok.findOneAndUpdate(
+                        { tenantId: tId, urunId: urun._id, depoId: depo._id },
+                        { $set: { miktar: stokMiktari, maliyet: Number(urun.alisFiyati || 0), sonHareketTarihi: new Date() } },
+                        { new: true, upsert: true, setDefaultsOnInsert: true }
+                    );
+                    if (fark) await StokHareket.create({
+                        tenantId: tId, urunId: urun._id, depoId: depo._id,
+                        tip: fark > 0 ? "SAYIM_ARTI" : "SAYIM_EKSI", miktar: Math.abs(fark),
+                        birimMaliyet: Number(urun.alisFiyati || 0), kaynak: "URUN_EXCEL",
+                        aciklama: "Excel ürün aktarımı stok güncellemesi",
+                        kullaniciId: req.kullanici?._id || req.user?._id || null
+                    });
+                    sonuc.stokGuncellenen++;
+                }
                 kodMap.set(metin(urun.kod).toUpperCase(), urun);
                 if (metin(urun.barkod)) barkodMap.set(metin(urun.barkod), urun);
                 if (yeni) sonuc.eklenen++; else sonuc.guncellenen++;
@@ -411,7 +455,7 @@ async function topluAktar(req, res, next) {
             }
         }
 
-        res.json({ basarili: true, mesaj: `${sonuc.eklenen} ürün eklendi, ${sonuc.guncellenen} ürün güncellendi, ${sonuc.atlanan} satır atlandı.`, ...sonuc });
+        res.json({ basarili: true, mesaj: `${sonuc.eklenen} ürün eklendi, ${sonuc.guncellenen} ürün güncellendi, ${sonuc.stokGuncellenen} stok kaydı işlendi, ${sonuc.atlanan} satır atlandı.`, varsayilanDepo: varsayilanDepo ? { kod: varsayilanDepo.kod, ad: varsayilanDepo.ad } : null, ...sonuc });
     } catch (error) { next(error); }
 }
 

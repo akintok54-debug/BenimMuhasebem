@@ -87,6 +87,13 @@ const UrunSchema = new mongoose.Schema(
             min: 0
         },
 
+        iskonto: {
+            type: Number,
+            default: 0,
+            min: 0,
+            max: 100
+        },
+
         paraBirimi: {
             type: String,
             enum: ["TRY", "USD", "EUR"],

@@ -186,7 +186,7 @@ async function olustur(req, res, next) {
                 miktar: item.miktar,
                 birimFiyat: item.birimFiyat,
                 kdv: item.kdv ?? urun.kdv ?? 20,
-                iskonto: item.iskonto || 0
+                iskonto: item.iskonto ?? urun.iskonto ?? 0
             });
 
             if (!kalemGecerliMi(kalem)) {
@@ -364,7 +364,7 @@ async function iadeOlustur(req, res, next) {
         for (const item of body.kalemler) {
             const urun = await Urun.findOne({ _id: item.urunId, tenantId });
             const stok = await Stok.findOne({ tenantId, urunId: item.urunId, depoId: depo._id });
-            const kalem = hesaplaKalem({ urunId: item.urunId, miktar: item.miktar, birimFiyat: item.birimFiyat ?? urun?.alisFiyati, kdv: item.kdv ?? urun?.kdv, iskonto: item.iskonto });
+            const kalem = hesaplaKalem({ urunId: item.urunId, miktar: item.miktar, birimFiyat: item.birimFiyat ?? urun?.alisFiyati, kdv: item.kdv ?? urun?.kdv, iskonto: item.iskonto ?? urun?.iskonto ?? 0 });
             if (!urun || !kalemGecerliMi(kalem) || Number(stok?.miktar || 0) < kalem.miktar) return res.status(409).json({ basarili: false, mesaj: "İade için ürün veya stok miktarı geçersiz." });
             kalemler.push({ urunId: urun._id, miktar: kalem.miktar, birimFiyat: kalem.birimFiyat, kdv: kalem.kdv, iskonto: kalem.iskonto, toplam: kalem.toplam }); genelToplam += kalem.toplam;
         }
@@ -395,7 +395,7 @@ async function siparisOlustur(req, res, next) {
         if (!body.siparisNo || !body.tedarikciId || !Array.isArray(body.kalemler) || !body.kalemler.length) return res.status(400).json({ basarili: false, mesaj: "Sipariş no, tedarikçi ve kalem zorunludur." });
         const tedarikci = await Tedarikci.findOne({ _id: body.tedarikciId, tenantId }); if (!tedarikci) return res.status(404).json({ basarili: false, mesaj: "Tedarikçi bulunamadı." });
         const kalemler = []; let genelToplam = 0;
-        for (const item of body.kalemler) { const urun = await Urun.findOne({ _id: item.urunId, tenantId }); if (!urun) return res.status(404).json({ basarili: false, mesaj: "Ürün bulunamadı." }); const k = hesaplaKalem({ urunId: urun._id, miktar: item.miktar, birimFiyat: item.birimFiyat ?? urun.alisFiyati, kdv: item.kdv ?? urun.kdv, iskonto: item.iskonto }); if (!kalemGecerliMi(k)) return res.status(400).json({ basarili: false, mesaj: "Sipariş kalemi geçersiz." }); kalemler.push({ urunId: urun._id, miktar: k.miktar, birimFiyat: k.birimFiyat, kdv: k.kdv, iskonto: k.iskonto, toplam: k.toplam }); genelToplam += k.toplam; }
+        for (const item of body.kalemler) { const urun = await Urun.findOne({ _id: item.urunId, tenantId }); if (!urun) return res.status(404).json({ basarili: false, mesaj: "Ürün bulunamadı." }); const k = hesaplaKalem({ urunId: urun._id, miktar: item.miktar, birimFiyat: item.birimFiyat ?? urun.alisFiyati, kdv: item.kdv ?? urun.kdv, iskonto: item.iskonto ?? urun.iskonto ?? 0 }); if (!kalemGecerliMi(k)) return res.status(400).json({ basarili: false, mesaj: "Sipariş kalemi geçersiz." }); kalemler.push({ urunId: urun._id, miktar: k.miktar, birimFiyat: k.birimFiyat, kdv: k.kdv, iskonto: k.iskonto, toplam: k.toplam }); genelToplam += k.toplam; }
         const siparis = await SatinAlmaSiparis.create({ tenantId, siparisNo: String(body.siparisNo).trim().toUpperCase(), tarih: body.tarih || new Date(), tedarikciId: tedarikci._id, kalemler, genelToplam, notlar: body.notlar || "", kullaniciId: req.kullanici?._id || req.user?._id || null });
         res.status(201).json({ basarili: true, siparis });
     } catch (error) { next(error); }
