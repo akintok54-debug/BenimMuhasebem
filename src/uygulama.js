@@ -62,6 +62,9 @@ uygulama.use(
 );
 
 uygulama.get("/api/saglik", saglikRotasi);
+const paylasimRotasi = require("./routes/paylasimRotasi");
+uygulama.use("/api/paylasim", paylasimRotasi.publicRouter);
+uygulama.use("/api/tenant/paylasim", paylasimRotasi.tenantRouter);
 const tenantRotasi = require("./routes/tenantRotasi");
 uygulama.use("/api/tenant", tenantRotasi);
 

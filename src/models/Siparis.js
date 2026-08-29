@@ -29,7 +29,8 @@ const SiparisKalemSchema = new mongoose.Schema(
         iskonto: {
             type: Number,
             default: 0,
-            min: 0
+            min: 0,
+            max: 100
         },
 
         araToplam: Number,
@@ -99,12 +100,19 @@ const SiparisSchema = new mongoose.Schema(
             default: 0
         },
 
+        paraBirimi: { type: String, enum: ["TRY", "USD", "EUR"], default: "TRY" },
+        teslimTarihi: { type: Date, default: null },
+        sevkAdresi: { type: String, trim: true, maxlength: 700, default: "" },
+        odemeKosullari: { type: String, trim: true, maxlength: 500, default: "" },
+
         durum: {
             type: String,
             enum: [
                 "TASLAK",
                 "ONAYLANDI",
                 "HAZIRLANIYOR",
+                "KISMI_SEVK",
+                "SEVK_EDILDI",
                 "TAMAMLANDI",
                 "IPTAL"
             ],

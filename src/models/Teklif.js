@@ -29,7 +29,8 @@ const TeklifKalemSchema = new mongoose.Schema(
         iskonto: {
             type: Number,
             default: 0,
-            min: 0
+            min: 0,
+            max: 100
         },
 
         araToplam: Number,
@@ -92,6 +93,14 @@ const TeklifSchema = new mongoose.Schema(
             default: 0
         },
 
+        paraBirimi: { type: String, enum: ["TRY", "USD", "EUR"], default: "TRY" },
+        teslimSuresiGun: { type: Number, min: 0, max: 3650, default: 0 },
+        odemeKosullari: { type: String, trim: true, maxlength: 500, default: "" },
+        teslimatKosullari: { type: String, trim: true, maxlength: 500, default: "" },
+        gonderimTarihi: { type: Date, default: null },
+        onayTarihi: { type: Date, default: null },
+        redNedeni: { type: String, trim: true, maxlength: 500, default: "" },
+
         durum: {
             type: String,
             enum: [
@@ -99,6 +108,8 @@ const TeklifSchema = new mongoose.Schema(
                 "GONDERILDI",
                 "ONAYLANDI",
                 "REDDEDILDI",
+                "SURESI_DOLDU",
+                "SIPARISE_DONUSTU",
                 "IPTAL"
             ],
             default: "TASLAK"

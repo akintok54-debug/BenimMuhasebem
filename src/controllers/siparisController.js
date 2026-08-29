@@ -46,7 +46,9 @@ async function guncelle(req, res, next) {
         if(!Array.isArray(body.kalemler)||!body.kalemler.length) return res.status(400).json({basarili:false,mesaj:"En az bir sipariş kalemi gerekir."});
         const kalemler=[]; let araToplam=0,toplamKdv=0,genelToplam=0;
         for(const item of body.kalemler){const urun=await Urun.findOne({_id:item.urunId,tenantId:tId});if(!urun)return res.status(404).json({basarili:false,mesaj:"Ürün bulunamadı."});const miktar=Number(item.miktar||0),birimFiyat=Number(item.birimFiyat??urun.satisFiyati),kdv=Number(item.kdv??urun.kdv),iskonto=Number(item.iskonto||0);if(miktar<=0)return res.status(400).json({basarili:false,mesaj:"Miktar geçersiz."});const brut=miktar*birimFiyat,kalemAra=brut-(brut*iskonto/100),kdvTutari=kalemAra*kdv/100;kalemler.push({urunId:urun._id,miktar,birimFiyat,kdv,iskonto,araToplam:kalemAra,kdvTutari,toplam:kalemAra+kdvTutari});araToplam+=kalemAra;toplamKdv+=kdvTutari;genelToplam+=kalemAra+kdvTutari;}
-        siparis.siparisNo=String(body.siparisNo||siparis.siparisNo).trim().toUpperCase();siparis.tarih=body.tarih||siparis.tarih;siparis.depoId=body.depoId||siparis.depoId;siparis.kalemler=kalemler;siparis.araToplam=araToplam;siparis.toplamKdv=toplamKdv;siparis.genelToplam=genelToplam;siparis.notlar=body.notlar??siparis.notlar;siparis.durum=body.durum||siparis.durum;await siparis.save();res.json({basarili:true,siparis});
+        siparis.siparisNo=String(body.siparisNo||siparis.siparisNo).trim().toUpperCase();siparis.tarih=body.tarih||siparis.tarih;siparis.depoId=body.depoId||siparis.depoId;siparis.kalemler=kalemler;siparis.araToplam=araToplam;siparis.toplamKdv=toplamKdv;siparis.genelToplam=genelToplam;siparis.notlar=body.notlar??siparis.notlar;siparis.durum=body.durum||siparis.durum;
+        ["paraBirimi", "teslimTarihi", "sevkAdresi", "odemeKosullari"].forEach(k => { if (body[k] !== undefined) siparis[k] = body[k] || null; });
+        await siparis.save();res.json({basarili:true,siparis});
     }catch(error){next(error);}
 }
 
@@ -85,6 +87,8 @@ async function olustur(req, res, next) {
             tenantId: tId, siparisNo: String(body.siparisNo).trim().toUpperCase(),
             tarih: body.tarih || new Date(), musteriId: musteri._id, depoId: depo._id,
             kalemler, araToplam, toplamKdv, genelToplam, durum: body.durum || "TASLAK",
+            paraBirimi: body.paraBirimi || "TRY", teslimTarihi: body.teslimTarihi || null,
+            sevkAdresi: body.sevkAdresi || "", odemeKosullari: body.odemeKosullari || "",
             notlar: body.notlar || "", kullaniciId: req.kullanici?._id || req.user?._id || null
         });
         res.status(201).json({ basarili: true, siparis });

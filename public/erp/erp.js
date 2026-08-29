@@ -51,6 +51,21 @@
         }).format(Number(value || 0));
     }
 
+    let firmaProfiliOnbellegi = null;
+    async function firmaProfiliGetir() {
+        if (firmaProfiliOnbellegi) return firmaProfiliOnbellegi;
+        try {
+            const data = await api("/api/tenant/dashboard");
+            const f = data.tenant?.firmaBilgileri || {};
+            firmaProfiliOnbellegi = { ...f, unvan: f.unvan || data.tenant?.name || "İşletmeniz" };
+        } catch (_) { firmaProfiliOnbellegi = { unvan: "İşletmeniz" }; }
+        return firmaProfiliOnbellegi;
+    }
+
+    function profesyonelPaylasimMesaji({ firmaAdi, musteriAdi, belgeAdi, belgeNo, link = "", ek = false }) {
+        return `Sayın ${musteriAdi || "Yetkili"},\n\n${firmaAdi} tarafından hazırlanan ${belgeAdi.toLocaleLowerCase("tr-TR")}${belgeNo ? ` (${belgeNo})` : ""} ${link ? "aşağıdaki güvenli bağlantıda" : ek ? "ekte" : "bilgilerinize"} sunulmuştur.${link ? `\n\n${link}` : ""}\n\nBelgeyle ilgili sorularınız için bizimle iletişime geçebilirsiniz.\n\nSaygılarımızla,\n${firmaAdi}`;
+    }
+
     async function api(url, options = {}) {
         const headers = {
             Accept: "application/json",
@@ -2127,7 +2142,8 @@
         const ilkSatirlar = mevcut?.kalemler?.length ? mevcut.kalemler.map(satirHtml).join("") : baslangicKalemleri.length ? baslangicKalemleri.map(satirHtml).join("") : satirHtml();
         const belgeTarihi = new Date(mevcut?.tarih || Date.now()).toISOString().slice(0, 10);
         const odemeHtml = tur === "satis" && !mevcut ? `<div class="sales-payment-box"><div><span>Belge Toplamı</span><strong id="salesDocumentTotal">₺0,00</strong></div><label>Ödeme Yöntemi<select name="odemeTipi"><option value="ACIK_HESAP">Açık Hesap</option><option value="NAKIT">Nakit</option><option value="KART">Kredi Kartı</option><option value="CEK">Çek</option><option value="SENET">Senet</option></select></label><label data-sales-account hidden>Kasa / Banka<select name="hesap"><option value="">Hesap seçin</option>${satisHesaplari.map(x => `<option value="${x.tip}|${x.id}" data-hesap-tipi="${x.tip}">${escapeHtml(x.tip)} · ${escapeHtml(x.ad)}</option>`).join("")}</select></label></div>` : "";
-        overlay.innerHTML = `<div class="erp-modal" style="max-width:1100px;width:98%"><div class="erp-modal-header"><div><h2>${mevcut ? `${ayar.baslik} - Düzenle` : ayar.baslik}</h2><p>${escapeHtml(musteri.kod)} · ${escapeHtml(musteri.unvan || musteri.adSoyad)} · Bakiye ${para(musteri.bakiye)}</p></div><button type="button" class="erp-modal-close">×</button></div><form id="musteriBelgeForm"><div class="erp-form-grid"><label>${ayar.no}<input name="no" value="${escapeHtml(no)}" required></label><label>Tarih<input name="tarih" type="date" value="${belgeTarihi}" required></label>${ayar.depo ? `<label class="full">Depo<select name="depoId" required><option value="">Depo seçin</option>${depolar.map(x => `<option value="${x._id}" ${String(x._id) === String(mevcut?.depoId?._id || mevcut?.depoId || "") ? "selected" : ""}>${escapeHtml(x.kod)} · ${escapeHtml(x.ad)}</option>`).join("")}</select></label>` : `<label>Geçerlilik Tarihi<input name="gecerlilikTarihi" type="date" value="${mevcut?.gecerlilikTarihi ? new Date(mevcut.gecerlilikTarihi).toISOString().slice(0, 10) : ""}"></label>`}</div><div class="panel-heading" style="margin-top:16px"><div><h3>Belge Kalemleri</h3><p>Ürünleri aynı tabloya satır olarak ekleyin.</p></div><button type="button" id="kalemEkle" class="erp-primary-button">+ Kalem Ekle</button></div><div class="table-scroll"><table><thead><tr><th>Ürün</th><th>Miktar</th><th>Birim Fiyat</th><th>KDV %</th><th>İskonto %</th><th></th></tr></thead><tbody id="belgeKalemler">${ilkSatirlar}</tbody></table></div>${odemeHtml}<label style="display:block;margin-top:12px">Notlar<textarea name="notlar" style="width:100%">${escapeHtml(mevcut?.notlar || "")}</textarea></label><div id="belgeMesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button secondary" data-kapat>Vazgeç</button><button type="submit" class="erp-primary-button">${mevcut ? "Değişiklikleri Kaydet" : tur === "iade" ? "İadeyi Kaydet" : "Kaydet"}</button></div></form></div>`;
+        const surecAlanlari = tur === "teklif" ? `<label>Geçerlilik Tarihi<input name="gecerlilikTarihi" type="date" value="${mevcut?.gecerlilikTarihi ? new Date(mevcut.gecerlilikTarihi).toISOString().slice(0, 10) : ""}"></label><label>Para Birimi<select name="paraBirimi"><option>TRY</option><option ${mevcut?.paraBirimi === "USD" ? "selected" : ""}>USD</option><option ${mevcut?.paraBirimi === "EUR" ? "selected" : ""}>EUR</option></select></label><label>Teslim Süresi (gün)<input name="teslimSuresiGun" type="number" min="0" value="${Number(mevcut?.teslimSuresiGun || 0)}"></label><label>Ödeme Koşulları<input name="odemeKosullari" value="${escapeHtml(mevcut?.odemeKosullari || "")}" placeholder="Örn. %50 peşin, bakiye teslimde"></label><label class="full">Teslimat Koşulları<input name="teslimatKosullari" value="${escapeHtml(mevcut?.teslimatKosullari || "")}" placeholder="Teslim şekli, nakliye ve termin bilgisi"></label>` : tur === "siparis" ? `<label class="full">Depo<select name="depoId" required><option value="">Depo seçin</option>${depolar.map(x => `<option value="${x._id}" ${String(x._id) === String(mevcut?.depoId?._id || mevcut?.depoId || "") ? "selected" : ""}>${escapeHtml(x.kod)} · ${escapeHtml(x.ad)}</option>`).join("")}</select></label><label>Teslim Tarihi<input name="teslimTarihi" type="date" value="${mevcut?.teslimTarihi ? new Date(mevcut.teslimTarihi).toISOString().slice(0, 10) : ""}"></label><label>Para Birimi<select name="paraBirimi"><option>TRY</option><option ${mevcut?.paraBirimi === "USD" ? "selected" : ""}>USD</option><option ${mevcut?.paraBirimi === "EUR" ? "selected" : ""}>EUR</option></select></label><label class="full">Sevk Adresi<input name="sevkAdresi" value="${escapeHtml(mevcut?.sevkAdresi || "")}"></label><label class="full">Ödeme Koşulları<input name="odemeKosullari" value="${escapeHtml(mevcut?.odemeKosullari || "")}"></label>` : ayar.depo ? `<label class="full">Depo<select name="depoId" required><option value="">Depo seçin</option>${depolar.map(x => `<option value="${x._id}" ${String(x._id) === String(mevcut?.depoId?._id || mevcut?.depoId || "") ? "selected" : ""}>${escapeHtml(x.kod)} · ${escapeHtml(x.ad)}</option>`).join("")}</select></label>` : "";
+        overlay.innerHTML = `<div class="erp-modal" style="max-width:1100px;width:98%"><div class="erp-modal-header"><div><h2>${mevcut ? `${ayar.baslik} - Düzenle` : ayar.baslik}</h2><p>${escapeHtml(musteri.kod)} · ${escapeHtml(musteri.unvan || musteri.adSoyad)} · Bakiye ${para(musteri.bakiye)}</p></div><button type="button" class="erp-modal-close">×</button></div><form id="musteriBelgeForm"><div class="erp-form-grid"><label>${ayar.no}<input name="no" value="${escapeHtml(no)}" required></label><label>Tarih<input name="tarih" type="date" value="${belgeTarihi}" required></label>${surecAlanlari}</div><div class="panel-heading" style="margin-top:16px"><div><h3>Belge Kalemleri</h3><p>Ürünleri aynı tabloya satır olarak ekleyin.</p></div><button type="button" id="kalemEkle" class="erp-primary-button">+ Kalem Ekle</button></div><div class="table-scroll"><table><thead><tr><th>Ürün</th><th>Miktar</th><th>Birim Fiyat</th><th>KDV %</th><th>İskonto %</th><th></th></tr></thead><tbody id="belgeKalemler">${ilkSatirlar}</tbody></table></div>${odemeHtml}<label style="display:block;margin-top:12px">Notlar<textarea name="notlar" style="width:100%">${escapeHtml(mevcut?.notlar || "")}</textarea></label><div id="belgeMesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button secondary" data-kapat>Vazgeç</button><button type="submit" class="erp-primary-button">${mevcut ? "Değişiklikleri Kaydet" : tur === "iade" ? "İadeyi Kaydet" : "Kaydet"}</button></div></form></div>`;
         document.body.appendChild(overlay);
         const kalemlerEl = document.getElementById("belgeKalemler");
         const belgeToplami = () => [...kalemlerEl.querySelectorAll(".belge-kalem")].reduce((n, x) => { const miktar = Number(x.querySelector("[name=miktar]").value || 0), fiyat = Number(x.querySelector("[name=birimFiyat]").value || 0), kdv = Number(x.querySelector("[name=kdv]").value || 0), iskonto = Number(x.querySelector("[name=iskonto]").value || 0); return n + miktar * fiyat * (1 - iskonto / 100) * (1 + kdv / 100); }, 0);
@@ -2155,7 +2171,7 @@
         overlay.querySelector("form").addEventListener("submit", async event => {
             event.preventDefault(); const fd = new FormData(event.currentTarget); const mesaj = document.getElementById("belgeMesaj");
             const kalemler = [...kalemlerEl.querySelectorAll(".belge-kalem")].map(x => ({ urunId: x.querySelector("[name=urunId]").value, miktar: Number(x.querySelector("[name=miktar]").value), birimFiyat: Number(x.querySelector("[name=birimFiyat]").value), kdv: Number(x.querySelector("[name=kdv]").value), iskonto: Number(x.querySelector("[name=iskonto]").value) }));
-            const body = { musteriId: musteri._id, tarih: fd.get("tarih"), depoId: fd.get("depoId") || undefined, gecerlilikTarihi: fd.get("gecerlilikTarihi") || undefined, notlar: fd.get("notlar"), kalemler }; body[ayar.noAlan] = fd.get("no");
+            const body = { musteriId: musteri._id, tarih: fd.get("tarih"), depoId: fd.get("depoId") || undefined, gecerlilikTarihi: fd.get("gecerlilikTarihi") || undefined, teslimTarihi: fd.get("teslimTarihi") || undefined, paraBirimi: fd.get("paraBirimi") || undefined, teslimSuresiGun: Number(fd.get("teslimSuresiGun") || 0), odemeKosullari: fd.get("odemeKosullari") || "", teslimatKosullari: fd.get("teslimatKosullari") || "", sevkAdresi: fd.get("sevkAdresi") || "", notlar: fd.get("notlar"), kalemler }; body[ayar.noAlan] = fd.get("no");
             if (tur === "satis" && !mevcut) { const [hesapTipi, hesapId] = String(fd.get("hesap") || "|").split("|"); Object.assign(body, { odemeTipi: fd.get("odemeTipi"), hesapTipi: hesapTipi || null, hesapId: hesapId || null }); }
             try { const endpoint = mevcut ? `${ayar.endpoint}/${encodeURIComponent(mevcut._id)}` : ayar.endpoint; await api(endpoint, { method: mevcut ? "PATCH" : "POST", body: JSON.stringify(body) }); musteriModalKapat(); await musteriAnaSayfaAc(musteri._id); }
             catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; }
@@ -2165,6 +2181,7 @@
     async function musteriBelgeMerkeziAc(tur, belge, musteri) {
         let belgeTercihi = {};
         try { belgeTercihi = (await api("/api/tenant/ayarlar")).ayarlar?.belgeAyari || {}; } catch (_) { belgeTercihi = {}; }
+        const firma = await firmaProfiliGetir();
         const turler = {
             SATIS: "Satış Faturası", TAHSILAT: "Tahsilat Makbuzu", SIPARIS: "Sipariş Makbuzu",
             IADE: "Satış İade Belgesi", TESELLUM: "Açık Hesap Tesellüm Makbuzu"
@@ -2184,6 +2201,12 @@
         const overlay = document.createElement("div"); overlay.id = "musteriIslemOverlay"; overlay.className = "erp-modal-overlay";
         overlay.innerHTML = `<div class="invoice-preview-shell"><div class="invoice-toolbar"><div><strong>${baslik}</strong><span>${escapeHtml(no)}</span></div><div class="invoice-toolbar-actions"><button id="belgePdf" class="erp-primary-button">PDF / Yazdır</button><button id="belgeExcel" class="erp-small-button">Excel İndir</button><button id="belgeEposta" class="erp-small-button">E-posta</button><button id="belgeWhatsapp" class="erp-small-button">WhatsApp</button><button class="erp-small-button erp-modal-close">Kapat</button></div></div><div id="musteriBelgeSayfa" class="invoice-page"><div class="invoice-header"><div><div class="invoice-brand">BENİMMUHASEBE</div><div class="invoice-subtitle">${baslik}</div></div><div class="invoice-meta"><div><span>Belge No</span><strong>${escapeHtml(no)}</strong></div><div><span>Tarih</span><strong>${tarihText}</strong></div></div></div><div class="invoice-parties"><div class="invoice-party"><span>MÜŞTERİ</span><strong>${escapeHtml(musteri.unvan || musteri.adSoyad || "-")}</strong><small>Kod: ${escapeHtml(musteri.kod || "-")}</small><small>Tel: ${escapeHtml(musteri.telefon || musteri.whatsapp || "-")}</small><small>E-posta: ${escapeHtml(musteri.email || "-")}</small></div><div class="invoice-party"><span>BELGE TOPLAMI</span><strong>${para(toplam)}</strong><small>${tur === "TESELLUM" ? "Açık hesap teslim belgesidir" : escapeHtml(belge.durum || belge.tip || "")}</small></div></div><div class="invoice-table-wrap"><table class="invoice-table"><thead><tr><th>#</th><th>Kod</th><th>Ürün / Açıklama</th><th>Miktar</th><th>Birim Fiyat</th><th>KDV</th><th>İskonto</th><th>Toplam</th></tr></thead><tbody>${satirlar.map(x => `<tr><td>${x.sira}</td><td>${escapeHtml(x.kod)}</td><td>${escapeHtml(x.urun)}</td><td>${x.miktar} ${escapeHtml(x.birim)}</td><td>${para(x.fiyat)}</td><td>%${x.kdv}</td><td>%${x.iskonto}</td><td><strong>${para(x.toplam)}</strong></td></tr>`).join("")}</tbody></table></div><div class="invoice-bottom"><div class="invoice-notes"><strong>Açıklama</strong><p>${escapeHtml(belge.notlar || belge.aciklama || "Belge elektronik ortamda hazırlanmıştır.")}</p>${tur === "TESELLUM" ? "<p>Teslim eden / Teslim alan imza alanı</p>" : ""}</div><div class="invoice-totals"><div><span>Genel Toplam</span><strong>${para(toplam)}</strong></div></div></div></div></div>`;
         const belgeSayfasi = overlay.querySelector("#musteriBelgeSayfa");
+        belgeSayfasi.querySelector(".invoice-brand").textContent = firma.unvan;
+        if (["TEKLIF", "SIPARIS"].includes(tur)) {
+            const linkDugmesi = document.createElement("button");
+            linkDugmesi.id = "belgeLink"; linkDugmesi.type = "button"; linkDugmesi.className = "erp-small-button"; linkDugmesi.textContent = "Güvenli Link";
+            overlay.querySelector("#belgeEposta").before(linkDugmesi);
+        }
         const sablon = tur === "TESELLUM" ? belgeTercihi.irsaliyeSablonu : belgeTercihi.faturaSablonu;
         belgeSayfasi.classList.add(`invoice-template-${sablon || "modern"}`);
         belgeSayfasi.style.setProperty("--invoice-primary", belgeTercihi.anaRenk || "#2563eb");
@@ -2194,7 +2217,8 @@
         const not = belgeSayfasi.querySelector(".invoice-notes p");
         if (not && !belge.notlar && !belge.aciklama && belgeTercihi.dipnot) not.textContent = belgeTercihi.dipnot;
         document.body.appendChild(overlay); overlay.querySelector(".erp-modal-close").addEventListener("click", musteriModalKapat);
-        const metin = `${baslik}\nBelge No: ${no}\nTarih: ${tarihText}\nTutar: ${para(toplam)}\nMüşteri: ${musteri.unvan || musteri.adSoyad || musteri.kod}`;
+        const musteriAdi = musteri.unvan || musteri.adSoyad || musteri.kod;
+        const metin = profesyonelPaylasimMesaji({ firmaAdi: firma.unvan, musteriAdi, belgeAdi: baslik, belgeNo: no, ek: true });
         document.getElementById("belgePdf").addEventListener("click", () => {
             const pencere = window.open("", "_blank"); if (!pencere) return alert("Yazdırma penceresi açılamadı.");
             pencere.document.write(`<!doctype html><html><head><title>${escapeHtml(no)}</title><link rel="stylesheet" href="/erp/erp.css"></head><body>${document.getElementById("musteriBelgeSayfa").outerHTML}</body></html>`); pencere.document.close(); pencere.onload = () => { pencere.focus(); pencere.print(); };
@@ -2203,6 +2227,14 @@
             if (!window.XLSX) return alert("Excel kitaplığı yüklenemedi.");
             const ws = XLSX.utils.json_to_sheet(satirlar.map(x => ({ "Belge Türü": baslik, "Belge No": no, Tarih: tarihText, "Müşteri Kodu": musteri.kod, Müşteri: musteri.unvan || musteri.adSoyad, "Ürün Kodu": x.kod, "Ürün/Açıklama": x.urun, Miktar: x.miktar, Birim: x.birim, "Birim Fiyat": x.fiyat, "KDV %": x.kdv, "İskonto %": x.iskonto, Toplam: x.toplam })));
             ws["!cols"] = [{ wch: 22 }, { wch: 22 }, { wch: 14 }, { wch: 16 }, { wch: 28 }, { wch: 16 }, { wch: 30 }, { wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 10 }, { wch: 12 }, { wch: 14 }]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Belge"); XLSX.writeFile(wb, `${baslik.replaceAll(" ", "-")}-${no}.xlsx`);
+        });
+        document.getElementById("belgeLink")?.addEventListener("click", async () => {
+            try {
+                const sonuc = await api("/api/tenant/paylasim", { method: "POST", body: JSON.stringify({ tur, belgeId: belge._id, gecerlilikGun: 30 }) });
+                const link = `${location.origin}/erp/paylasim.html?token=${encodeURIComponent(sonuc.paylasim.token)}`;
+                await navigator.clipboard.writeText(link);
+                alert(`30 gün geçerli güvenli bağlantı kopyalandı.\n\n${profesyonelPaylasimMesaji({ firmaAdi: firma.unvan, musteriAdi, belgeAdi: baslik, belgeNo: no, link })}`);
+            } catch (error) { alert(error.message); }
         });
         document.getElementById("belgeEposta").addEventListener("click", () => {
             if (!musteri.email) return alert("Müşterinin e-posta adresi yok.");
@@ -3712,8 +3744,9 @@
                 document.getElementById("cariPaylas").onclick = async () => {
                     try {
                         const result = await api(`/api/tenant/cari/musteri/${encodeURIComponent(id)}/ekstre-paylas`, { method: "POST" });
-                        const mesaj = `${taraf?.unvan || taraf?.adSoyad || "Müşteri"} cari hesap ekstresi: ${result.link}`;
-                        if (navigator.share) await navigator.share({ title: "Cari Hesap Ekstresi", text: mesaj, url: result.link });
+                        const firma = await firmaProfiliGetir();
+                        const mesaj = profesyonelPaylasimMesaji({ firmaAdi: firma.unvan, musteriAdi: taraf?.unvan || taraf?.adSoyad, belgeAdi: "Cari Hesap Ekstresi", link: result.link });
+                        if (navigator.share) await navigator.share({ title: `${firma.unvan} · Cari Hesap Ekstresi`, text: mesaj, url: result.link });
                         else {
                             await navigator.clipboard.writeText(result.link);
                             alert("Ekstre bağlantısı panoya kopyalandı. Bağlantı 30 gün geçerlidir.");
@@ -4491,6 +4524,59 @@
         } catch (error) { errorBox(error); }
     }
 
+    async function musteriSecerekBelgeAc(tur) {
+        const data = await api("/api/tenant/musteriler");
+        const musteriler = (data.musteriler || []).filter(x => x.aktif !== false);
+        if (!musteriler.length) throw new Error("Önce aktif bir müşteri oluşturun.");
+        const overlay = document.createElement("div"); overlay.id = "musteriIslemOverlay"; overlay.className = "erp-modal-overlay";
+        overlay.innerHTML = `<div class="erp-modal" style="max-width:620px"><div class="erp-modal-header"><div><h2>Müşteri Seçin</h2><p>${tur === "teklif" ? "Teklif" : "Sipariş"} hazırlanacak müşteriyi seçin.</p></div><button class="erp-modal-close">×</button></div><form><label>Müşteri<select name="musteriId" required><option value="">Müşteri seçin</option>${musteriler.map(x => `<option value="${x._id}">${escapeHtml(x.kod)} · ${escapeHtml(x.unvan || x.adSoyad)}</option>`).join("")}</select></label><div class="erp-modal-footer"><button type="button" class="erp-small-button" data-kapat>Vazgeç</button><button class="erp-primary-button">Devam Et</button></div></form></div>`;
+        document.body.appendChild(overlay); const kapat = () => overlay.remove(); overlay.querySelectorAll(".erp-modal-close,[data-kapat]").forEach(x => x.onclick = kapat);
+        overlay.querySelector("form").onsubmit = event => { event.preventDefault(); const m = musteriler.find(x => x._id === event.currentTarget.elements.musteriId.value); kapat(); musteriBelgeFormu(tur, m).catch(error => alert(error.message)); };
+    }
+
+    function belgeGuncellemeGovdesi(belge, durum) {
+        return { teklifNo: belge.teklifNo, siparisNo: belge.siparisNo, tarih: belge.tarih, gecerlilikTarihi: belge.gecerlilikTarihi, teslimTarihi: belge.teslimTarihi, depoId: belge.depoId?._id || belge.depoId, paraBirimi: belge.paraBirimi || "TRY", teslimSuresiGun: belge.teslimSuresiGun || 0, odemeKosullari: belge.odemeKosullari || "", teslimatKosullari: belge.teslimatKosullari || "", sevkAdresi: belge.sevkAdresi || "", notlar: belge.notlar || "", durum, kalemler: (belge.kalemler || []).map(k => ({ urunId: k.urunId?._id || k.urunId, miktar: k.miktar, birimFiyat: k.birimFiyat, kdv: k.kdv, iskonto: k.iskonto })) };
+    }
+
+    async function katalogIslemi(tip, urunler, kategori) {
+        const liste = kategori ? urunler.filter(x => x.kategori === kategori) : urunler;
+        if (!liste.length) return alert("Seçilen katalogda ürün yok.");
+        const firma = await firmaProfiliGetir(), baslik = kategori ? `${kategori} Kataloğu` : "Ürün Kataloğu";
+        if (tip === "excel") {
+            if (!window.XLSX) return alert("Excel kitaplığı yüklenemedi.");
+            const ws = XLSX.utils.json_to_sheet(liste.map(x => ({ "Ürün Kodu": x.kod, Barkod: x.barkod || "", Ürün: x.ad, Kategori: x.kategori || "", Marka: x.marka || "", Model: x.model || "", Birim: x.birim, "Satış Fiyatı": Number(x.satisFiyati || 0), "Para Birimi": x.paraBirimi || "TRY", "İskonto %": Number(x.iskonto || 0), "KDV %": Number(x.kdv || 0), "Görsel URL": x.gorsel || "" })));
+            ws["!cols"] = [{wch:16},{wch:18},{wch:34},{wch:20},{wch:18},{wch:18},{wch:10},{wch:14},{wch:12},{wch:12},{wch:10},{wch:45}]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Katalog"); XLSX.writeFile(wb, `${baslik.replaceAll(" ", "-")}.xlsx`, { compression: true }); return;
+        }
+        if (tip === "pdf") {
+            const kartlar = liste.map(x => `<article style="break-inside:avoid;border:1px solid #ddd;border-radius:10px;padding:12px">${x.gorsel ? `<img src="${escapeHtml(x.gorsel)}" style="width:100%;height:130px;object-fit:contain">` : ""}<small>${escapeHtml([x.kategori,x.marka,x.model].filter(Boolean).join(" · "))}</small><h3>${escapeHtml(x.ad)}</h3><div>${escapeHtml(x.kod)} · ${escapeHtml(x.birim)}</div><b>${finansPara(x.satisFiyati,x.paraBirimi)}</b></article>`).join("");
+            const pencere = window.open("", "_blank"); if (!pencere) return alert("Yazdırma penceresi açılamadı."); pencere.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(baslik)}</title><style>body{font-family:Arial;padding:30px;color:#172033}header{border-bottom:2px solid #ddd;margin-bottom:20px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}b{display:block;margin-top:10px;color:#1857a8}@media print{body{padding:0}}</style></head><body><header><h1>${escapeHtml(firma.unvan)}</h1><h2>${escapeHtml(baslik)}</h2><p>${new Date().toLocaleDateString("tr-TR")} · ${liste.length} ürün</p></header><main class="grid">${kartlar}</main></body></html>`); pencere.document.close(); pencere.onload = () => pencere.print(); return;
+        }
+        const sonuc = await api("/api/tenant/paylasim", { method: "POST", body: JSON.stringify({ tur: "KATALOG", kategori, baslik, gecerlilikGun: 30 }) });
+        const link = `${location.origin}/erp/paylasim.html?token=${encodeURIComponent(sonuc.paylasim.token)}`;
+        await navigator.clipboard.writeText(link);
+        alert(`Katalog bağlantısı kopyalandı.\n\n${profesyonelPaylasimMesaji({ firmaAdi: firma.unvan, belgeAdi: baslik, link })}`);
+    }
+
+    async function teklifSiparisYukle(tur) {
+        const teklifMi = tur === "teklif", endpoint = teklifMi ? "/api/tenant/teklifler" : "/api/tenant/siparisler";
+        setTitle(teklifMi ? "Teklifler ve Kataloglar" : "Siparişler"); loading("Satış belgeleri hazırlanıyor...");
+        try {
+            const [data, urunData] = await Promise.all([api(endpoint), teklifMi ? api("/api/tenant/urunler") : Promise.resolve({ urunler: [] })]);
+            const kayitlar = data[teklifMi ? "teklifler" : "siparisler"] || [], urunler = (urunData.urunler || []).filter(x => x.aktif !== false), kategoriler = [...new Set(urunler.map(x => x.kategori).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"tr"));
+            const durumlar = teklifMi ? ["TASLAK","GONDERILDI","ONAYLANDI","REDDEDILDI","SURESI_DOLDU","IPTAL"] : ["TASLAK","ONAYLANDI","HAZIRLANIYOR","KISMI_SEVK","SEVK_EDILDI","TAMAMLANDI","IPTAL"];
+            const aktif = kayitlar.filter(x => !["REDDEDILDI","IPTAL","TAMAMLANDI","SIPARISE_DONUSTU"].includes(x.durum));
+            content.innerHTML = `<div class="sales-hero"><div><div class="eyebrow">${teklifMi ? "TEKLİF VE KATALOG YÖNETİMİ" : "SİPARİŞ YÖNETİMİ"}</div><h2>${teklifMi ? "Tekliften siparişe profesyonel satış akışı" : "Siparişleri teslimata kadar yönetin"}</h2><p>${teklifMi ? "Teklif hazırlayın, PDF/Excel paylaşın, ürün kataloğu oluşturun ve kabul edilen teklifi siparişe çevirin." : "Onay, hazırlık, sevk ve satışa dönüşüm adımlarını tek ekrandan izleyin."}</p></div><button id="belgeYeni" class="sales-primary-cta">+ Yeni ${teklifMi ? "Teklif" : "Sipariş"}</button></div><div class="dashboard-grid">${card("Toplam", kayitlar.length, "Tüm kayıtlar")}${card("Aktif Süreç", aktif.length, "İşlem bekleyen")}${card(teklifMi ? "Onaylanan" : "Sevk Bekleyen", kayitlar.filter(x => teklifMi ? x.durum === "ONAYLANDI" : ["ONAYLANDI","HAZIRLANIYOR"].includes(x.durum)).length, "Takip edilecek")}${card("Toplam Tutar", para(kayitlar.reduce((n,x)=>n+Number(x.genelToplam||0),0)), "Belge toplamı")}</div>${teklifMi ? `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Ürün Katalogları</h2><p>Örneğin Balata kategorisini seçerek müşteriye PDF, Excel veya 30 gün geçerli güvenli bağlantı gönderin.</p></div></div><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end"><label>Katalog<select id="katalogKategori"><option value="">Tüm Ürünler</option>${kategoriler.map(x=>`<option>${escapeHtml(x)}</option>`).join("")}</select></label><button id="katalogPdf" class="erp-small-button">PDF / Yazdır</button><button id="katalogExcel" class="erp-small-button">Excel İndir</button><button id="katalogLink" class="erp-primary-button">Güvenli Link Oluştur</button></div><small>Bağlantılar alıcı verisini URL'ye yazmaz, arama motorlarına kapalıdır ve 30 gün sonra sona erer.</small></div>` : ""}<div class="dashboard-panel"><div class="panel-heading"><div><h2>${teklifMi ? "Teklifler" : "Siparişler"}</h2><p>${kayitlar.length} belge</p></div><input id="belgeAra" class="erp-input" placeholder="Belge no veya müşteri ara..."></div><div class="table-scroll"><table><thead><tr><th>Belge</th><th>Tarih</th><th>Müşteri</th><th>Geçerlilik / Teslim</th><th>Durum</th><th>Tutar</th><th>İşlem</th></tr></thead><tbody>${kayitlar.length ? kayitlar.map((x,i)=>`<tr data-belge-satir="${i}"><td><b>${escapeHtml(x.teklifNo||x.siparisNo)}</b></td><td>${tarihKisa(x.tarih)}</td><td>${escapeHtml(x.musteriId?.unvan||x.musteriId?.adSoyad||"-")}</td><td>${tarihKisa(teklifMi?x.gecerlilikTarihi:x.teslimTarihi)}</td><td><select data-durum="${i}" ${["TAMAMLANDI","SIPARISE_DONUSTU"].includes(x.durum)?"disabled":""}>${durumlar.map(d=>`<option ${x.durum===d?"selected":""}>${d.replaceAll("_"," ")}</option>`).join("")}</select></td><td><b>${finansPara(x.genelToplam,x.paraBirimi)}</b></td><td><button class="erp-small-button" data-gor="${i}">Görüntüle</button> <button class="erp-small-button" data-duzenle="${i}" ${["TAMAMLANDI","SIPARISE_DONUSTU"].includes(x.durum)?"disabled":""}>Düzenle</button>${teklifMi&&x.durum==="ONAYLANDI"?` <button class="erp-primary-button" data-donustur="${i}">Siparişe Çevir</button>`:""}${!teklifMi&&["ONAYLANDI","HAZIRLANIYOR"].includes(x.durum)?` <button class="erp-primary-button" data-satis="${i}">Satışa Çevir</button>`:""}</td></tr>`).join("") : '<tr><td colspan="7">Henüz belge bulunmuyor.</td></tr>'}</tbody></table></div></div>`;
+            content.querySelector("#belgeYeni").onclick = () => musteriSecerekBelgeAc(tur).catch(error => alert(error.message));
+            content.querySelector("#belgeAra").oninput = e => content.querySelectorAll("[data-belge-satir]").forEach(x => x.hidden = !x.textContent.toLocaleLowerCase("tr-TR").includes(e.target.value.toLocaleLowerCase("tr-TR")));
+            content.querySelectorAll("[data-gor]").forEach(btn => btn.onclick = () => { const x=kayitlar[Number(btn.dataset.gor)]; musteriBelgeMerkeziAc(teklifMi?"TEKLIF":"SIPARIS",x,x.musteriId); });
+            content.querySelectorAll("[data-duzenle]").forEach(btn => btn.onclick = () => { const x=kayitlar[Number(btn.dataset.duzenle)]; musteriBelgeFormu(tur,x.musteriId,x).catch(error=>alert(error.message)); });
+            content.querySelectorAll("[data-durum]").forEach(sel => sel.onchange = async () => { const x=kayitlar[Number(sel.dataset.durum)]; try { await api(`${endpoint}/${x._id}`,{method:"PATCH",body:JSON.stringify(belgeGuncellemeGovdesi(x,sel.value))}); await teklifSiparisYukle(tur); } catch(error){ alert(error.message); sel.value=x.durum; } });
+            content.querySelectorAll("[data-donustur]").forEach(btn => btn.onclick = async () => { try { const depolar=(await api("/api/tenant/stok/depolar")).depolar||[]; if(!depolar.length)throw new Error("Aktif depo bulunamadı."); const x=kayitlar[Number(btn.dataset.donustur)], no=prompt("Sipariş numarası:",`SIP-${Date.now()}`); if(!no)return; await api(`/api/tenant/teklifler/${x._id}/siparise-donustur`,{method:"POST",body:JSON.stringify({siparisNo:no,depoId:depolar[0]._id})}); await teklifSiparisYukle(tur); }catch(error){alert(error.message);} });
+            content.querySelectorAll("[data-satis]").forEach(btn => btn.onclick = async () => { const x=kayitlar[Number(btn.dataset.satis)], no=prompt("Satış belge numarası:",x.siparisNo); if(!no)return; try{await api(`/api/tenant/siparisler/${x._id}/satisa-donustur`,{method:"POST",body:JSON.stringify({belgeNo:no})});await teklifSiparisYukle(tur);}catch(error){alert(error.message);} });
+            if(teklifMi){const kategori=()=>content.querySelector("#katalogKategori").value; content.querySelector("#katalogPdf").onclick=()=>katalogIslemi("pdf",urunler,kategori()).catch(e=>alert(e.message));content.querySelector("#katalogExcel").onclick=()=>katalogIslemi("excel",urunler,kategori()).catch(e=>alert(e.message));content.querySelector("#katalogLink").onclick=()=>katalogIslemi("link",urunler,kategori()).catch(e=>alert(e.message));}
+        } catch (error) { errorBox(error); }
+    }
+
     async function sayfaYukle(page) {
         const buYukleme = ++sayfaYuklemeNo;
         if (page === "dashboard" || page === "anaSayfa" || !page) {
@@ -4561,6 +4647,12 @@
         if (page === "masraflar") {
             if (buYukleme !== sayfaYuklemeNo) return;
             await masraflarYukle();
+            return;
+        }
+
+        if (page === "teklifler" || page === "siparisler") {
+            if (buYukleme !== sayfaYuklemeNo) return;
+            await teklifSiparisYukle(page === "teklifler" ? "teklif" : "siparis");
             return;
         }
 

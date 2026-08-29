@@ -4,6 +4,7 @@ const Teklif = require("../models/Teklif");
 const Musteri = require("../models/Musteri");
 const Urun = require("../models/Urun");
 const Siparis = require("../models/Siparis");
+const Ayar = require("../models/Ayar");
 
 function tenantId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
@@ -33,6 +34,7 @@ function hesapla(item) {
 
 async function listele(req, res, next) {
     try {
+        await Teklif.updateMany({ tenantId: tenantId(req), durum: "GONDERILDI", gecerlilikTarihi: { $lt: new Date() } }, { $set: { durum: "SURESI_DOLDU" } });
         const teklifler = await Teklif.find({
             tenantId: tenantId(req)
         })
@@ -73,7 +75,11 @@ async function guncelle(req, res, next) {
             if (h.miktar <= 0) return res.status(400).json({ basarili: false, mesaj: "Miktar geçersiz." });
             kalemler.push({ urunId: urun._id, ...h }); araToplam += h.araToplam; toplamKdv += h.kdvTutari; genelToplam += h.toplam;
         }
-        teklif.teklifNo = String(body.teklifNo || teklif.teklifNo).trim().toUpperCase(); teklif.tarih = body.tarih || teklif.tarih; teklif.gecerlilikTarihi = body.gecerlilikTarihi || null; teklif.kalemler = kalemler; teklif.araToplam = araToplam; teklif.toplamKdv = toplamKdv; teklif.genelToplam = genelToplam; teklif.notlar = body.notlar ?? teklif.notlar; teklif.durum = body.durum || teklif.durum; await teklif.save();
+        teklif.teklifNo = String(body.teklifNo || teklif.teklifNo).trim().toUpperCase(); teklif.tarih = body.tarih || teklif.tarih; teklif.gecerlilikTarihi = body.gecerlilikTarihi || null; teklif.kalemler = kalemler; teklif.araToplam = araToplam; teklif.toplamKdv = toplamKdv; teklif.genelToplam = genelToplam; teklif.notlar = body.notlar ?? teklif.notlar; teklif.durum = body.durum || teklif.durum;
+        ["paraBirimi", "teslimSuresiGun", "odemeKosullari", "teslimatKosullari", "redNedeni"].forEach(k => { if (body[k] !== undefined) teklif[k] = body[k]; });
+        if (body.durum === "GONDERILDI" && !teklif.gonderimTarihi) teklif.gonderimTarihi = new Date();
+        if (body.durum === "ONAYLANDI" && !teklif.onayTarihi) teklif.onayTarihi = new Date();
+        await teklif.save();
         res.json({ basarili: true, teklif });
     } catch (error) { next(error); }
 }
@@ -147,16 +153,25 @@ async function olustur(req, res, next) {
             genelToplam += hesap.toplam;
         }
 
+        let gecerlilikTarihi = body.gecerlilikTarihi || null;
+        if (!gecerlilikTarihi) {
+            const ayar = await Ayar.findOne({ tenantId: tId }).select("genel.teklifGecerlilikGun").lean();
+            gecerlilikTarihi = new Date(Date.now() + Number(ayar?.genel?.teklifGecerlilikGun || 15) * 86400000);
+        }
         const teklif = await Teklif.create({
             tenantId: tId,
             teklifNo: String(body.teklifNo).trim().toUpperCase(),
             tarih: body.tarih || new Date(),
-            gecerlilikTarihi: body.gecerlilikTarihi || null,
+            gecerlilikTarihi,
             musteriId: musteri._id,
             kalemler,
             araToplam,
             toplamKdv,
             genelToplam,
+            paraBirimi: body.paraBirimi || "TRY",
+            teslimSuresiGun: Number(body.teslimSuresiGun || 0),
+            odemeKosullari: body.odemeKosullari || "",
+            teslimatKosullari: body.teslimatKosullari || "",
             durum: body.durum || "TASLAK",
             notlar: body.notlar || "",
             kullaniciId: req.kullanici?._id || null
@@ -184,6 +199,8 @@ async function onayla(req, res, next) {
                 mesaj: "Teklif bulunamadı."
             });
         }
+
+        if (["SIPARISE_DONUSTU", "IPTAL", "SURESI_DOLDU"].includes(teklif.durum)) return res.status(409).json({ basarili: false, mesaj: "Bu teklif onaylanabilir durumda değil." });
 
         teklif.durum = "ONAYLANDI";
         await teklif.save();
@@ -256,6 +273,9 @@ async function sipariseDonustur(req, res, next) {
             notlar: teklif.notlar,
             kullaniciId: req.kullanici?._id || null
         });
+
+        teklif.durum = "SIPARISE_DONUSTU";
+        await teklif.save();
 
         res.status(201).json({
             basarili: true,

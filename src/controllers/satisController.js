@@ -81,7 +81,7 @@ async function panel(req, res, next) {
                 .populate("kullaniciId", "adSoyad email")
                 .sort({ tarih: -1, createdAt: -1 }).lean(),
             Siparis.countDocuments({ tenantId, durum: { $nin: ["TAMAMLANDI", "IPTAL"] } }),
-            Teklif.countDocuments({ tenantId, durum: { $nin: ["ONAYLANDI", "REDDEDILDI", "IPTAL"] } }),
+            Teklif.countDocuments({ tenantId, durum: { $nin: ["ONAYLANDI", "REDDEDILDI", "IPTAL", "SURESI_DOLDU", "SIPARISE_DONUSTU"] } }),
             SatisIade.find({ tenantId, tarih: { $gte: ayBasi } }).select("genelToplam tarih").lean()
         ]);
         const bugunSatis = satislar.filter(x => new Date(x.tarih) >= bugun);
