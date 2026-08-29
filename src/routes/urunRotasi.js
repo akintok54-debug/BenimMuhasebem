@@ -19,6 +19,7 @@ router.post("/ozel-fiyatlar", yetkiKontrol("sales.write"), controller.ozelFiyatO
 router.patch("/ozel-fiyatlar/:id", yetkiKontrol("sales.write"), controller.ozelFiyatGuncelle);
 router.delete("/ozel-fiyatlar/:id", yetkiKontrol("sales.write"), controller.ozelFiyatSil);
 router.get("/", controller.listele);
+router.post("/toplu-aktar", yetkiKontrol("stock.write"), controller.topluAktar);
 router.get("/:id", controller.detay);
 router.post("/", yetkiKontrol("stock.write"), controller.olustur);
 router.patch("/:id", yetkiKontrol("stock.write"), controller.guncelle);

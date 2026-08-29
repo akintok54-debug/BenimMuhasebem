@@ -4,6 +4,7 @@ const UrunKategori = require("../models/UrunKategori");
 const OzelFiyat = require("../models/OzelFiyat");
 
 const SAYISAL_ALANLAR = ["kdv", "alisFiyati", "satisFiyati", "bayiFiyati", "perakendeFiyati", "minimumStok", "kritikStok"];
+const TOPLU_ALANLAR = ["kod", "barkod", "ad", "kategori", "marka", "model", "uyumluluk", "birim", "kdv", "alisFiyati", "satisFiyati", "bayiFiyati", "perakendeFiyati", "paraBirimi", "gorsel", "minimumStok", "kritikStok", "aktif", "notlar"];
 
 function metin(value) {
     return String(value ?? "").trim();
@@ -116,6 +117,16 @@ function sayilariDogrula(body) {
             throw error;
         }
     }
+}
+
+function paraBirimiDogrula(value) {
+    const paraBirimi = metin(value || "TRY").toUpperCase();
+    if (!["TRY", "USD", "EUR"].includes(paraBirimi)) {
+        const error = new Error("Para birimi TRY, USD veya EUR olmalıdır.");
+        error.status = 400;
+        throw error;
+    }
+    return paraBirimi;
 }
 
 function tenantId(req) {
@@ -267,6 +278,7 @@ async function olustur(req, res, next) {
             satisFiyati: Number(body.satisFiyati || 0),
             bayiFiyati: Number(body.bayiFiyati || 0),
             perakendeFiyati: Number(body.perakendeFiyati ?? body.satisFiyati ?? 0),
+            paraBirimi: paraBirimiDogrula(body.paraBirimi),
             gorsel: gorselDogrula(body.gorsel),
             minimumStok: Number(body.minimumStok || 0),
             kritikStok: Number(body.kritikStok || 0),
@@ -311,6 +323,7 @@ async function guncelle(req, res, next) {
             "satisFiyati",
             "bayiFiyati",
             "perakendeFiyati",
+            "paraBirimi",
             "gorsel",
             "minimumStok",
             "kritikStok",
@@ -325,6 +338,7 @@ async function guncelle(req, res, next) {
             if (req.body[alan] !== undefined) {
                 if (alan === "kod") urun[alan] = metin(req.body[alan]).toUpperCase();
                 else if (alan === "gorsel") urun[alan] = gorselDogrula(req.body[alan]);
+                else if (alan === "paraBirimi") urun[alan] = paraBirimiDogrula(req.body[alan]);
                 else if (SAYISAL_ALANLAR.includes(alan)) urun[alan] = Number(req.body[alan]);
                 else urun[alan] = req.body[alan];
             }
@@ -345,6 +359,62 @@ async function guncelle(req, res, next) {
     }
 }
 
+async function topluAktar(req, res, next) {
+    try {
+        const satirlar = Array.isArray(req.body?.urunler) ? req.body.urunler : [];
+        if (!satirlar.length) return res.status(400).json({ basarili: false, mesaj: "Aktarılacak ürün satırı bulunamadı." });
+        if (satirlar.length > 2000) return res.status(400).json({ basarili: false, mesaj: "Tek seferde en fazla 2000 ürün aktarılabilir." });
+
+        const tId = tenantId(req);
+        const mevcutlar = await Urun.find({ tenantId: tId });
+        const kodMap = new Map(mevcutlar.map(x => [metin(x.kod).toUpperCase(), x]));
+        const barkodMap = new Map(mevcutlar.filter(x => metin(x.barkod)).map(x => [metin(x.barkod), x]));
+        const sonuc = { eklenen: 0, guncellenen: 0, atlanan: 0, hatalar: [] };
+
+        for (let index = 0; index < satirlar.length; index++) {
+            try {
+                const kaynak = satirlar[index] || {};
+                const kod = metin(kaynak.kod).toUpperCase();
+                const barkod = metin(kaynak.barkod);
+                const ad = metin(kaynak.ad);
+                if (!kod || !ad) throw Object.assign(new Error("Ürün kodu ve ürün adı zorunludur."), { status: 400 });
+
+                const kodEslesmesi = kodMap.get(kod);
+                const barkodEslesmesi = barkod ? barkodMap.get(barkod) : null;
+                if (kodEslesmesi && barkodEslesmesi && String(kodEslesmesi._id) !== String(barkodEslesmesi._id)) {
+                    throw Object.assign(new Error("Ürün kodu ve barkod farklı ürünlerle eşleşiyor."), { status: 409 });
+                }
+
+                const urun = kodEslesmesi || barkodEslesmesi || new Urun({ tenantId: tId });
+                const yeni = urun.isNew;
+                const veri = Object.fromEntries(TOPLU_ALANLAR.filter(alan => kaynak[alan] !== undefined && kaynak[alan] !== "").map(alan => [alan, kaynak[alan]]));
+                veri.kod = kod;
+                veri.ad = ad;
+                if (barkod) veri.barkod = barkod;
+                sayilariDogrula(veri);
+
+                for (const [alan, value] of Object.entries(veri)) {
+                    if (alan === "gorsel") urun[alan] = gorselDogrula(value);
+                    else if (alan === "paraBirimi") urun[alan] = paraBirimiDogrula(value);
+                    else if (SAYISAL_ALANLAR.includes(alan)) urun[alan] = Number(value);
+                    else if (alan === "uyumluluk") urun[alan] = Array.isArray(value) ? value.map(metin).filter(Boolean) : metin(value).split(",").map(metin).filter(Boolean);
+                    else urun[alan] = value;
+                }
+
+                await urun.save();
+                kodMap.set(metin(urun.kod).toUpperCase(), urun);
+                if (metin(urun.barkod)) barkodMap.set(metin(urun.barkod), urun);
+                if (yeni) sonuc.eklenen++; else sonuc.guncellenen++;
+            } catch (error) {
+                sonuc.atlanan++;
+                sonuc.hatalar.push({ satir: index + 2, mesaj: error.code === 11000 ? "Ürün kodu veya barkod zaten kullanılıyor." : error.message });
+            }
+        }
+
+        res.json({ basarili: true, mesaj: `${sonuc.eklenen} ürün eklendi, ${sonuc.guncellenen} ürün güncellendi, ${sonuc.atlanan} satır atlandı.`, ...sonuc });
+    } catch (error) { next(error); }
+}
+
 module.exports = {
     kategorileriListele,
     kategoriOlustur,
@@ -353,6 +423,7 @@ module.exports = {
     detay,
     olustur,
     guncelle,
+    topluAktar,
     ozelFiyatlariListele,
     ozelFiyatOlustur,
     ozelFiyatGuncelle,

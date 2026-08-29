@@ -555,6 +555,39 @@ async function guncelle(req, res, next) {
     }catch(error){next(error);}
 }
 
+async function sil(req, res, next) {
+    try {
+        const tenantId = tenantObjectId(req);
+        const satis = await Satis.findOne({ _id: req.params.id, tenantId });
+        if (!satis) return res.status(404).json({ basarili: false, mesaj: "Satış bulunamadı." });
+        if (Number(satis.odenenTutar || 0) > 0) {
+            return res.status(409).json({
+                basarili: false,
+                mesaj: "Ödemesi alınmış satış silinemez. Önce iade işlemi oluşturun."
+            });
+        }
+
+        const musteri = await Musteri.findOne({ _id: satis.musteriId, tenantId });
+        if (!musteri) return res.status(409).json({ basarili: false, mesaj: "Satışın müşteri kaydı bulunamadı." });
+
+        for (const kalem of satis.kalemler) {
+            let stok = await Stok.findOne({ tenantId, urunId: kalem.urunId, depoId: satis.depoId });
+            if (!stok) stok = new Stok({ tenantId, urunId: kalem.urunId, depoId: satis.depoId, miktar: 0, maliyet: 0 });
+            stok.miktar += Number(kalem.miktar || 0);
+            stok.sonHareketTarihi = new Date();
+            await stok.save();
+        }
+
+        musteri.bakiye -= Number(satis.kalanTutar || satis.genelToplam || 0);
+        await musteri.save();
+        await CariHareket.deleteMany({ tenantId, kaynak: "SATIS", kaynakId: satis._id });
+        await StokHareket.deleteMany({ tenantId, kaynak: { $in: ["SATIS", "SATIS_DUZELTME"] }, kaynakId: satis._id });
+        await Satis.deleteOne({ _id: satis._id, tenantId });
+
+        return res.json({ basarili: true, mesaj: "Satış silindi; stok ve cari bakiye geri alındı." });
+    } catch (error) { next(error); }
+}
+
 module.exports = {
     listele,
     panel,
@@ -562,6 +595,7 @@ module.exports = {
     olustur,
     iadeAl,
     iadeleriListele,
-    guncelle
+    guncelle,
+    sil
 };
 

@@ -17,6 +17,9 @@ async function veritabaniHazirla() {
 
 module.exports = async function handler(req, res) {
     try {
+        if (String(req.url || "").split("?")[0] === "/api/assets/xlsx.js") {
+            return uygulama(req, res);
+        }
         await veritabaniHazirla();
         return uygulama(req, res);
     } catch (error) {

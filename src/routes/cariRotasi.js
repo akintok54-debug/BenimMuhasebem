@@ -16,6 +16,8 @@ router.get("/ozet", controller.ozet);
 router.get("/hareketler", controller.hareketler);
 
 router.post("/musteri/tahsilat", yetkiKontrol("accounting.write", "cash.write"), controller.musteriTahsilat);
+router.patch("/musteri/tahsilat/:id", yetkiKontrol("accounting.write", "cash.write"), controller.musteriTahsilatGuncelle);
+router.delete("/musteri/tahsilat/:id", yetkiKontrol("accounting.write", "cash.write"), controller.musteriTahsilatSil);
 router.post("/musteri/odeme", yetkiKontrol("accounting.write", "cash.write"), controller.musteriOdeme);
 router.patch("/musteri/:musteriId/bakiye", yetkiKontrol("balance.adjust"), controller.musteriBakiyeDuzelt);
 router.post("/musteri/hareket", yetkiKontrol("accounting.write"), controller.musteriManuelHareket);

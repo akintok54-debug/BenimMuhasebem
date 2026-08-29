@@ -17,6 +17,17 @@ test("Satış panel endpointi kimliksiz erişimi reddeder", async () => {
     } finally { await new Promise(resolve => server.close(resolve)); }
 });
 
+test("Satış silme endpointi kimliksiz erişimi reddeder", async () => {
+    const server = await new Promise((resolve, reject) => {
+        const instance = uygulama.listen(0, "127.0.0.1", () => resolve(instance));
+        instance.once("error", reject);
+    });
+    try {
+        const response = await fetch(`http://127.0.0.1:${server.address().port}/api/tenant/satis/507f1f77bcf86cd799439011`, { method: "DELETE" });
+        assert.equal(response.status, 401);
+    } finally { await new Promise(resolve => server.close(resolve)); }
+});
+
 test("Satış panel rotası detay rotasından önce tanımlıdır", () => {
     const router = require("./routes/satisRotasi");
     const yollar = router.stack.filter(x => x.route).map(x => x.route.path);

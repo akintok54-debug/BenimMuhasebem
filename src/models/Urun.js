@@ -87,6 +87,12 @@ const UrunSchema = new mongoose.Schema(
             min: 0
         },
 
+        paraBirimi: {
+            type: String,
+            enum: ["TRY", "USD", "EUR"],
+            default: "TRY"
+        },
+
         gorsel: {
             type: String,
             default: ""

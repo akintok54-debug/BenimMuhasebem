@@ -324,6 +324,117 @@ async function musteriTahsilat(req, res, next) {
     }
 }
 
+async function musteriTahsilatSil(req, res, next) {
+    try {
+        const tId = tenantId(req);
+        const hareket = await CariHareket.findOne({
+            _id: req.params.id,
+            tenantId: tId,
+            tarafTipi: "MUSTERI",
+            tip: "TAHSILAT",
+            kaynak: "TAHSILAT"
+        });
+        if (!hareket) return res.status(404).json({ basarili: false, mesaj: "Tahsilat kaydı bulunamadı." });
+
+        const musteri = await Musteri.findOne({ _id: hareket.tarafId, tenantId: tId });
+        if (!musteri) return res.status(409).json({ basarili: false, mesaj: "Tahsilatın müşteri kaydı bulunamadı." });
+
+        const paraHareket = await ParaHareket.findOne({
+            tenantId: tId,
+            kaynak: "TAHSILAT",
+            kaynakId: hareket._id
+        });
+        let hesap = null;
+        if (paraHareket) {
+            hesap = paraHareket.hesapTipi === "KASA"
+                ? await Kasa.findOne({ _id: paraHareket.hesapId, tenantId: tId })
+                : await Banka.findOne({ _id: paraHareket.hesapId, tenantId: tId });
+            if (!hesap) return res.status(409).json({ basarili: false, mesaj: "Tahsilatın aktarıldığı hesap bulunamadı." });
+            if (Number(hesap.bakiye || 0) < Number(paraHareket.tutar || 0)) {
+                return res.status(409).json({ basarili: false, mesaj: "Hesap bakiyesi tahsilatı geri almaya yetmiyor." });
+            }
+        }
+
+        musteri.bakiye += Number(hareket.tutar || 0);
+        await musteri.save();
+        if (hesap) {
+            hesap.bakiye -= Number(paraHareket.tutar || 0);
+            await hesap.save();
+        }
+        if (paraHareket) await ParaHareket.deleteOne({ _id: paraHareket._id, tenantId: tId });
+        await CariHareket.deleteOne({ _id: hareket._id, tenantId: tId });
+
+        return res.json({ basarili: true, mesaj: "Tahsilat silindi; müşteri ve hesap bakiyeleri geri alındı." });
+    } catch (error) { next(error); }
+}
+
+async function musteriTahsilatGuncelle(req, res, next) {
+    try {
+        const tId = tenantId(req);
+        const body = req.body || {};
+        const yeniTutar = Number(body.tutar || 0);
+        if (!Number.isFinite(yeniTutar) || yeniTutar <= 0) {
+            return res.status(400).json({ basarili: false, mesaj: "Tahsilat tutarı pozitif olmalıdır." });
+        }
+
+        const hareket = await CariHareket.findOne({
+            _id: req.params.id,
+            tenantId: tId,
+            tarafTipi: "MUSTERI",
+            tip: "TAHSILAT",
+            kaynak: "TAHSILAT"
+        });
+        if (!hareket) return res.status(404).json({ basarili: false, mesaj: "Tahsilat kaydı bulunamadı." });
+
+        const musteri = await Musteri.findOne({ _id: hareket.tarafId, tenantId: tId });
+        if (!musteri) return res.status(409).json({ basarili: false, mesaj: "Tahsilatın müşteri kaydı bulunamadı." });
+
+        const eskiTutar = Number(hareket.tutar || 0);
+        const fark = yeniTutar - eskiTutar;
+        if (fark > 0 && Number(musteri.bakiye || 0) < fark) {
+            return res.status(409).json({ basarili: false, mesaj: "Yeni tahsilat tutarı müşterinin kalan bakiyesini aşamaz." });
+        }
+
+        const paraHareket = await ParaHareket.findOne({ tenantId: tId, kaynak: "TAHSILAT", kaynakId: hareket._id });
+        let hesap = null;
+        if (paraHareket) {
+            hesap = paraHareket.hesapTipi === "KASA"
+                ? await Kasa.findOne({ _id: paraHareket.hesapId, tenantId: tId })
+                : await Banka.findOne({ _id: paraHareket.hesapId, tenantId: tId });
+            if (!hesap) return res.status(409).json({ basarili: false, mesaj: "Tahsilatın aktarıldığı hesap bulunamadı." });
+            if (fark < 0 && Number(hesap.bakiye || 0) < Math.abs(fark)) {
+                return res.status(409).json({ basarili: false, mesaj: "Hesap bakiyesi tahsilat tutarını azaltmaya yetmiyor." });
+            }
+        }
+
+        musteri.bakiye -= fark;
+        await musteri.save();
+        if (hesap) {
+            hesap.bakiye += fark;
+            await hesap.save();
+            paraHareket.tutar = yeniTutar;
+            paraHareket.tarih = body.tarih || hareket.tarih;
+            paraHareket.aciklama = String(body.aciklama ?? hareket.aciklama ?? "").trim();
+            await paraHareket.save();
+        }
+
+        hareket.tutar = yeniTutar;
+        hareket.bakiyeDegisimi = -yeniTutar;
+        if (hareket.oncekiBakiye !== null) hareket.sonrakiBakiye = Number(hareket.oncekiBakiye) - yeniTutar;
+        hareket.tarih = body.tarih || hareket.tarih;
+        hareket.aciklama = String(body.aciklama ?? hareket.aciklama ?? "").trim();
+        await hareket.save();
+
+        return res.json({
+            basarili: true,
+            mesaj: "Tahsilat güncellendi; müşteri ve hesap bakiyeleri fark kadar düzeltildi.",
+            musteriBakiye: musteri.bakiye,
+            cariHareket: hareket,
+            paraHareket
+        });
+    } catch (error) { next(error); }
+}
+
 async function musteriOdeme(req, res, next) {
     try {
         const tId = tenantId(req), body = req.body || {}, tutar = Number(body.tutar || 0);
@@ -537,6 +648,8 @@ module.exports = {
     ozet,
     hareketler,
     musteriTahsilat,
+    musteriTahsilatGuncelle,
+    musteriTahsilatSil,
     musteriOdeme,
     musteriBakiyeDuzelt,
     tedarikciOdeme,

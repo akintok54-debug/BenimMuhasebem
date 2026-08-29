@@ -2,6 +2,8 @@ require("dotenv").config();
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const CariHareket = require("./models/CariHareket");
 
 async function istek(path, options = {}) {
@@ -23,6 +25,8 @@ test("Cari yönetim rotaları kimliksiz erişimi reddeder", async () => {
     const id = "507f1f77bcf86cd799439011";
     const kontroller = [
         ["POST", "/api/tenant/cari/musteri/odeme"],
+        ["PATCH", `/api/tenant/cari/musteri/tahsilat/${id}`],
+        ["DELETE", `/api/tenant/cari/musteri/tahsilat/${id}`],
         ["PATCH", `/api/tenant/cari/musteri/${id}/bakiye`],
         ["DELETE", `/api/tenant/musteriler/${id}`],
         ["POST", "/api/tenant/cari/tedarikci/odeme"],
@@ -43,4 +47,13 @@ test("Cari hareket modeli profesyonel ödeme yöntemlerini ve düzeltme izini de
     assert.ok(CariHareket.schema.path("bakiyeDegisimi"));
     assert.ok(CariHareket.schema.path("oncekiBakiye"));
     assert.ok(CariHareket.schema.path("sonrakiBakiye"));
+});
+
+test("Cari arayüzü aktif tarafa göre yeni kayıt açar ve müşteri güncellemesini CSRF uyumlu API ile yapar", () => {
+    const js = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
+    assert.match(js, /aktif === "musteri" \? "\+ Yeni Müşteri" : "\+ Yeni Tedarikçi"/);
+    assert.match(js, /aktif === "musteri" \? yeniMusteriPaneli\(\) : tedarikciFormAc\(\)/);
+    assert.match(js, /await api\(`\/api\/tenant\/musteriler\/\$\{encodeURIComponent\(id\)\}`/);
+    assert.match(js, /musteriTahsilatDuzenleFormu/);
+    assert.match(js, /Tutarı Değiştir/);
 });
