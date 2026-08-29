@@ -4,7 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const uygulama = require("./uygulama");
 
-test("BAHADIR ERP sağlık endpointi çalışır", async () => {
+test("BenimMuhasebe sağlık endpointi çalışır", async () => {
     const server = await new Promise((resolve, reject) => {
         const instance = uygulama.listen(0, "127.0.0.1", () => resolve(instance));
         instance.once("error", reject);

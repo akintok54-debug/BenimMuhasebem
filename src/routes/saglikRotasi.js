@@ -1,7 +1,7 @@
 ﻿function saglikRotasi(req, res) {
     res.json({
         basarili: true,
-        sistem: "BAHADIR ERP V2",
+        sistem: "BenimMuhasebe İşletme Yönetimi",
         durum: "CALISIYOR",
         zaman: new Date().toISOString()
     });

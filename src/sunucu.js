@@ -10,7 +10,7 @@ const HOST = "127.0.0.1";
 async function baslat() {
     try {
         productionGuvenlikDogrula();
-        console.log("BAHADIR ERP V2 başlatılıyor...");
+        console.log("BenimMuhasebe İşletme Yönetimi başlatılıyor...");
         console.log("HOST:", HOST);
         console.log("PORT:", PORT);
 
@@ -21,7 +21,7 @@ async function baslat() {
         const server = uygulama.listen(PORT, HOST, () => {
             console.log("");
             console.log("====================================");
-            console.log(" BAHADIR ERP V2");
+            console.log(" BenimMuhasebe İşletme Yönetimi");
             console.log("====================================");
             console.log(`Sunucu: http://${HOST}:${PORT}`);
             console.log(`Sağlık: http://${HOST}:${PORT}/api/saglik`);
@@ -36,7 +36,7 @@ async function baslat() {
 
     } catch (error) {
         console.error("");
-        console.error("BAHADIR ERP BASLATILAMADI:");
+        console.error("BENİMMUHASEBE BAŞLATILAMADI:");
         console.error(error);
         process.exit(1);
     }
