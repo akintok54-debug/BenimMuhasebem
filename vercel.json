@@ -1,6 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "benimmuhasebe.com" }],
+      "destination": "https://www.benimmuhasebe.com/:path*",
+      "permanent": true
+    },
     { "source": "/", "destination": "/erp/login.html", "permanent": false },
     { "source": "/giris", "destination": "/erp/login.html", "permanent": false },
     { "source": "/login", "destination": "/erp/login.html", "permanent": false }
