@@ -1,6 +1,26 @@
 ﻿(() => {
     "use strict";
 
+    function sonKullaniciMetinleriniDuzelt(kok) {
+        if (!kok) return;
+        const walker = document.createTreeWalker(kok, NodeFilter.SHOW_TEXT);
+        const dugumler = [];
+        while (walker.nextNode()) dugumler.push(walker.currentNode);
+        for (const dugum of dugumler) {
+            let metin = dugum.nodeValue;
+            metin = metin.replace(/BAHADIR ERP/gi, "BenimMuhasebe");
+            metin = metin.replace(/BENİMMUHASEBE ERP/gi, "BENİMMUHASEBE İŞLETME YÖNETİMİ");
+            metin = metin.replace(/\bERP\b/g, "İşletme Yönetimi");
+            metin = metin.replace(/\s+V2\b/g, "");
+            metin = metin.replace(/Tenant bağlantısı aktif/gi, "İşletme hesabınız aktif");
+            metin = metin.replace(/Tenant İzolasyonu/gi, "Firma Veri Güvenliği");
+            if (metin !== dugum.nodeValue) dugum.nodeValue = metin;
+        }
+    }
+    const metinGozlemcisi = new MutationObserver(degisiklikler => degisiklikler.forEach(degisiklik => degisiklik.addedNodes.forEach(node => sonKullaniciMetinleriniDuzelt(node.nodeType === Node.TEXT_NODE ? node.parentNode : node))));
+    sonKullaniciMetinleriniDuzelt(document.body);
+    metinGozlemcisi.observe(document.body, { childList: true, subtree: true });
+
     const content = document.getElementById("content");
     const pageTitle = document.getElementById("pageTitle");
 
@@ -851,7 +871,7 @@
 
             if (tenantInfo) {
                 tenantInfo.textContent =
-                    "Tenant bağlantısı aktif";
+                    "İşletme hesabınız aktif";
             }
 
             content.innerHTML = `
@@ -859,7 +879,7 @@
 
                     <div>
                         <div class="eyebrow">
-                            BEN&#304;MMUHASEBE ERP
+                            BEN&#304;MMUHASEBE İŞLETME YÖNETİMİ
                         </div>
 
                         <h2>Kontrol Paneli</h2>
@@ -1184,7 +1204,7 @@
                             <div>
                                 <h2>Bugün Ne Yapmalıyım?</h2>
                                 <p>
-                                    ERP'nin sana yardımcı olması için
+                                    İşletmenizi yönetmenize yardımcı olacak
                                     önemli kontrol noktaları
                                 </p>
                             </div>
@@ -1219,7 +1239,7 @@
                             <div>
                                 <h2>Hızlı Yönetim</h2>
                                 <p>
-                                    ERP'yi daha verimli kullan
+                                    Günlük işlemlere hızlı erişin
                                 </p>
                             </div>
 
@@ -3885,7 +3905,7 @@
         if (!pencere) return alert("Döküm için açılır pencereye izin verin.");
         pencere.opener = null;
         const hucreler = satirlar.map(row => `<tr>${row.map(x => `<td>${escapeHtml(x ?? "-")}</td>`).join("")}</tr>`).join("");
-        pencere.document.write(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${escapeHtml(baslik)}</title><style>body{font:12px Arial;color:#172033;margin:28px}h1{font-size:22px;margin:0 0 5px}.meta{color:#64748b;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #cbd5e1;padding:7px;text-align:left}th{background:#e2e8f0}.footer{margin-top:24px;color:#475569}@media print{button{display:none}}</style></head><body><h1>BAHADIR ERP · ${escapeHtml(baslik)}</h1><div class="meta">Döküm tarihi: ${new Date().toLocaleString("tr-TR")}</div><table><thead><tr>${kolonlar.map(x => `<th>${escapeHtml(x)}</th>`).join("")}</tr></thead><tbody>${hucreler || `<tr><td colspan="${kolonlar.length}">Kayıt yok</td></tr>`}</tbody></table><div class="footer">${escapeHtml(altBilgi)}</div><script>window.onload=()=>window.print()<\/script></body></html>`);
+        pencere.document.write(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>${escapeHtml(baslik)}</title><style>body{font:12px Arial;color:#172033;margin:28px}h1{font-size:22px;margin:0 0 5px}.meta{color:#64748b;margin-bottom:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #cbd5e1;padding:7px;text-align:left}th{background:#e2e8f0}.footer{margin-top:24px;color:#475569}@media print{button{display:none}}</style></head><body><h1>BenimMuhasebe · ${escapeHtml(baslik)}</h1><div class="meta">Döküm tarihi: ${new Date().toLocaleString("tr-TR")}</div><table><thead><tr>${kolonlar.map(x => `<th>${escapeHtml(x)}</th>`).join("")}</tr></thead><tbody>${hucreler || `<tr><td colspan="${kolonlar.length}">Kayıt yok</td></tr>`}</tbody></table><div class="footer">${escapeHtml(altBilgi)}</div><script>window.onload=()=>window.print()<\/script></body></html>`);
         pencere.document.close();
     }
 
@@ -4158,7 +4178,7 @@
             const firmaAc = () => { panel.innerHTML=`<div class="dashboard-panel"><h2>Firma ve Resmî Bilgiler</h2><form class="erp-form-grid">${[["unvan","Firma Ünvanı"],["yetkili","Yetkili"],["vergiDairesi","Vergi Dairesi"],["vergiNo","Vergi / T.C. No"],["telefon","Telefon"],["web","Web Sitesi"],["il","İl"],["ilce","İlçe"],["postaKodu","Posta Kodu"]].map(([k,l])=>`<label>${l}<input name="${k}" value="${escapeHtml(firma[k]||"")}"></label>`).join("")}<label class="full">Adres<textarea name="adres">${escapeHtml(firma.adres||"")}</textarea></label>${durum("firmaMesaj")}<div class="full"><button class="erp-primary-button">Firma Bilgilerini Kaydet</button></div></form></div>`;panel.querySelector("form").onsubmit=async e=>{e.preventDefault();try{await api("/api/tenant/firma",{method:"PATCH",body:JSON.stringify(Object.fromEntries(new FormData(e.currentTarget)))});panel.querySelector("#firmaMesaj").innerHTML='<div class="success">Firma bilgileri kaydedildi.</div>';}catch(err){panel.querySelector("#firmaMesaj").innerHTML=`<div class="error">${escapeHtml(err.message)}</div>`;}}; };
             const belgeler = () => { panel.innerHTML=`<div class="dashboard-panel"><div class="panel-heading"><div><h2>Fatura ve İrsaliye Tasarımcısı</h2><p>Seçimler kullanıcı hesabınıza özel saklanır.</p></div></div><form><h3>Fatura Şablonu</h3><div class="settings-template-grid">${a.hazirSablonlar.map(x=>`<label class="settings-template-card"><input type="radio" name="faturaSablonu" value="${x.id}" ${b.faturaSablonu===x.id?"checked":""}><span class="template-mini template-mini-${x.id}"><b>${x.ad}</b><small>${x.aciklama}</small></span></label>`).join("")}</div><div class="erp-form-grid"><label>İrsaliye Şablonu<select name="irsaliyeSablonu">${a.hazirSablonlar.map(x=>`<option value="${x.id}" ${b.irsaliyeSablonu===x.id?"selected":""}>${x.ad}</option>`).join("")}</select></label><label>Ana Renk<input name="anaRenk" type="color" value="${escapeHtml(b.anaRenk||"#2563eb")}"></label><label>Vurgu Rengi<input name="vurguRengi" type="color" value="${escapeHtml(b.vurguRengi||"#0f172a")}"></label><label>Belge Başlığı<input name="belgeBasligi" maxlength="100" value="${escapeHtml(b.belgeBasligi||"")}"></label><label class="full">Logo URL<input name="logo" value="${escapeHtml(b.logo||"")}" placeholder="https://..."></label><label class="full">Dipnot<textarea name="dipnot" maxlength="500">${escapeHtml(b.dipnot||"")}</textarea></label>${["bankaBilgisiGoster","vergiBilgisiGoster","imzaAlaniGoster"].map((k,i)=>`<label><span><input name="${k}" type="checkbox" ${b[k]!==false?"checked":""}> ${["Banka bilgilerini göster","Vergi bilgilerini göster","İmza alanı göster"][i]}</span></label>`).join("")}${durum("belgeMesaj")}<div class="full"><button class="erp-primary-button">Kişisel Şablonumu Kaydet</button></div></div></form></div>`;panel.querySelector("form").onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,body=Object.fromEntries(new FormData(f));["bankaBilgisiGoster","vergiBilgisiGoster","imzaAlaniGoster"].forEach(k=>body[k]=f.elements[k].checked);try{await api("/api/tenant/ayarlar/belgeler",{method:"PATCH",body:JSON.stringify(body)});panel.querySelector("#belgeMesaj").innerHTML='<div class="success">Şablonunuz kaydedildi.</div>';}catch(err){panel.querySelector("#belgeMesaj").innerHTML=`<div class="error">${escapeHtml(err.message)}</div>`;}}; };
             const entegrasyonlar = () => { panel.innerHTML=`<div class="settings-integration-grid">${a.entegrasyonlar.map(x=>`<form class="dashboard-panel integration-card" data-ent="${x.tip}"><div class="panel-heading"><div><h3>${entegrasyonAdlari[x.tip]}</h3><p>${x.aktif?"Aktif":"Yapılandırılmadı"}${x.gizliAnahtarKayitli?" · Anahtar kayıtlı":""}</p></div><input name="aktif" type="checkbox" ${x.aktif?"checked":""}></div><label>Sağlayıcı<input name="saglayici" value="${escapeHtml(x.saglayici)}"></label><label>HTTPS API Adresi<input name="apiUrl" value="${escapeHtml(x.apiUrl)}" placeholder="https://api..."></label><label>Hesap / Firma Kodu<input name="hesapKodu" value="${escapeHtml(x.hesapKodu)}"></label><label>API Anahtarı<input name="gizliAnahtar" type="password" autocomplete="new-password" placeholder="${x.gizliAnahtarKayitli?"Kayıtlı — değiştirmek için yazın":"Gizli anahtar"}"></label><div data-ent-mesaj></div><button class="erp-primary-button">Kaydet</button></form>`).join("")}</div>`;panel.querySelectorAll("[data-ent]").forEach(f=>f.onsubmit=async e=>{e.preventDefault();const body=Object.fromEntries(new FormData(f));body.aktif=f.elements.aktif.checked;try{await api(`/api/tenant/ayarlar/entegrasyonlar/${f.dataset.ent}`,{method:"PATCH",body:JSON.stringify(body)});f.querySelector("[data-ent-mesaj]").innerHTML='<div class="success">Kaydedildi.</div>';}catch(err){f.querySelector("[data-ent-mesaj]").innerHTML=`<div class="error">${escapeHtml(err.message)}</div>`;}}); };
-            const guvenlik = () => { panel.innerHTML=`<div class="dashboard-grid">${card("Tenant İzolasyonu","Aktif","Firma verileri ayrıdır")}${card("Gizli Anahtarlar","AES-256-GCM","API yanıtında gösterilmez")}${card("Kişisel Şablon","Aktif","Kullanıcı bazında tasarım")}${card("Yedekleme",g.otomatikYedekleme!==false?"Açık":"Kapalı","Genel ayarlardan yönetilir")}</div><div class="dashboard-panel"><h2>Güvenlik Kontrolü</h2><p>API anahtarlarını düzenli yenileyin, yalnızca HTTPS servisleri kullanın ve kritik işlemler için çift onayı etkinleştirin.</p></div>`; };
+            const guvenlik = () => { panel.innerHTML=`<div class="dashboard-grid">${card("Firma Veri Güvenliği","Aktif","Her işletmenin verileri ayrıdır")}${card("Gizli Anahtarlar","Güvenli","Hassas bilgiler korunur")}${card("Kişisel Şablon","Aktif","Kullanıcı bazında tasarım")}${card("Yedekleme",g.otomatikYedekleme!==false?"Açık":"Kapalı","Genel ayarlardan yönetilir")}</div><div class="dashboard-panel"><h2>Güvenlik Kontrolü</h2><p>Entegrasyon anahtarlarını düzenli yenileyin, yalnızca güvenli bağlantıları kullanın ve kritik işlemler için çift onayı etkinleştirin.</p></div>`; };
             const ac=key=>{content.querySelectorAll("[data-ayar-tab]").forEach(x=>x.classList.toggle("active",x.dataset.ayarTab===key));({genel,firma:firmaAc,belgeler,entegrasyonlar,guvenlik}[key]||genel)();};content.querySelectorAll("[data-ayar-tab]").forEach(x=>x.onclick=()=>ac(x.dataset.ayarTab));ac("genel");
         } catch(error) { errorBox(error); }
     }
@@ -4251,6 +4271,48 @@
         } catch (error) { errorBox(error); }
     }
 
+    function finansPara(value, paraBirimi = "TRY") {
+        return new Intl.NumberFormat("tr-TR", { style: "currency", currency: ["TRY", "USD", "EUR"].includes(paraBirimi) ? paraBirimi : "TRY" }).format(Number(value || 0));
+    }
+
+    function finansHesapAdi(hesap) { return hesap?.ad || hesap?.bankaAdi || "Hesap"; }
+
+    async function finansHesapFormu(tip, mevcut = null) {
+        document.getElementById("finansModal")?.remove();
+        const banka = tip === "BANKA", v = mevcut || {}, overlay = document.createElement("div"); overlay.id = "finansModal"; overlay.className = "erp-modal-overlay";
+        overlay.innerHTML = `<div class="erp-modal"><div class="erp-modal-header"><div><h2>${mevcut ? "Hesabı Düzenle" : banka ? "Yeni Banka Hesabı" : "Yeni Kasa"}</h2><p>${mevcut ? "Hesap bilgileri ve kullanım durumu" : "Açılış bakiyesi işlem geçmişine otomatik kaydedilir."}</p></div><button class="erp-modal-close">×</button></div><form><div class="erp-form-grid"><label>Hesap Kodu<input name="kod" required maxlength="30" value="${escapeHtml(v.kod || "")}"></label><label>${banka ? "Banka Adı" : "Kasa Adı"}<input name="${banka ? "bankaAdi" : "ad"}" required value="${escapeHtml(finansHesapAdi(v) === "Hesap" ? "" : finansHesapAdi(v))}"></label>${banka ? `<label>Şube<input name="sube" value="${escapeHtml(v.sube || "")}"></label><label>Hesap No<input name="hesapNo" value="${escapeHtml(v.hesapNo || "")}"></label><label class="full">IBAN<input name="iban" value="${escapeHtml(v.iban || "")}" placeholder="TR..."></label>` : ""}<label>Para Birimi<select name="paraBirimi" ${mevcut && Number(v.bakiye || 0) !== 0 ? "disabled" : ""}>${[["TRY", "Türk Lirası"], ["USD", "Amerikan Doları"], ["EUR", "Euro"]].map(([kod, ad]) => `<option value="${kod}" ${(v.paraBirimi || "TRY") === kod ? "selected" : ""}>${ad}</option>`).join("")}</select></label>${mevcut ? `<label>Durum<select name="aktif"><option value="true" ${v.aktif !== false ? "selected" : ""}>Aktif</option><option value="false" ${v.aktif === false ? "selected" : ""}>Pasif</option></select></label>` : `<label>Açılış Bakiyesi<input name="bakiye" type="number" step="0.01" value="0"></label>`}<label class="full">Açıklama<textarea name="aciklama">${escapeHtml(v.aciklama || "")}</textarea></label></div><div id="finansMesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button" data-kapat>Vazgeç</button><button class="erp-primary-button">Kaydet</button></div></form></div>`;
+        document.body.appendChild(overlay); const kapat = () => overlay.remove(); overlay.querySelectorAll(".erp-modal-close,[data-kapat]").forEach(x => x.onclick = kapat);
+        overlay.querySelector("form").onsubmit = async event => { event.preventDefault(); const mesaj = overlay.querySelector("#finansMesaj"); try { const body = Object.fromEntries(new FormData(event.currentTarget)); body.aktif = body.aktif !== "false"; if (!mevcut) body.bakiye = Number(body.bakiye || 0); const url = mevcut ? `/api/tenant/finans/hesaplar/${tip}/${mevcut._id}` : `/api/tenant/finans/${banka ? "bankalar" : "kasalar"}`; const sonuc = await api(url, { method: mevcut ? "PATCH" : "POST", body: JSON.stringify(body) }); mesaj.innerHTML = `<div class="success">${escapeHtml(sonuc.mesaj)}</div>`; setTimeout(() => { kapat(); finansYukle("hesaplar"); }, 450); } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } };
+    }
+
+    function finansHareketFormu(data, varsayilan = {}) {
+        const hesaplar = [...(data.kasalar || []).map(x => ({ ...x, tip: "KASA" })), ...(data.bankalar || []).map(x => ({ ...x, tip: "BANKA" }))].filter(x => x.aktif !== false);
+        document.getElementById("finansModal")?.remove(); const overlay = document.createElement("div"); overlay.id = "finansModal"; overlay.className = "erp-modal-overlay";
+        overlay.innerHTML = `<div class="erp-modal" style="max-width:680px"><div class="erp-modal-header"><div><h2>Para Girişi / Çıkışı</h2><p>Satış ve cari dışındaki nakit hareketlerini belge numarasıyla kaydedin.</p></div><button class="erp-modal-close">×</button></div><form><div class="erp-form-grid"><label>Hesap<select name="hesap" required><option value="">Hesap seçin</option>${hesaplar.map(x => `<option value="${x.tip}|${x._id}" ${String(x._id) === String(varsayilan.hesapId || "") ? "selected" : ""}>${x.tip === "KASA" ? "Kasa" : "Banka"} · ${escapeHtml(finansHesapAdi(x))} · ${finansPara(x.bakiye, x.paraBirimi)}</option>`).join("")}</select></label><label>İşlem<select name="tip"><option value="GIRIS">Para Girişi</option><option value="CIKIS">Para Çıkışı</option></select></label><label>Tutar<input name="tutar" type="number" min="0.01" step="0.01" required></label><label>Tarih<input name="tarih" type="date" value="${new Date().toISOString().slice(0, 10)}" required></label><label>Belge / Fiş No<input name="belgeNo" value="NK-${Date.now()}"></label><label class="full">Açıklama<input name="aciklama" required placeholder="İşlemin nedeni"></label></div><div id="finansMesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button" data-kapat>Vazgeç</button><button class="erp-primary-button">İşlemi Kaydet</button></div></form></div>`;
+        document.body.appendChild(overlay); const kapat = () => overlay.remove(); overlay.querySelectorAll(".erp-modal-close,[data-kapat]").forEach(x => x.onclick = kapat); overlay.querySelector("form").onsubmit = async event => { event.preventDefault(); const fd = new FormData(event.currentTarget), [hesapTipi, hesapId] = String(fd.get("hesap")).split("|"); try { const sonuc = await api("/api/tenant/finans/para-hareketleri", { method: "POST", body: JSON.stringify({ hesapTipi, hesapId, tip: fd.get("tip"), tutar: Number(fd.get("tutar")), tarih: fd.get("tarih"), belgeNo: fd.get("belgeNo"), aciklama: fd.get("aciklama") }) }); overlay.querySelector("#finansMesaj").innerHTML = `<div class="success">${escapeHtml(sonuc.mesaj)}</div>`; setTimeout(() => { kapat(); finansYukle("hareketler"); }, 450); } catch (error) { overlay.querySelector("#finansMesaj").innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } };
+    }
+
+    function finansTransferFormu(data) {
+        const hesaplar = [...(data.kasalar || []).map(x => ({ ...x, tip: "KASA" })), ...(data.bankalar || []).map(x => ({ ...x, tip: "BANKA" }))].filter(x => x.aktif !== false);
+        document.getElementById("finansModal")?.remove(); const overlay = document.createElement("div"); overlay.id = "finansModal"; overlay.className = "erp-modal-overlay", secenekler = hesaplar.map(x => `<option value="${x.tip}|${x._id}" data-currency="${x.paraBirimi || "TRY"}">${x.tip === "KASA" ? "Kasa" : "Banka"} · ${escapeHtml(finansHesapAdi(x))} · ${finansPara(x.bakiye, x.paraBirimi)}</option>`).join("");
+        overlay.innerHTML = `<div class="erp-modal" style="max-width:680px"><div class="erp-modal-header"><div><h2>Hesaplar Arası Transfer</h2><p>Aynı para birimindeki kasa ve banka hesapları arasında aktarım yapın.</p></div><button class="erp-modal-close">×</button></div><form><div class="erp-form-grid"><label>Kaynak Hesap<select name="kaynak" required><option value="">Seçin</option>${secenekler}</select></label><label>Hedef Hesap<select name="hedef" required><option value="">Seçin</option>${secenekler}</select></label><label>Tutar<input name="tutar" type="number" min="0.01" step="0.01" required></label><label>Tarih<input name="tarih" type="date" value="${new Date().toISOString().slice(0, 10)}" required></label><label>Transfer No<input name="belgeNo" value="TRF-${Date.now()}"></label><label class="full">Açıklama<input name="aciklama" value="Hesaplar arası transfer"></label></div><div id="finansMesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button" data-kapat>Vazgeç</button><button class="erp-primary-button">Transferi Tamamla</button></div></form></div>`;
+        document.body.appendChild(overlay); const kapat = () => overlay.remove(); overlay.querySelectorAll(".erp-modal-close,[data-kapat]").forEach(x => x.onclick = kapat); overlay.querySelector("form").onsubmit = async event => { event.preventDefault(); const fd = new FormData(event.currentTarget), [kaynakHesapTipi, kaynakHesapId] = String(fd.get("kaynak")).split("|"), [hedefHesapTipi, hedefHesapId] = String(fd.get("hedef")).split("|"); try { const sonuc = await api("/api/tenant/finans/transfer", { method: "POST", body: JSON.stringify({ kaynakHesapTipi, kaynakHesapId, hedefHesapTipi, hedefHesapId, tutar: Number(fd.get("tutar")), tarih: fd.get("tarih"), belgeNo: fd.get("belgeNo"), aciklama: fd.get("aciklama") }) }); overlay.querySelector("#finansMesaj").innerHTML = `<div class="success">${escapeHtml(sonuc.mesaj)}</div>`; setTimeout(() => { kapat(); finansYukle("hareketler"); }, 450); } catch (error) { overlay.querySelector("#finansMesaj").innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } };
+    }
+
+    async function finansYukle(aktifSekme = "ozet") {
+        setTitle("Kasa ve Bankalar"); loading("Finansal durum hazırlanıyor...");
+        try {
+            const data = await api("/api/tenant/finans/ozet"), hesaplar = [...(data.kasalar || []).map(x => ({ ...x, tip: "KASA" })), ...(data.bankalar || []).map(x => ({ ...x, tip: "BANKA" }))], hesapMap = new Map(hesaplar.map(x => [`${x.tip}|${x._id}`, x])), genel = data.toplamlar?.genel || { TRY: data.toplamNakit || 0, USD: 0, EUR: 0 }, ay = data.nakitAkisi?.ay || {};
+            const hesapAdi = hareket => finansHesapAdi(hesapMap.get(`${hareket.hesapTipi}|${hareket.hesapId}`));
+            const hareketTablosu = rows => `<div class="table-scroll"><table><thead><tr><th>Tarih</th><th>Hesap</th><th>Belge</th><th>Açıklama</th><th>Kaynak</th><th>Giriş</th><th>Çıkış</th><th>İşlemi Yapan</th></tr></thead><tbody>${rows.length ? rows.map(x => `<tr data-finans-hareket><td>${tarihKisa(x.tarih)}</td><td><b>${escapeHtml(hesapAdi(x))}</b><small>${escapeHtml(x.hesapTipi)}</small></td><td>${escapeHtml(x.belgeNo || "-")}</td><td>${escapeHtml(x.aciklama || "-")}</td><td>${escapeHtml(x.kaynak || "-")}</td><td class="sales-clear">${x.tip === "GIRIS" ? finansPara(x.tutar, x.paraBirimi) : "-"}</td><td class="sales-debt">${x.tip === "CIKIS" ? finansPara(x.tutar, x.paraBirimi) : "-"}</td><td>${escapeHtml(x.kullaniciId?.adSoyad || x.kullaniciId?.email || "Sistem")}</td></tr>`).join("") : '<tr><td colspan="8">Henüz para hareketi yok.</td></tr>'}</tbody></table></div>`;
+            content.innerHTML = `<div class="purchase-hero"><div><span>FİNANS YÖNETİMİ</span><h2>Kasa, banka ve nakit kontrolü</h2><p>Tüm hesap bakiyelerini, para akışını ve transferleri tek merkezden yönetin.</p></div><div class="stock-hero-actions"><button id="finansExcel">Excel Dökümü</button><button id="finansHareket">+ Para Girişi / Çıkışı</button><button id="finansTransfer">Hesaplar Arası Transfer</button><button id="finansYeniKasa">+ Yeni Kasa</button><button id="finansYeniBanka">+ Yeni Banka</button></div></div><div class="dashboard-grid">${card("Toplam Türk Lirası", finansPara(genel.TRY, "TRY"), "Kasa ve banka")}${card("Toplam Dolar", finansPara(genel.USD, "USD"), "USD hesapları")}${card("Toplam Euro", finansPara(genel.EUR, "EUR"), "EUR hesapları")}${card("Bu Ay Para Girişi", finansPara(ay.TRY?.giris || 0), "Transferler hariç")}${card("Bu Ay Para Çıkışı", finansPara(ay.TRY?.cikis || 0), "Transferler hariç")}</div><div class="stock-tabs">${[["ozet", "Genel Bakış"], ["hesaplar", "Kasa ve Bankalar"], ["hareketler", "Hareket Geçmişi"]].map(([k, ad]) => `<button data-finans-tab="${k}" class="${aktifSekme === k ? "active" : ""}">${ad}</button>`).join("")}</div><div id="finansAltPanel"></div>`;
+            const panel = content.querySelector("#finansAltPanel"), hesaplarRender = () => { panel.innerHTML = `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Hesaplar</h2><p>Pasif hesaplar yeni işlemlerde kullanılamaz; geçmiş hareketleri korunur.</p></div><input id="finansHesapAra" class="erp-input" placeholder="Hesap ara..."></div><div class="table-scroll"><table><thead><tr><th>Tür</th><th>Kod / Hesap</th><th>Şube / IBAN</th><th>Para Birimi</th><th>Bakiye</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>${hesaplar.map(x => `<tr data-finans-hesap><td>${x.tip === "KASA" ? "Kasa" : "Banka"}</td><td><b>${escapeHtml(x.kod)}</b><small>${escapeHtml(finansHesapAdi(x))}</small></td><td>${escapeHtml(x.tip === "BANKA" ? [x.sube, x.iban].filter(Boolean).join(" · ") || "-" : x.aciklama || "-")}</td><td>${escapeHtml(x.paraBirimi || "TRY")}</td><td><b>${finansPara(x.bakiye, x.paraBirimi)}</b></td><td>${x.aktif === false ? "Pasif" : "Aktif"}</td><td><button class="erp-small-button" data-finans-ekstre="${x.tip}|${x._id}">Ekstre</button> <button class="erp-small-button" data-finans-islem="${x.tip}|${x._id}">İşlem</button> <button class="erp-small-button" data-finans-duzenle="${x.tip}|${x._id}">Düzenle</button></td></tr>`).join("") || '<tr><td colspan="7">Henüz hesap yok.</td></tr>'}</tbody></table></div></div>`; panel.querySelector("#finansHesapAra").oninput = e => { const q = e.target.value.toLocaleLowerCase("tr-TR"); panel.querySelectorAll("[data-finans-hesap]").forEach(x => x.hidden = !x.textContent.toLocaleLowerCase("tr-TR").includes(q)); }; panel.querySelectorAll("[data-finans-duzenle]").forEach(b => b.onclick = () => { const [tip, id] = b.dataset.finansDuzenle.split("|"); finansHesapFormu(tip, hesapMap.get(`${tip}|${id}`)); }); panel.querySelectorAll("[data-finans-islem]").forEach(b => b.onclick = () => { const [, id] = b.dataset.finansIslem.split("|"); finansHareketFormu(data, { hesapId: id }); }); panel.querySelectorAll("[data-finans-ekstre]").forEach(b => b.onclick = () => { const [tip, id] = b.dataset.finansEkstre.split("|"); aktifSekme = "hareketler"; hareketlerRender((data.sonHareketler || []).filter(x => x.hesapTipi === tip && String(x.hesapId) === id), hesapMap.get(`${tip}|${id}`)); }); };
+            const hareketlerRender = (rows = data.sonHareketler || [], hesap = null) => { panel.innerHTML = `<div class="dashboard-panel"><div class="panel-heading"><div><h2>${hesap ? `${escapeHtml(finansHesapAdi(hesap))} Ekstresi` : "Para Hareketleri"}</h2><p>${rows.length} son işlem; satış, alış, tahsilat, ödeme ve transfer kayıtları birlikte gösterilir.</p></div><input id="finansHareketAra" class="erp-input" placeholder="Belge, hesap veya açıklama ara..."></div>${hareketTablosu(rows)}</div>`; panel.querySelector("#finansHareketAra").oninput = e => { const q = e.target.value.toLocaleLowerCase("tr-TR"); panel.querySelectorAll("[data-finans-hareket]").forEach(x => x.hidden = !x.textContent.toLocaleLowerCase("tr-TR").includes(q)); }; };
+            const ozetRender = () => { const aktif = hesaplar.filter(x => x.aktif !== false), kritik = aktif.filter(x => Number(x.bakiye || 0) < 0); panel.innerHTML = `<div class="sales-layout"><section class="dashboard-panel sales-wide"><div class="panel-heading"><div><h2>Son Para Hareketleri</h2><p>Nakit akışının en güncel kayıtları</p></div></div>${hareketTablosu((data.sonHareketler || []).slice(0, 12))}</section><aside class="dashboard-panel"><h2>Hesap Durumu</h2><div class="supplier-info"><div><b>Aktif Kasa</b><span>${(data.kasalar || []).filter(x => x.aktif !== false).length}</span></div><div><b>Aktif Banka</b><span>${(data.bankalar || []).filter(x => x.aktif !== false).length}</span></div><div><b>Pasif Hesap</b><span>${hesaplar.filter(x => x.aktif === false).length}</span></div><div><b>Negatif Bakiye</b><span>${kritik.length}</span></div></div></aside></div>`; };
+            const sekmeAc = key => { content.querySelectorAll("[data-finans-tab]").forEach(x => x.classList.toggle("active", x.dataset.finansTab === key)); if (key === "hesaplar") hesaplarRender(); else if (key === "hareketler") hareketlerRender(); else ozetRender(); }; content.querySelectorAll("[data-finans-tab]").forEach(x => x.onclick = () => sekmeAc(x.dataset.finansTab)); content.querySelector("#finansYeniKasa").onclick = () => finansHesapFormu("KASA"); content.querySelector("#finansYeniBanka").onclick = () => finansHesapFormu("BANKA"); content.querySelector("#finansHareket").onclick = () => finansHareketFormu(data); content.querySelector("#finansTransfer").onclick = () => finansTransferFormu(data); content.querySelector("#finansExcel").onclick = () => { if (!window.XLSX) return alert("Excel kitaplığı yüklenemedi."); const ws = XLSX.utils.json_to_sheet((data.sonHareketler || []).map(x => ({ Tarih: String(x.tarih || "").slice(0, 10), Hesap: hesapAdi(x), Tür: x.tip === "GIRIS" ? "Para Girişi" : "Para Çıkışı", "Belge No": x.belgeNo || "", Açıklama: x.aciklama || "", Kaynak: x.kaynak || "", Tutar: Number(x.tutar || 0), "Para Birimi": x.paraBirimi || "TRY", Kullanıcı: x.kullaniciId?.adSoyad || "Sistem" }))); ws["!cols"] = [{ wch: 13 }, { wch: 25 }, { wch: 15 }, { wch: 18 }, { wch: 35 }, { wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 22 }]; const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Para Hareketleri"); XLSX.writeFile(wb, `nakit-hareketleri-${new Date().toISOString().slice(0, 10)}.xlsx`, { compression: true }); }; sekmeAc(aktifSekme);
+        } catch (error) { errorBox(error); }
+    }
+
     async function sayfaYukle(page) {
         const buYukleme = ++sayfaYuklemeNo;
         if (page === "dashboard" || page === "anaSayfa" || !page) {
@@ -4325,21 +4387,8 @@
         }
 
         if (page === "finans" || page === "kasa" || page === "banka") {
-            setTitle("Kasa / Banka");
-            loading();
-            try {
-                const d = await api("/api/tenant/finans/ozet");
-                if (buYukleme !== sayfaYuklemeNo) return;
-                content.innerHTML = `
-                    <div class="dashboard-grid">
-                        ${card("Kasa", para(d.kasaToplam), "Aktif kasa bakiyesi")}
-                        ${card("Banka", para(d.bankaToplam), "Aktif banka bakiyesi")}
-                        ${card("Toplam Nakit", para(d.toplamNakit), "Kasa + banka")}
-                    </div>
-                `;
-            } catch (error) {
-                errorBox(error);
-            }
+            if (buYukleme !== sayfaYuklemeNo) return;
+            await finansYukle();
             return;
         }
 

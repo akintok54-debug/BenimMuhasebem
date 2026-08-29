@@ -149,6 +149,7 @@ async function olustur(req, res, next) {
             hesapId: hesap._id,
             tip: "CIKIS",
             tutar,
+            paraBirimi: hesap.paraBirimi || "TRY",
             aciklama: body.aciklama,
             kaynak: "MASRAF",
             tarih: body.tarih || new Date(),

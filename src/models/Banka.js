@@ -45,6 +45,12 @@ const BankaSchema = new mongoose.Schema(
             default: 0
         },
 
+        paraBirimi: {
+            type: String,
+            enum: ["TRY", "USD", "EUR"],
+            default: "TRY"
+        },
+
         aktif: {
             type: Boolean,
             default: true

@@ -37,6 +37,12 @@ const ParaHareketSchema = new mongoose.Schema(
             min: 0
         },
 
+        paraBirimi: {
+            type: String,
+            enum: ["TRY", "USD", "EUR"],
+            default: "TRY"
+        },
+
         aciklama: {
             type: String,
             trim: true,

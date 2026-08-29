@@ -478,6 +478,9 @@ async function olustur(req, res, next) {
                 tutar:
                     odenenTutar,
 
+                paraBirimi:
+                    finansHesabi.paraBirimi || "TRY",
+
                 aciklama:
                     `Satış ${belgeNo}`,
 

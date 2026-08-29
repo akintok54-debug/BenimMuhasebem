@@ -17,6 +17,7 @@ router.post("/kasalar", yetkiKontrol("cash.write"), controller.kasaOlustur);
 
 router.get("/bankalar", controller.bankaListele);
 router.post("/bankalar", yetkiKontrol("cash.write"), controller.bankaOlustur);
+router.patch("/hesaplar/:tip/:id", yetkiKontrol("cash.write"), controller.hesapGuncelle);
 
 router.get("/para-hareketleri", controller.paraHareketleri);
 router.post("/para-hareketleri", yetkiKontrol("cash.write"), controller.hesapHareketi);

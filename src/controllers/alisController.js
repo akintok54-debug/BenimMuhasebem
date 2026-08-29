@@ -331,7 +331,7 @@ async function olustur(req, res, next) {
             odemeHesabi.bakiye -= odenenTutar;
             await odemeHesabi.save();
             const odemeCari = await CariHareket.create({ tenantId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id, tip: "ODEME", tutar: odenenTutar, belgeNo, aciklama: `Alış ödemesi ${belgeNo}`, kaynak: "ALIS_ODEME", kaynakId: alis._id, tarih: body.tarih || new Date(), kullaniciId: req.kullanici?._id || req.user?._id || null });
-            await ParaHareket.create({ tenantId, hesapTipi, hesapId: odemeHesabi._id, tip: "CIKIS", tutar: odenenTutar, belgeNo, aciklama: `Alış ödemesi ${belgeNo}`, kaynak: "ALIS_ODEME", kaynakId: odemeCari._id, tarih: body.tarih || new Date(), kullaniciId: req.kullanici?._id || req.user?._id || null });
+            await ParaHareket.create({ tenantId, hesapTipi, hesapId: odemeHesabi._id, tip: "CIKIS", tutar: odenenTutar, paraBirimi: odemeHesabi.paraBirimi || "TRY", belgeNo, aciklama: `Alış ödemesi ${belgeNo}`, kaynak: "ALIS_ODEME", kaynakId: odemeCari._id, tarih: body.tarih || new Date(), kullaniciId: req.kullanici?._id || req.user?._id || null });
         }
 
         return res.status(201).json({
