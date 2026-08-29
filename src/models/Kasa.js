@@ -33,6 +33,12 @@ const KasaSchema = new mongoose.Schema(
             default: "TRY"
         },
 
+        kasaTuru: {
+            type: String,
+            enum: ["NAKIT", "DIGER"],
+            default: "NAKIT"
+        },
+
         aktif: {
             type: Boolean,
             default: true

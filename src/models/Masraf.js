@@ -30,6 +30,11 @@ const MasrafSchema = new mongoose.Schema(
                 "SGK",
                 "REKLAM",
                 "OFIS",
+                "YEMEK",
+                "SEYAHAT",
+                "BAKIM",
+                "TEMIZLIK",
+                "SIGORTA",
                 "DIGER"
             ],
             default: "DIGER",
@@ -41,6 +46,14 @@ const MasrafSchema = new mongoose.Schema(
             trim: true,
             required: true
         },
+
+        firma: { type: String, trim: true, default: "" },
+        fisNo: { type: String, trim: true, default: "" },
+        fisGorseli: { type: String, default: "" },
+        notlar: { type: String, trim: true, default: "" },
+        kdvOrani: { type: Number, min: 0, max: 100, default: 0 },
+        kdvTutari: { type: Number, min: 0, default: 0 },
+        aracPlaka: { type: String, trim: true, uppercase: true, default: "" },
 
         tutar: {
             type: Number,
@@ -60,6 +73,12 @@ const MasrafSchema = new mongoose.Schema(
             index: true
         },
 
+        paraBirimi: {
+            type: String,
+            enum: ["TRY", "USD", "EUR"],
+            default: "TRY"
+        },
+
         odemeDurumu: {
             type: String,
             enum: [
@@ -68,6 +87,18 @@ const MasrafSchema = new mongoose.Schema(
             ],
             default: "ODENDI"
         },
+
+        durum: {
+            type: String,
+            enum: ["AKTIF", "IPTAL"],
+            default: "AKTIF",
+            index: true
+        },
+
+        iptalTarihi: { type: Date, default: null },
+        iptalNedeni: { type: String, trim: true, default: "" },
+        iptalEdenKullaniciId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null },
+        iptalParaHareketId: { type: mongoose.Schema.Types.ObjectId, ref: "ParaHareket", default: null },
 
         kaynak: {
             type: String,

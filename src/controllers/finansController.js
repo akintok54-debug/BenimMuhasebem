@@ -44,7 +44,9 @@ async function kasaOlustur(req, res, next) {
         const body = req.body || {}, bakiye = Number(body.bakiye || 0);
         if (!metin(body.kod) || !metin(body.ad)) return res.status(400).json({ basarili: false, mesaj: "Kasa kodu ve kasa adı zorunludur." });
         if (!Number.isFinite(bakiye)) return res.status(400).json({ basarili: false, mesaj: "Açılış bakiyesi geçersizdir." });
-        const kasa = await Kasa.create({ tenantId: tenantId(req), kod: metin(body.kod).toUpperCase(), ad: metin(body.ad), bakiye, paraBirimi: paraBirimi(body.paraBirimi), aktif: body.aktif !== false, aciklama: metin(body.aciklama) });
+        const kasaTuru = metin(body.kasaTuru || "NAKIT").toUpperCase();
+        if (!["NAKIT", "DIGER"].includes(kasaTuru)) return res.status(400).json({ basarili: false, mesaj: "Kasa türü Nakit Kasa veya Diğer Kasa olmalıdır." });
+        const kasa = await Kasa.create({ tenantId: tenantId(req), kod: metin(body.kod).toUpperCase(), ad: metin(body.ad), bakiye, paraBirimi: paraBirimi(body.paraBirimi), kasaTuru, aktif: body.aktif !== false, aciklama: metin(body.aciklama) });
         await acilisHareketi(req, "KASA", kasa);
         res.status(201).json({ basarili: true, mesaj: "Kasa hesabı oluşturuldu.", kasa });
     } catch (error) { next(error); }
@@ -75,6 +77,11 @@ async function hesapGuncelle(req, res, next) {
         const body = req.body || {};
         if (body.kod !== undefined) hesap.kod = metin(body.kod).toUpperCase();
         if (tip === "KASA" && body.ad !== undefined) hesap.ad = metin(body.ad);
+        if (tip === "KASA" && body.kasaTuru !== undefined) {
+            const kasaTuru = metin(body.kasaTuru).toUpperCase();
+            if (!["NAKIT", "DIGER"].includes(kasaTuru)) return res.status(400).json({ basarili: false, mesaj: "Geçersiz kasa türü." });
+            hesap.kasaTuru = kasaTuru;
+        }
         if (tip === "BANKA" && body.bankaAdi !== undefined) hesap.bankaAdi = metin(body.bankaAdi);
         for (const alan of ["sube", "hesapNo", "aciklama"]) if (tip === "BANKA" || alan === "aciklama") if (body[alan] !== undefined) hesap[alan] = metin(body[alan]);
         if (tip === "BANKA" && body.iban !== undefined) hesap.iban = metin(body.iban).replace(/\s+/g, "").toUpperCase();
@@ -175,8 +182,8 @@ async function ozet(req, res, next) {
             ParaHareket.aggregate([{ $match: { tenantId: tId, tarih: { $gte: bugun }, kaynak: { $ne: "TRANSFER" } } }, { $group: { _id: { paraBirimi: "$paraBirimi", tip: "$tip" }, toplam: { $sum: "$tutar" } } }]),
             ParaHareket.aggregate([{ $match: { tenantId: tId, tarih: { $gte: ay }, kaynak: { $ne: "TRANSFER" } } }, { $group: { _id: { paraBirimi: "$paraBirimi", tip: "$tip" }, toplam: { $sum: "$tutar" } } }])
         ]);
-        const aktifKasalar = kasalar.filter(x => x.aktif !== false), aktifBankalar = bankalar.filter(x => x.aktif !== false), kasaToplamlari = paraToplamlari(aktifKasalar), bankaToplamlari = paraToplamlari(aktifBankalar);
-        res.json({ basarili: true, kasaToplam: kasaToplamlari.TRY, bankaToplam: bankaToplamlari.TRY, toplamNakit: kasaToplamlari.TRY + bankaToplamlari.TRY, toplamlar: { kasa: kasaToplamlari, banka: bankaToplamlari, genel: { TRY: kasaToplamlari.TRY + bankaToplamlari.TRY, USD: kasaToplamlari.USD + bankaToplamlari.USD, EUR: kasaToplamlari.EUR + bankaToplamlari.EUR } }, nakitAkisi: { bugun: akisToplamlari(bugunAkis), ay: akisToplamlari(ayAkis) }, kasalar, bankalar, sonHareketler });
+        const aktifKasalar = kasalar.filter(x => x.aktif !== false), aktifBankalar = bankalar.filter(x => x.aktif !== false), nakitKasalar = aktifKasalar.filter(x => (x.kasaTuru || "NAKIT") === "NAKIT"), digerKasalar = aktifKasalar.filter(x => x.kasaTuru === "DIGER"), kasaToplamlari = paraToplamlari(aktifKasalar), bankaToplamlari = paraToplamlari(aktifBankalar);
+        res.json({ basarili: true, kasaToplam: kasaToplamlari.TRY, bankaToplam: bankaToplamlari.TRY, toplamNakit: kasaToplamlari.TRY + bankaToplamlari.TRY, toplamlar: { kasa: kasaToplamlari, nakitKasa: paraToplamlari(nakitKasalar), digerKasa: paraToplamlari(digerKasalar), banka: bankaToplamlari, genel: { TRY: kasaToplamlari.TRY + bankaToplamlari.TRY, USD: kasaToplamlari.USD + bankaToplamlari.USD, EUR: kasaToplamlari.EUR + bankaToplamlari.EUR } }, nakitAkisi: { bugun: akisToplamlari(bugunAkis), ay: akisToplamlari(ayAkis) }, kasalar, bankalar, sonHareketler });
     } catch (error) { next(error); }
 }
 
