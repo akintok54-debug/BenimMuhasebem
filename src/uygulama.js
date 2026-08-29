@@ -9,12 +9,14 @@ const morgan = require("morgan");
 const hataYonetici = require("./middleware/hataYonetici");
 const saglikRotasi = require("./routes/saglikRotasi");
 const authRotasi = require("./modules/auth/routes/authRotasi");
-const { rateLimit, istekKimligi, girdiTemizleme, httpsZorunlulugu } = require("./middleware/guvenlikKatmani");
+const { rateLimit, istekKimligi, girdiTemizleme, httpsZorunlulugu, kanonikAlanAdi } = require("./middleware/guvenlikKatmani");
 const auditMiddleware = require("./middleware/auditMiddleware");
 const { csrfKontrol } = require("./services/oturumGuvenligi");
 
 const uygulama = express();
 if (process.env.NODE_ENV === "production") uygulama.set("trust proxy", 1);
+
+uygulama.use(kanonikAlanAdi);
 
 uygulama.get(["/", "/giris", "/login"], (req, res) => {
     res.redirect(302, "/erp/login.html");
@@ -26,7 +28,6 @@ uygulama.use(auditMiddleware);
 const corsIzinleri = new Set([
     ...String(process.env.CORS_ORIGINS || "").split(","),
     process.env.PUBLIC_APP_URL,
-    "https://benimmuhasebe.com",
     "https://www.benimmuhasebe.com"
 ].map(x => String(x || "").trim().replace(/\/$/, "")).filter(Boolean));
 uygulama.use(cors({

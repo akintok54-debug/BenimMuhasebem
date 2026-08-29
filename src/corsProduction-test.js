@@ -17,7 +17,7 @@ async function istek(origin) {
     }
 }
 
-for (const origin of ["https://benimmuhasebe.com", "https://www.benimmuhasebe.com"]) {
+for (const origin of ["https://www.benimmuhasebe.com"]) {
     test(`${origin} mobil/web origin erişimine izin verilir`, async () => {
         const response = await istek(origin);
         assert.equal(response.status, 200);
@@ -25,3 +25,8 @@ for (const origin of ["https://benimmuhasebe.com", "https://www.benimmuhasebe.co
         assert.equal(response.headers.get("access-control-allow-credentials"), "true");
     });
 }
+
+test("www olmayan production origin erişimine izin verilmez", async () => {
+    const response = await istek("https://benimmuhasebe.com");
+    assert.equal(response.status, 403);
+});

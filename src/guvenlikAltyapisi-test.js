@@ -3,7 +3,7 @@ require("dotenv").config();
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const jwt = require("jsonwebtoken");
-const { guvenliAnahtarlar } = require("./middleware/guvenlikKatmani");
+const { guvenliAnahtarlar, kanonikAlanAdi } = require("./middleware/guvenlikKatmani");
 const { izinVar } = require("./middleware/yetkiKontrol");
 const { tokenOlustur, tokenDogrula } = require("./services/tokenServisi");
 const { bankaKimlikBilgisiDogrula } = require("./services/bankaEntegrasyonServisi");
@@ -62,7 +62,22 @@ test("Oturum cookie'si HttpOnly, SameSite ve production'da Secure olur", () => {
     const yazilan = [], res = { cookie: (ad, deger, secenek) => yazilan.push({ ad, deger, secenek }) };
     const eski = process.env.NODE_ENV; process.env.NODE_ENV = "production"; oturumCookieYaz(res, "jwt"); process.env.NODE_ENV = eski;
     assert.equal(yazilan[0].secenek.httpOnly, true); assert.equal(yazilan[0].secenek.secure, true); assert.equal(yazilan[0].secenek.sameSite, "strict");
+    assert.equal(yazilan[0].secenek.maxAge, 30 * 24 * 60 * 60 * 1000);
     assert.equal(yazilan[1].secenek.httpOnly, false);
+});
+
+test("Production istekleri www.benimmuhasebe.com alan adına yönlendirilir", () => {
+    const eski = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    let yonlendirme;
+    const req = { get: ad => ad === "host" ? "benimmuhasebe.com" : "", originalUrl: "/erp/login.html?x=1" };
+    const res = { redirect: (kod, adres) => { yonlendirme = { kod, adres }; } };
+    try {
+        kanonikAlanAdi(req, res, () => assert.fail("www olmayan alan adı devam etmemeliydi"));
+        assert.deepEqual(yonlendirme, { kod: 308, adres: "https://www.benimmuhasebe.com/erp/login.html?x=1" });
+    } finally {
+        process.env.NODE_ENV = eski;
+    }
 });
 
 test("Redis ve alarm webhook'u yokken güvenli fallback çalışır", async () => {

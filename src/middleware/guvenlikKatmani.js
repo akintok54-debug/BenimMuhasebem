@@ -43,4 +43,21 @@ function httpsZorunlulugu(req, res, next) {
     return res.status(426).json({ basarili: false, mesaj: "Bu işlem güvenli HTTPS bağlantısı gerektirir." });
 }
 
-module.exports = { rateLimit, istekKimligi, girdiTemizleme, httpsZorunlulugu, guvenliAnahtarlar };
+function kanonikAlanAdi(req, res, next) {
+    if (process.env.NODE_ENV !== "production") return next();
+
+    const kanonikHost = String(process.env.CANONICAL_HOST || "www.benimmuhasebe.com")
+        .trim()
+        .toLowerCase()
+        .replace(/^https?:\/\//, "")
+        .replace(/\/$/, "");
+    const istekHost = String(req.get("x-forwarded-host") || req.get("host") || "")
+        .split(",")[0]
+        .trim()
+        .toLowerCase();
+
+    if (!kanonikHost || istekHost === kanonikHost) return next();
+    return res.redirect(308, `https://${kanonikHost}${req.originalUrl}`);
+}
+
+module.exports = { rateLimit, istekKimligi, girdiTemizleme, httpsZorunlulugu, kanonikAlanAdi, guvenliAnahtarlar };
