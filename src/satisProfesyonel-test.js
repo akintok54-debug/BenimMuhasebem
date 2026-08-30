@@ -42,3 +42,13 @@ test("Profesyonel satış arayüzü temel operasyon bağlantılarını içerir",
     assert.match(css, /\.sales-kpis/);
     assert.match(css, /@media\(max-width:760px\)/);
 });
+
+test("Satış ürün araması kod, barkod ve ada göre sonuç gösterip miktarlı sepete ekler", () => {
+    const js = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
+    const css = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.css"), "utf8");
+    for (const ifade of ["data-sales-search", "salesProductResultCount", "salesProductEmpty", "data-sales-quantity", "data-sales-add", "sepeteEkle", "ürün gösteriliyor"]) assert.match(js, new RegExp(ifade));
+    assert.match(js, /\[u\.kod,u\.barkod,u\.ad,u\.marka,u\.model,u\.kategori\]/);
+    assert.match(js, /Math\.min\(stok, Math\.floor/);
+    assert.match(css, /\.sales-product-add/);
+    assert.match(css, /\.sales-cart-quantity input/);
+});
