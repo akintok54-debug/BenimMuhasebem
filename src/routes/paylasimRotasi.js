@@ -10,6 +10,7 @@ publicRouter.get("/:token", controller.paylasilanBelge);
 const tenantRouter = express.Router();
 tenantRouter.use(kimlikKontrol);
 tenantRouter.use(tenantKontrol);
+tenantRouter.use(yetkiKontrol("sales.read"));
 tenantRouter.post("/", yetkiKontrol("sales.write"), controller.paylasimOlustur);
 
 module.exports = { publicRouter, tenantRouter };

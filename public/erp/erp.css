@@ -1529,6 +1529,18 @@ th {
     margin: 12px 0 22px;
 }
 
+.permission-section { margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 18px; }
+.permission-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.permission-grid fieldset { border: 1px solid #dbe4ef; border-radius: 12px; padding: 12px; min-width: 0; background: #f8fafc; }
+.permission-grid legend { padding: 0 7px; font-weight: 800; color: #1e3a5f; }
+.permission-toggle { display: flex !important; flex-direction: row !important; align-items: flex-start !important; gap: 9px; margin: 8px 0; font-weight: 500 !important; }
+.permission-toggle input { width: 18px !important; min-width: 18px; height: 18px; margin-top: 1px; }
+
+@media (max-width: 850px) {
+    .permission-grid { grid-template-columns: 1fr; }
+    body[data-kullanici-rol="SALES"] .main { padding-bottom: 72px; }
+}
+
 .settings-template-card { cursor: pointer; }
 .settings-template-card > input { position: absolute; opacity: 0; }
 .template-mini {

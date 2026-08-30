@@ -9,6 +9,7 @@ const router = express.Router();
 
 router.use(kimlikKontrol);
 router.use(tenantKontrol);
+router.use(yetkiKontrol("party.read"));
 
 router.get("/", musteriController.listele);
 router.get("/:id", musteriController.detay);

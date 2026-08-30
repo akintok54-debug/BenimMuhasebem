@@ -9,6 +9,7 @@ const router = express.Router();
 
 router.use(kimlikKontrol);
 router.use(tenantKontrol);
+router.use(yetkiKontrol("stock.read"));
 
 router.get("/kategoriler", controller.kategorileriListele);
 router.post("/kategoriler", yetkiKontrol("stock.write"), controller.kategoriOlustur);

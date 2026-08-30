@@ -33,8 +33,12 @@
     forgotBtn.addEventListener("click", async function () {
         const emailInput = document.getElementById("email");
         if (!emailInput.value.trim()) {
-            mesaj.textContent = "Önce e-posta adresinizi yazın.";
+            mesaj.textContent = "Önce e-posta adresinizi veya telefonunuzu yazın.";
             emailInput.focus();
+            return;
+        }
+        if (!emailInput.value.includes("@")) {
+            mesaj.textContent = "Telefonla giriş yapan kullanıcıların parolasını işletme yöneticisi Kullanıcılar / Yetkiler ekranından yenileyebilir.";
             return;
         }
         forgotBtn.disabled = true;
@@ -68,7 +72,7 @@
                     "Accept": "application/json"
                 },
                 body: JSON.stringify({
-                    email: document.getElementById("email").value.trim(),
+                    kimlik: document.getElementById("email").value.trim(),
                     sifre: document.getElementById("sifre").value
                 })
             });

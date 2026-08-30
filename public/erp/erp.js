@@ -114,6 +114,30 @@
         return data;
     }
 
+    let oturumKullanici = null;
+    const rolYetkileri = {
+        MANAGER: ["sales.", "purchase.", "stock.", "party.", "reports.read"],
+        SALES: ["sales.", "party.read", "party.write", "stock.read", "reports.read"],
+        CASHIER: ["cash.", "party.read", "sales.read"],
+        ACCOUNTING: ["cash.", "accounting.", "party.", "reports.read", "sales.read", "purchase.read"],
+        WAREHOUSE: ["stock.", "sales.read", "purchase.read"], DEPO: ["stock.", "sales.read", "purchase.read"],
+        ECOMMERCE: ["sales.", "party.read", "stock.read"], ETICARET: ["sales.", "party.read", "stock.read"]
+    };
+    function oturumYetkisiVar(gerekli) {
+        const rol = String(oturumKullanici?.rol || "").toUpperCase();
+        if (["OWNER", "ADMIN"].includes(rol)) return true;
+        const izinler = oturumKullanici?.yetkiModu === "OZEL" ? (oturumKullanici.ozelYetkiler || []) : (rolYetkileri[rol] || []);
+        return izinler.some(izin => izin === gerekli || (izin.endsWith(".") && gerekli.startsWith(izin)));
+    }
+    function sayfaErisimiVar(page) {
+        const esleme = { musteriler: ["party.read"], tedarikciler: ["party.read"], urunler: ["stock.read"], stok: ["stock.read"], alis: ["purchase.read"], satis: ["sales.read"], teklifler: ["sales.read"], siparisler: ["sales.read"], eticaret: ["sales.read"], whatsapp: ["sales.read"], cari: ["party.read", "accounting.read"], finans: ["cash.read"], masraflar: ["accounting.read"], personeller: ["tenant.users"], kullanicilar: ["tenant.users"], raporlar: ["reports.read"], ayarlar: ["tenant.settings"] };
+        return !esleme[page] || esleme[page].some(oturumYetkisiVar);
+    }
+    function mobilYetkiMenusunuUygula() {
+        document.querySelectorAll("[data-page]").forEach(button => { button.hidden = !sayfaErisimiVar(button.dataset.page); });
+        document.body.dataset.kullaniciRol = String(oturumKullanici?.rol || "");
+    }
+
     function loading(text = "Yükleniyor...") {
         content.innerHTML = `
             <div class="dashboard-loading">
@@ -4295,12 +4319,26 @@
         }
     }
 
+    function kullaniciSifreFormu(kullanici) {
+        document.getElementById("kullaniciModal")?.remove(); const overlay = document.createElement("div"); overlay.id = "kullaniciModal"; overlay.className = "erp-modal-overlay";
+        overlay.innerHTML = `<div class="erp-modal" style="max-width:560px"><div class="erp-modal-header"><div><h2>Yeni Parola Belirle</h2><p>${escapeHtml(kullanici.adSoyad)} için en az 8 karakter</p></div><button class="erp-modal-close">×</button></div><form><label>Yeni parola<input name="sifre" type="password" minlength="8" maxlength="128" autocomplete="new-password" required></label><label class="permission-toggle"><input name="geciciSifre" type="checkbox"><span>İlk girişte değiştirilmek üzere geçici parola</span></label><div id="kullaniciMesaj"></div><div class="erp-modal-footer"><button type="button" data-kapat class="erp-small-button">Vazgeç</button><button class="erp-primary-button">Parolayı Kaydet</button></div></form></div>`;
+        document.body.appendChild(overlay); const kapat = () => overlay.remove(); overlay.querySelectorAll(".erp-modal-close,[data-kapat]").forEach(x => x.onclick = kapat); overlay.querySelector("form").onsubmit = async e => { e.preventDefault(); try { const f = e.currentTarget; const sonuc = await api(`/api/tenant/kullanicilar/${encodeURIComponent(kullanici.id)}/sifre`, { method: "POST", body: JSON.stringify({ sifre: f.elements.sifre.value, geciciSifre: f.elements.geciciSifre.checked }) }); overlay.querySelector("#kullaniciMesaj").innerHTML = `<div class="success">${escapeHtml(sonuc.mesaj)}</div>`; setTimeout(kapat, 650); } catch (error) { overlay.querySelector("#kullaniciMesaj").innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } };
+    }
+
+    function kullaniciFormu(data, mevcut = null) {
+        document.getElementById("kullaniciModal")?.remove(); const yonetici = mevcut && ["OWNER", "ADMIN"].includes(mevcut.rol), overlay = document.createElement("div"); overlay.id = "kullaniciModal"; overlay.className = "erp-modal-overlay";
+        const rol = mevcut?.rol || "SALES", secili = new Set(mevcut?.etkinYetkiler || data.roller.find(x => x.kod === rol)?.varsayilanYetkiler || []), gruplar = [...new Set(data.yetkiKatalogu.map(x => x.grup))];
+        overlay.innerHTML = `<div class="erp-modal" style="max-width:980px"><div class="erp-modal-header"><div><h2>${mevcut ? "Kullanıcı ve Yetkileri" : "Yeni Saha Kullanıcısı"}</h2><p>E-posta veya telefonla mobil giriş; yetkiler kutucuklarla anında uygulanır.</p></div><button class="erp-modal-close">×</button></div><form><div class="erp-form-grid"><label>Ad Soyad<input name="adSoyad" minlength="2" maxlength="100" required value="${escapeHtml(mevcut?.adSoyad || "")}"></label><label>Görev / Ünvan<input name="unvan" maxlength="100" value="${escapeHtml(mevcut?.unvan || "")}" placeholder="Saha Satış Elemanı"></label>${mevcut ? `<label>E-posta / Telefon<input disabled value="${escapeHtml(mevcut.email || mevcut.telefon || "-")}"></label>` : `<label>E-posta<input name="email" type="email" maxlength="254" placeholder="Telefon varsa isteğe bağlı"></label><label>Cep Telefonu<input name="telefon" type="tel" maxlength="30" placeholder="05xx xxx xx xx"></label><label>Başlangıç Parolası<input name="sifre" type="password" minlength="8" maxlength="128" autocomplete="new-password" required></label>`}<label>Rol<select name="rol" ${yonetici ? "disabled" : ""}>${data.roller.map(x => `<option value="${x.kod}" ${x.kod === rol ? "selected" : ""}>${escapeHtml(x.ad)}</option>`).join("")}${mevcut?.rol === "OWNER" ? '<option value="OWNER" selected>İşletme Sahibi</option>' : ""}</select></label>${mevcut ? `<label>Hesap Durumu<select name="aktif" ${yonetici ? "disabled" : ""}><option value="true" ${mevcut.aktif ? "selected" : ""}>Aktif</option><option value="false" ${!mevcut.aktif ? "selected" : ""}>Pasif — girişi engelle</option></select></label>` : ""}</div><div class="permission-section"><div class="panel-heading"><div><h3>Modül ve İşlem Yetkileri</h3><p>İşaretli kutulara izin verilir. Kritik yetkileri yalnızca gerektiğinde açın.</p></div>${!yonetici ? '<button type="button" id="rolYetkileriniUygula" class="erp-small-button">Rol Önerisini Uygula</button>' : ""}</div><div class="permission-grid">${gruplar.map(grup => `<fieldset><legend>${escapeHtml(grup)}</legend>${data.yetkiKatalogu.filter(x => x.grup === grup).map(x => `<label class="permission-toggle"><input type="checkbox" name="yetki" value="${x.kod}" ${secili.has(x.kod) ? "checked" : ""} ${yonetici ? "disabled" : ""}><span>${escapeHtml(x.ad)}</span></label>`).join("")}</fieldset>`).join("")}</div></div><div id="kullaniciMesaj"></div><div class="erp-modal-footer"><button type="button" data-kapat class="erp-small-button">Vazgeç</button><button class="erp-primary-button" ${yonetici ? "disabled" : ""}>${mevcut ? "Değişiklikleri Kaydet" : "Kullanıcıyı Oluştur"}</button></div></form></div>`;
+        document.body.appendChild(overlay); const form = overlay.querySelector("form"), kapat = () => overlay.remove(), rolUygula = () => { const r = data.roller.find(x => x.kod === form.elements.rol.value), izinler = new Set(r?.varsayilanYetkiler || []); form.querySelectorAll('[name="yetki"]').forEach(x => x.checked = izinler.has(x.value)); }; overlay.querySelectorAll(".erp-modal-close,[data-kapat]").forEach(x => x.onclick = kapat); overlay.querySelector("#rolYetkileriniUygula")?.addEventListener("click", rolUygula); if (!mevcut) form.elements.rol.onchange = rolUygula;
+        form.onsubmit = async e => { e.preventDefault(); const f = e.currentTarget, body = { adSoyad: f.elements.adSoyad.value, unvan: f.elements.unvan.value, rol: f.elements.rol.value, ozelYetkiler: [...f.querySelectorAll('[name="yetki"]:checked')].map(x => x.value) }; if (mevcut) body.aktif = f.elements.aktif.value === "true"; else { body.email = f.elements.email.value; body.telefon = f.elements.telefon.value; body.sifre = f.elements.sifre.value; } try { const sonuc = await api(mevcut ? `/api/tenant/kullanicilar/${encodeURIComponent(mevcut.id)}` : "/api/tenant/kullanicilar", { method: mevcut ? "PATCH" : "POST", body: JSON.stringify(body) }); overlay.querySelector("#kullaniciMesaj").innerHTML = `<div class="success">${escapeHtml(sonuc.mesaj)}</div>`; setTimeout(() => { kapat(); kullanicilarYukle(); }, 650); } catch (error) { overlay.querySelector("#kullaniciMesaj").innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } };
+    }
+
     async function kullanicilarYukle() {
-        setTitle("Kullanıcılar ve Yetkiler"); loading();
+        setTitle("Kullanıcılar ve Yetkiler"); loading("Kullanıcı güvenliği hazırlanıyor...");
         try {
-            const data = await api("/api/tenant/kullanicilar"), kullanicilar = data.kullanicilar || [];
-            content.innerHTML = `<div class="welcome-banner"><div><div class="eyebrow">YETKİ YÖNETİMİ</div><h2>Kullanıcılar ve Kritik İşlem Yetkileri</h2><p>Bakiye düzeltme gibi muhasebe geçmişini etkileyen işlemleri yalnızca açıkça yetkilendirdiğiniz çalışanlar yapabilir.</p></div></div><div class="dashboard-panel"><div class="panel-heading"><div><h2>Kullanıcı Yetkileri</h2><p>Yönetici yetkileri kalıcıdır. Satış ve muhasebe çalışanlarına ihtiyaç halinde özel yetki verin.</p></div></div><div class="table-scroll"><table><thead><tr><th>Kullanıcı</th><th>Rol / Departman</th><th>Durum</th><th>Son Giriş</th><th>Bakiye Düzeltme</th></tr></thead><tbody>${kullanicilar.map(k => { const yonetici = ["OWNER", "ADMIN"].includes(k.rol), yetkili = yonetici || (k.ozelYetkiler || []).includes("balance.adjust"); return `<tr><td><b>${escapeHtml(k.adSoyad)}</b><small>${escapeHtml(k.email)}</small></td><td>${escapeHtml(k.rol)}</td><td><span class="durum-badge ${k.aktif ? "aktif" : "pasif"}">${k.aktif ? "Aktif" : "Pasif"}</span></td><td>${k.sonGirisTarihi ? new Date(k.sonGirisTarihi).toLocaleString("tr-TR") : "Henüz giriş yok"}</td><td><label class="permission-toggle"><input type="checkbox" data-balance-permission="${k._id || k.id}" ${yetkili ? "checked" : ""} ${yonetici || !k.aktif ? "disabled" : ""}><span>${yonetici ? "Yönetici — zorunlu" : yetkili ? "Yetkili" : "Yetkisiz"}</span></label></td></tr>`; }).join("") || '<tr><td colspan="5">Kullanıcı bulunamadı.</td></tr>'}</tbody></table></div><div id="permissionMessage"></div></div>`;
-            content.querySelectorAll("[data-balance-permission]").forEach(input => input.onchange = async () => { const mesaj = content.querySelector("#permissionMessage"); input.disabled = true; try { const sonuc = await api(`/api/tenant/kullanicilar/${encodeURIComponent(input.dataset.balancePermission)}/yetkiler`, { method: "PATCH", body: JSON.stringify({ ozelYetkiler: input.checked ? ["balance.adjust"] : [] }) }); input.nextElementSibling.textContent = input.checked ? "Yetkili" : "Yetkisiz"; mesaj.innerHTML = `<div class="success">${escapeHtml(sonuc.mesaj)} Değişiklik anında geçerlidir.</div>`; } catch (error) { input.checked = !input.checked; mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } finally { input.disabled = false; } });
+            const data = await api("/api/tenant/kullanicilar"), kullanicilar = data.kullanicilar || [], aktif = kullanicilar.filter(x => x.aktif), saha = kullanicilar.filter(x => x.rol === "SALES");
+            content.innerHTML = `<div class="welcome-banner"><div><div class="eyebrow">KULLANICI VE YETKİ MERKEZİ</div><h2>Mobil ekibinizi güvenle yönetin</h2><p>Çalışanlar e-posta veya telefonuyla giriş yapar; yalnızca işaretlediğiniz modül ve işlemleri kullanabilir.</p></div><button id="yeniKullanici" class="erp-primary-button">+ Yeni Kullanıcı</button></div><div class="dashboard-grid">${card("Toplam Kullanıcı", kullanicilar.length, "Firma hesapları")}${card("Aktif Kullanıcı", aktif.length, "Giriş yapabilir")}${card("Saha Satış", saha.length, "Mobil satış ekibi")}${card("Pasif Hesap", kullanicilar.length - aktif.length, "Erişimi kapalı")}</div><div class="dashboard-panel"><div class="panel-heading"><div><h2>Kullanıcılar</h2><p>Yetki ve durum değişiklikleri açık oturumlarda dahi anında geçerlidir.</p></div><input id="kullaniciAra" class="erp-input" placeholder="Ad, e-posta, telefon veya rol ara..."></div><div class="table-scroll"><table><thead><tr><th>Kullanıcı</th><th>Giriş Kimliği</th><th>Rol / Görev</th><th>Yetki</th><th>Durum</th><th>Son Giriş</th><th>İşlem</th></tr></thead><tbody>${kullanicilar.map(k => { const kilitli = k.rol === "OWNER"; return `<tr data-kullanici-row><td><b>${escapeHtml(k.adSoyad)}</b><small>${escapeHtml(k.unvan || "-")}</small></td><td>${escapeHtml(k.email || k.telefon || "-")}<small>${k.email && k.telefon ? escapeHtml(k.telefon) : "Mobil / web giriş"}</small></td><td>${escapeHtml(k.rolEtiketi)}</td><td><b>${k.etkinYetkiler.length}</b><small>${k.yetkiModu === "OZEL" ? "Özel seçim" : "Rol varsayılanı"}</small></td><td><span class="durum-badge ${k.aktif ? "aktif" : "pasif"}">${k.aktif ? "Aktif" : "Pasif"}</span></td><td>${k.sonGirisTarihi ? new Date(k.sonGirisTarihi).toLocaleString("tr-TR") : "Henüz giriş yok"}</td><td><button class="erp-small-button" data-kullanici-duzenle="${k.id}" ${kilitli ? "disabled" : ""}>Yetkiler / Düzenle</button> <button class="erp-small-button" data-kullanici-sifre="${k.id}" ${kilitli ? "disabled" : ""}>Parola</button></td></tr>`; }).join("") || '<tr><td colspan="7">Kullanıcı bulunamadı.</td></tr>'}</tbody></table></div><div id="permissionMessage"></div></div>`;
+            content.querySelector("#yeniKullanici").onclick = () => kullaniciFormu(data); content.querySelector("#kullaniciAra").oninput = e => { const q = e.target.value.toLocaleLowerCase("tr-TR"); content.querySelectorAll("[data-kullanici-row]").forEach(x => x.hidden = !x.textContent.toLocaleLowerCase("tr-TR").includes(q)); }; content.querySelectorAll("[data-kullanici-duzenle]").forEach(b => b.onclick = () => kullaniciFormu(data, kullanicilar.find(x => String(x.id) === b.dataset.kullaniciDuzenle))); content.querySelectorAll("[data-kullanici-sifre]").forEach(b => b.onclick = () => kullaniciSifreFormu(kullanicilar.find(x => String(x.id) === b.dataset.kullaniciSifre)));
         } catch (error) { errorBox(error); }
     }
 
@@ -4771,6 +4809,11 @@
 
     async function sayfaYukle(page) {
         const buYukleme = ++sayfaYuklemeNo;
+        if (!sayfaErisimiVar(page)) {
+            setTitle("Yetkisiz Erişim");
+            content.innerHTML = '<div class="error"><strong>Bu modül için yetkiniz bulunmuyor.</strong><div style="margin-top:8px">İşletme yöneticiniz Kullanıcılar / Yetkiler ekranından erişim verebilir.</div></div>';
+            return;
+        }
         if (page === "dashboard" || page === "anaSayfa" || !page) {
             if (buYukleme !== sayfaYuklemeNo) return;
             await dashboardYukle();
@@ -4950,6 +4993,18 @@
         });
     });
 
-    // Başlangıç.
-    anaSayfa();
+    // Başlangıç: menüyü güncel rol/yetki bilgisine göre daralt.
+    (async function uygulamayiBaslat() {
+        try {
+            const profil = await api("/api/auth/profil");
+            oturumKullanici = profil.kullanici || null;
+            mobilYetkiMenusunuUygula();
+            document.querySelector("#accountButton strong").textContent = oturumKullanici?.adSoyad || "Hesabım";
+            document.querySelector("#accountButton small").textContent = oturumKullanici?.unvan || oturumKullanici?.rol || "Profil ve güvenlik";
+        } catch (_) {
+            window.location.replace("/erp/login.html");
+            return;
+        }
+        anaSayfa();
+    })();
 })();

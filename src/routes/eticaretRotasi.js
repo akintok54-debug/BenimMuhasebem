@@ -9,6 +9,7 @@ const router = express.Router();
 
 router.use(kimlikKontrol);
 router.use(tenantKontrol);
+router.use(yetkiKontrol("sales.read"));
 
 router.get("/siparisler", controller.listele);
 router.post("/siparisler/al", yetkiKontrol("sales.write"), controller.al);

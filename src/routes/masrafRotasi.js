@@ -9,6 +9,7 @@ const router = express.Router();
 
 router.use(kimlikKontrol);
 router.use(tenantKontrol);
+router.use(yetkiKontrol("accounting.read"));
 
 router.get("/", controller.listele);
 router.get("/ozet", controller.ozet);

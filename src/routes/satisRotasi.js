@@ -9,6 +9,7 @@ const router = express.Router();
 
 router.use(kimlikKontrol);
 router.use(tenantKontrol);
+router.use(yetkiKontrol("sales.read"));
 
 router.get("/", controller.listele);
 router.get("/panel", controller.panel);

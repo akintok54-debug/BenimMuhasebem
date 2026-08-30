@@ -6,5 +6,8 @@ const controller = require("../controllers/kullaniciYonetimController");
 const router = express.Router();
 router.use(kimlikKontrol, tenantKontrol, yetkiKontrol("tenant.users"));
 router.get("/", controller.listele);
+router.post("/", controller.olustur);
+router.patch("/:id", controller.guncelle);
 router.patch("/:id/yetkiler", controller.yetkiGuncelle);
+router.post("/:id/sifre", controller.sifreBelirle);
 module.exports = router;

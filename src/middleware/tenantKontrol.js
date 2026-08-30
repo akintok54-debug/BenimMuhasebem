@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { tenantAboneliginiKontrolEt } = require("../services/abonelikServisi");
+const Kullanici = require("../models/Kullanici");
 
 async function tenantKontrol(req, res, next) {
     try {
@@ -13,6 +14,11 @@ async function tenantKontrol(req, res, next) {
 
         const id = String(kullanici.tenantId || "");
         if (!mongoose.Types.ObjectId.isValid(id)) return res.status(403).json({ basarili: false, mesaj: "İşletme erişimi doğrulanamadı." });
+        const guncelKullanici = await Kullanici.findOne({ _id: kullanici.kullaniciId, tenantId: id, aktif: true, silinmeTarihi: null })
+            .select("adSoyad email telefon rol aktif ozelYetkiler yetkiModu tenantId").lean();
+        if (!guncelKullanici) return res.status(401).json({ basarili: false, mesaj: "Kullanıcı hesabı pasif veya oturum yetkisi kaldırılmış." });
+        req.currentUser = guncelKullanici;
+        req.kullanici.rol = guncelKullanici.rol;
         req.tenantId = id;
 
         const kontrol = await tenantAboneliginiKontrolEt(id);

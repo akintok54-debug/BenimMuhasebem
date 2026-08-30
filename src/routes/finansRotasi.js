@@ -9,6 +9,7 @@ const router = express.Router();
 
 router.use(kimlikKontrol);
 router.use(tenantKontrol);
+router.use(yetkiKontrol("cash.read"));
 router.use((req, res, next) => {
     res.set("Cache-Control", "private, no-store");
     next();

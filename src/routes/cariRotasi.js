@@ -11,6 +11,7 @@ router.get("/paylasim/:token", controller.paylasilanEkstre);
 
 router.use(kimlikKontrol);
 router.use(tenantKontrol);
+router.use(yetkiKontrol("accounting.read", "party.read"));
 
 router.get("/ozet", controller.ozet);
 router.get("/hareketler", controller.hareketler);

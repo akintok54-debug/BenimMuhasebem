@@ -11,13 +11,14 @@ const { sifrele, coz } = require("../../../services/sifrelemeServisi");
 const ikiFaktor = require("../../../services/ikiFaktorServisi");
 const { sifreSifirlamaEpostasiGonder } = require("../../../services/epostaServisi");
 const { trialTarihleri } = require("../../../services/abonelikServisi");
+const { telefonNormalize, gercekEposta } = require("../../../utils/kullaniciKimligi");
 
 function kullaniciId(req) { return req.kullanici?.kullaniciId || req.user?.kullaniciId; }
-function guvenliKullanici(k) { return { id: k._id, adSoyad: k.adSoyad, email: k.email, telefon: k.telefon || "", unvan: k.unvan || "", rol: k.rol, tenantId: k.tenantId, ozelYetkiler: k.ozelYetkiler || [], ikiFaktorEtkin: !!k.ikiFaktor?.etkin, sonGirisTarihi: k.sonGirisTarihi, createdAt: k.createdAt }; }
+function guvenliKullanici(k) { return { id: k._id, adSoyad: k.adSoyad, email: gercekEposta(k.email), telefon: k.telefon || "", unvan: k.unvan || "", rol: k.rol, tenantId: k.tenantId, ozelYetkiler: k.ozelYetkiler || [], yetkiModu: k.yetkiModu || "ROL", ikiFaktorEtkin: !!k.ikiFaktor?.etkin, sonGirisTarihi: k.sonGirisTarihi, createdAt: k.createdAt }; }
 async function oturumAc(req, res, k) { k.sonGirisTarihi = new Date(); await k.save(); const p = { kullaniciId: k._id.toString(), email: k.email, rol: k.rol, tenantId: k.tenantId?.toString() || null }; const token = tokenOlustur(p), csrfToken = oturumCookieYaz(res, token); req.user = p; return res.json({ basarili: true, mesaj: "Giriş başarılı.", csrfToken, token: process.env.JWT_ALLOW_LEGACY === "false" ? undefined : token, kullanici: { ...guvenliKullanici(k), aktif: k.aktif } }); }
 
 async function login(req, res) {
-    try { const { email, sifre } = req.body || {}; if (!email || !sifre) return res.status(400).json({ basarili: false, mesaj: "E-posta ve şifre zorunludur." }); const k = await Kullanici.findOne({ email: String(email).trim().toLowerCase() }).select("+ikiFaktor.gizliAnahtar +ikiFaktor.kurtarmaKodlariHash"); if (!k || !k.aktif || !(await bcrypt.compare(String(sifre), String(k.sifre)))) { if (k) req.user = { kullaniciId: k._id, tenantId: k.tenantId, rol: k.rol }; res.locals.guvenlikOlayi = { kategori: "GIRIS", seviye: "UYARI" }; return res.status(401).json({ basarili: false, mesaj: "E-posta veya şifre hatalı." }); } if (k.ikiFaktor?.etkin) return res.json({ basarili: true, ikiFaktorGerekli: true, challengeToken: geciciTokenOlustur({ purpose: "2fa", kullaniciId: k._id.toString() }) }); return oturumAc(req, res, k); } catch (e) { console.error("LOGIN_HATASI", { message: e.message }); return res.status(500).json({ basarili: false, mesaj: "Giriş işlemi sırasında sunucu hatası." }); }
+    try { const body = req.body || {}, kimlik = String(body.kimlik || body.email || "").trim(), sifre = body.sifre; if (!kimlik || !sifre) return res.status(400).json({ basarili: false, mesaj: "E-posta/telefon ve şifre zorunludur." }); const email = kimlik.toLowerCase(), telefonKod = telefonNormalize(kimlik), sorgu = kimlik.includes("@") ? { email } : { telefonNormalize: telefonKod }; const k = await Kullanici.findOne(sorgu).select("+ikiFaktor.gizliAnahtar +ikiFaktor.kurtarmaKodlariHash"); if (!k || !k.aktif || !(await bcrypt.compare(String(sifre), String(k.sifre)))) { if (k) req.user = { kullaniciId: k._id, tenantId: k.tenantId, rol: k.rol }; res.locals.guvenlikOlayi = { kategori: "GIRIS", seviye: "UYARI" }; return res.status(401).json({ basarili: false, mesaj: "E-posta, telefon veya şifre hatalı." }); } if (k.ikiFaktor?.etkin) return res.json({ basarili: true, ikiFaktorGerekli: true, challengeToken: geciciTokenOlustur({ purpose: "2fa", kullaniciId: k._id.toString() }) }); return oturumAc(req, res, k); } catch (e) { console.error("LOGIN_HATASI", { message: e.message }); return res.status(500).json({ basarili: false, mesaj: "Giriş işlemi sırasında sunucu hatası." }); }
 }
 
 function firmaSlugOlustur(firmaAdi) {
@@ -41,6 +42,7 @@ async function kayit(req, res) {
         const adSoyad = String(body.adSoyad || "").trim();
         const email = String(body.email || "").trim().toLowerCase();
         const telefon = String(body.telefon || "").trim();
+        const telefonKod = telefonNormalize(telefon);
         const sifre = String(body.sifre || "");
 
         if (firmaAdi.length < 2 || firmaAdi.length > 150) return res.status(400).json({ basarili: false, mesaj: "Firma adı 2-150 karakter arasında olmalıdır." });
@@ -49,7 +51,7 @@ async function kayit(req, res) {
         if (telefon.length > 30) return res.status(400).json({ basarili: false, mesaj: "Telefon numarası en fazla 30 karakter olabilir." });
         if (sifre.length < 8 || sifre.length > 128) return res.status(400).json({ basarili: false, mesaj: "Parola 8-128 karakter arasında olmalıdır." });
         if (body.kosullariKabul !== true) return res.status(400).json({ basarili: false, mesaj: "Kullanım ve gizlilik koşullarını kabul etmelisiniz." });
-        if (await Kullanici.exists({ email })) return res.status(409).json({ basarili: false, mesaj: "Bu e-posta adresiyle kayıtlı bir hesap zaten var." });
+        if (await Kullanici.exists({ $or: [{ email }, ...(telefonKod ? [{ telefonNormalize: telefonKod }] : [])] })) return res.status(409).json({ basarili: false, mesaj: "Bu e-posta veya telefonla kayıtlı bir hesap zaten var." });
 
         let plan = await Plan.findOne({ code: "STARTER" });
         if (!plan) {
@@ -77,6 +79,7 @@ async function kayit(req, res) {
             adSoyad,
             email,
             telefon,
+            telefonNormalize: telefonKod || undefined,
             unvan: firmaAdi,
             sifre: await bcrypt.hash(sifre, 12),
             rol: "OWNER",

@@ -9,6 +9,7 @@ const router = express.Router();
 
 router.use(kimlikKontrol);
 router.use(tenantKontrol);
+router.use(yetkiKontrol("stock.read"));
 
 router.get("/depolar", controller.depolar);
 router.post("/depolar", yetkiKontrol("stock.write"), controller.depoOlustur);

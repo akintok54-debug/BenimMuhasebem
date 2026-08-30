@@ -17,6 +17,7 @@ const KullaniciSchema = new mongoose.Schema(
         },
 
         telefon: { type: String, trim: true, default: "" },
+        telefonNormalize: { type: String, trim: true, default: undefined },
         unvan: { type: String, trim: true, default: "" },
 
         sifre: {
@@ -34,6 +35,8 @@ const KullaniciSchema = new mongoose.Schema(
                 "SALES",
                 "CASHIER",
                 "ACCOUNTING",
+                "WAREHOUSE",
+                "ECOMMERCE",
                 "SATIS",
                 "DEPO",
                 "MUHASEBE",
@@ -61,9 +64,15 @@ const KullaniciSchema = new mongoose.Schema(
         },
         ozelYetkiler: {
             type: [String],
-            enum: ["balance.adjust"],
+            enum: [
+                "sales.read", "sales.write", "purchase.read", "purchase.write",
+                "stock.read", "stock.write", "party.read", "party.write",
+                "cash.read", "cash.write", "accounting.read", "accounting.write",
+                "reports.read", "tenant.users", "tenant.settings", "balance.adjust"
+            ],
             default: []
         },
+        yetkiModu: { type: String, enum: ["ROL", "OZEL"], default: "ROL" },
 
         sonGirisTarihi: { type: Date, default: null },
         sifreSifirlama: {
@@ -87,5 +96,6 @@ const KullaniciSchema = new mongoose.Schema(
 );
 
 KullaniciSchema.index({ tenantId: 1, rol: 1 });
+KullaniciSchema.index({ telefonNormalize: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model("Kullanici", KullaniciSchema);
