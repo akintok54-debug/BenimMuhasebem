@@ -115,7 +115,10 @@ const MasrafSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: "ParaHareket",
             default: null
-        }
+        },
+
+        personelId: { type: mongoose.Schema.Types.ObjectId, ref: "Personel", default: null, index: true },
+        personelFinansIslemId: { type: mongoose.Schema.Types.ObjectId, ref: "PersonelFinansIslem", default: null }
     },
     {
         timestamps: true

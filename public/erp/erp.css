@@ -1544,6 +1544,8 @@ th {
 .personnel-hero { background: linear-gradient(125deg, #0f172a, #173a62 62%, #0f766e); }
 .personnel-hero h2, .personnel-hero p, .personnel-hero .eyebrow { color: #fff; }
 .personnel-kpis { margin: 18px 0; }
+.personnel-hero-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.personnel-hero-actions .erp-small-button { background: rgba(255,255,255,.13); border-color: rgba(255,255,255,.35); color: #fff; }
 .personnel-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; border-bottom: 1px solid #e2e8f0; }
 .personnel-tabs { display: flex; align-items: center; gap: 4px; overflow-x: auto; }
 .personnel-tabs button { border: 0; border-bottom: 3px solid transparent; background: transparent; padding: 13px 15px; color: #64748b; font-weight: 700; cursor: pointer; white-space: nowrap; }
@@ -1553,6 +1555,8 @@ th {
 .personnel-filters { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(180px, 260px); gap: 10px; margin-bottom: 16px; }
 .personnel-filters input, .personnel-filters select { min-height: 42px; border: 1px solid #dbe3ed; border-radius: 10px; padding: 0 12px; background: #fff; }
 .personnel-table td { vertical-align: middle; }
+.personnel-clickable { cursor: pointer; transition: background .15s ease; }
+.personnel-clickable:hover { background: #f0fdfa; }
 .personnel-table td > small, .personnel-table td > strong + small { display: block; margin-top: 4px; color: #64748b; }
 .personnel-person { display: flex; align-items: center; gap: 11px; min-width: 220px; }
 .personnel-person > span { width: 38px; height: 38px; flex: 0 0 38px; display: grid; place-items: center; border-radius: 12px; background: #e6fffb; color: #0f766e; font-size: 12px; font-weight: 800; }
@@ -1565,6 +1569,15 @@ th {
 .personnel-modal { width: min(980px, 96vw); max-height: 92vh; overflow-y: auto; }
 .personnel-form-section { padding: 15px 0; border-bottom: 1px solid #e2e8f0; }
 .personnel-form-section h3 { margin: 0 0 12px; color: #0f172a; font-size: 14px; }
+.personnel-finance-summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin: 4px 0 18px; }
+.personnel-finance-summary > div { padding: 14px; border: 1px solid #dbe4ee; border-radius: 12px; background: #f8fafc; }
+.personnel-finance-summary span { display: block; color: #64748b; font-size: 11px; font-weight: 700; margin-bottom: 6px; }
+.personnel-finance-summary strong { color: #0f766e; font-size: 17px; }
+.personnel-finance-summary .negative strong { color: #b91c1c; }
+.personnel-finance-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px; margin-bottom: 18px; border-radius: 14px; background: #f1f5f9; }
+.personnel-finance-actions button { border: 1px solid #cbd5e1; border-radius: 9px; padding: 9px 12px; background: #fff; color: #334155; font-weight: 700; cursor: pointer; }
+.personnel-finance-actions button:hover { border-color: #0f766e; color: #0f766e; }
+.personnel-finance-note { margin: 14px 0; padding: 11px 13px; border-left: 4px solid #0f766e; border-radius: 8px; background: #ecfdf5; color: #335c52; font-size: 12px; line-height: 1.5; }
 .integration-card { display: flex; flex-direction: column; gap: 12px; }
 .integration-card label { display: flex; flex-direction: column; gap: 6px; }
 .invoice-logo { max-width: 210px; max-height: 70px; object-fit: contain; }
@@ -1583,6 +1596,12 @@ th {
     .personnel-toolbar { align-items: stretch; flex-direction: column; }
     .personnel-actions { padding-left: 4px; }
     .personnel-filters { grid-template-columns: 1fr; }
+    .personnel-finance-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+    .personnel-finance-summary { grid-template-columns: 1fr; }
+    .personnel-hero-actions { justify-content: flex-start; }
 }
 
 @media print {
