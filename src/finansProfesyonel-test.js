@@ -75,6 +75,7 @@ test("Profesyonel finans ekranı hesap, hareket, transfer ve Excel işlemlerini 
     const js = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
     assert.match(js, /Kasa, banka ve nakit kontrolü/);
     assert.match(js, /Hesaplar Arası Transfer/);
+    assert.match(js, /const secenekler = hesaplar\.map/);
     assert.match(js, /\/api\/tenant\/finans\/hesaplar\//);
     assert.match(js, /Para Hareketleri/);
     assert.match(js, /nakit-hareketleri-/);
