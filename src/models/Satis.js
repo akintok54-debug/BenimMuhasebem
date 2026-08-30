@@ -158,6 +158,12 @@ const SatisSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             default: null
         },
+        satisKanali: {
+            type: String,
+            enum: ["NORMAL", "PERAKENDE", "SAHA"],
+            default: "NORMAL",
+            index: true
+        },
         notlar: {
             type: String,
             trim: true,

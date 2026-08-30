@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const uygulama = require("./uygulama");
+const Satis = require("./models/Satis");
 
 test("Satış panel endpointi kimliksiz erişimi reddeder", async () => {
     const server = await new Promise((resolve, reject) => {
@@ -51,4 +52,15 @@ test("Satış ürün araması kod, barkod ve ada göre sonuç gösterip miktarl�
     assert.match(js, /Math\.min\(stok, Math\.floor/);
     assert.match(css, /\.sales-product-add/);
     assert.match(css, /\.sales-cart-quantity input/);
+});
+
+test("Perakende satış müşteri seçmeden peşin tahsilat ve ayrı satış kanalı kullanır", () => {
+    const js = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
+    const controller = fs.readFileSync(path.join(__dirname, "controllers", "satisController.js"), "utf8");
+    assert.deepEqual(Satis.schema.path("satisKanali").enumValues, ["NORMAL", "PERAKENDE", "SAHA"]);
+    for (const ifade of ["Perakende Satış", "data-sales-mode", "Perakende Satışı Tamamla", "perakendeFiyati", "retail-sale-modal"]) assert.match(js, new RegExp(ifade));
+    assert.match(controller, /kod:\s*"PERAKENDE"/);
+    assert.match(controller, /unvan:\s*"Perakende Müşteri"/);
+    assert.match(controller, /\["NAKIT",\s*"KART",\s*"BANKA"\]/);
+    assert.match(controller, /satisKanali:\s*perakende\s*\?\s*"PERAKENDE"/);
 });

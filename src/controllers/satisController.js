@@ -163,6 +163,7 @@ async function olustur(req, res, next) {
     try {
         const tenantId = tenantObjectId(req);
         const body = req.body || {};
+        const perakende = body.perakende === true || String(body.satisKanali || "").toUpperCase() === "PERAKENDE";
 
         if (!body.belgeNo) {
             return res.status(400).json({
@@ -171,11 +172,15 @@ async function olustur(req, res, next) {
             });
         }
 
-        if (!body.musteriId || !body.depoId) {
+        if ((!body.musteriId && !perakende) || !body.depoId) {
             return res.status(400).json({
                 basarili: false,
-                mesaj: "Müşteri ve depo zorunludur."
+                mesaj: perakende ? "Depo zorunludur." : "Müşteri ve depo zorunludur."
             });
+        }
+
+        if (perakende && !["NAKIT", "KART", "BANKA"].includes(String(body.odemeTipi || "").toUpperCase())) {
+            return res.status(400).json({ basarili: false, mesaj: "Perakende satış nakit, kredi kartı veya banka ödemesiyle tamamlanmalıdır." });
         }
 
         if (!Array.isArray(body.kalemler) || body.kalemler.length === 0) {
@@ -185,7 +190,20 @@ async function olustur(req, res, next) {
             });
         }
 
-        const musteri = await Musteri.findOne({ _id: body.musteriId, tenantId, ...(yonetici(req) ? {} : { $or: [{ temsilciId: islemKullaniciId(req) }, { olusturanKullaniciId: islemKullaniciId(req) }] }) });
+        let musteri = null;
+        if (perakende) {
+            musteri = await Musteri.findOne({ tenantId, kod: "PERAKENDE" });
+            if (!musteri) {
+                try {
+                    musteri = await Musteri.create({ tenantId, kod: "PERAKENDE", unvan: "Perakende Müşteri", grup: "Perakende", bakiye: 0, aktif: true, notlar: "Perakende satışlarda sistem tarafından kullanılan kasa müşterisi.", olusturanKullaniciId: islemKullaniciId(req) });
+                } catch (error) {
+                    if (error?.code !== 11000) throw error;
+                    musteri = await Musteri.findOne({ tenantId, kod: "PERAKENDE" });
+                }
+            }
+        } else {
+            musteri = await Musteri.findOne({ _id: body.musteriId, tenantId, ...(yonetici(req) ? {} : { $or: [{ temsilciId: islemKullaniciId(req) }, { olusturanKullaniciId: islemKullaniciId(req) }] }) });
+        }
 
         if (!musteri) {
             return res.status(404).json({
@@ -403,6 +421,7 @@ async function olustur(req, res, next) {
             kalanTutar,
             hesapTipi,
             hesapId,
+            satisKanali: perakende ? "PERAKENDE" : String(body.satisKanali || "NORMAL").toUpperCase(),
             notlar: body.notlar || "",
             kullaniciId: islemKullaniciId(req)
         });
