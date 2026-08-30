@@ -53,7 +53,7 @@ test("Masraf ekranı telefon kamerası, örnek giderler, filtre ve Excel sunar",
     assert.match(js, /Masraf Örnekleri/);
     assert.match(js, /masraflarYukle/);
     assert.match(js, /masrafExcel/);
-    assert.match(html, /20260830-001/);
+    assert.match(html, /erp\.js\?v=20260830-/);
 });
 
 test("Finans ekranı nakit kasa ve diğer kasaları ayrı gösterir", () => {
