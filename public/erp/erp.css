@@ -1530,13 +1530,17 @@ th {
 }
 
 .permission-section { margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 18px; }
-.permission-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.user-permission-modal { width: min(1180px, 96vw) !important; max-width: 1180px !important; max-height: 94vh; overflow: hidden; display: flex; flex-direction: column; }
+.user-permission-modal > form { overflow-y: auto; min-height: 0; padding-right: 5px; }
+.user-permission-modal .erp-modal-footer { position: sticky; bottom: 0; z-index: 3; background: #fff; box-shadow: 0 -10px 20px rgba(15, 23, 42, .08); }
+.permission-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .permission-grid fieldset { border: 1px solid #dbe4ef; border-radius: 12px; padding: 12px; min-width: 0; background: #f8fafc; }
 .permission-grid legend { padding: 0 7px; font-weight: 800; color: #1e3a5f; }
 .permission-toggle { display: flex !important; flex-direction: row !important; align-items: flex-start !important; gap: 9px; margin: 8px 0; font-weight: 500 !important; }
 .permission-toggle input { width: 18px !important; min-width: 18px; height: 18px; margin-top: 1px; }
 
 @media (max-width: 850px) {
+    .user-permission-modal { width: 98vw !important; max-height: 96vh; }
     .permission-grid { grid-template-columns: 1fr; }
     body[data-kullanici-rol="SALES"] .main { padding-bottom: 72px; }
 }

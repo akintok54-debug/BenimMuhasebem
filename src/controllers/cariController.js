@@ -9,9 +9,18 @@ const ParaHareket = require("../models/ParaHareket");
 const CariEkstrePaylasim = require("../models/CariEkstrePaylasim");
 const Tenant = require("../modules/platform/models/Tenant");
 const crypto = require("crypto");
+const { etkinYetkiler } = require("../middleware/yetkiKontrol");
 
 function tenantId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
+}
+
+function cariErisimi(req) {
+    const izinler = new Set(etkinYetkiler(req.currentUser || {}));
+    return {
+        musteri: izinler.has("customer.read"),
+        tedarikci: izinler.has("supplier.read")
+    };
 }
 
 async function hesapBul(req, hesapTipi, hesapId) {
@@ -51,19 +60,20 @@ function odemeBilgisi(body) {
 async function ozet(req, res, next) {
     try {
         const tId = tenantId(req);
+        const erisim = cariErisimi(req);
 
         const [musteriler, tedarikciler] = await Promise.all([
-            Musteri.find({
+            erisim.musteri ? Musteri.find({
                 tenantId: tId
             })
                 .select("kod unvan adSoyad bakiye")
-                .lean(),
+                .lean() : [],
 
-            Tedarikci.find({
+            erisim.tedarikci ? Tedarikci.find({
                 tenantId: tId
             })
                 .select("kod unvan adSoyad bakiye")
-                .lean()
+                .lean() : []
         ]);
 
         const musteriAlacak = musteriler.reduce(
@@ -76,12 +86,13 @@ async function ozet(req, res, next) {
             0
         );
 
-        return res.json({
+        const sonuc = {
             basarili: true,
-            musteriAlacak,
-            tedarikciBorc,
-            netCari: musteriAlacak - tedarikciBorc
-        });
+            ...(erisim.musteri ? { musteriAlacak } : {}),
+            ...(erisim.tedarikci ? { tedarikciBorc } : {})
+        };
+        if (erisim.musteri && erisim.tedarikci) sonuc.netCari = musteriAlacak - tedarikciBorc;
+        return res.json(sonuc);
     } catch (error) {
         next(error);
     }
@@ -89,12 +100,22 @@ async function ozet(req, res, next) {
 
 async function hareketler(req, res, next) {
     try {
+        const erisim = cariErisimi(req);
         const filter = {
             tenantId: tenantId(req)
         };
 
         if (req.query.tarafTipi) {
-            filter.tarafTipi = req.query.tarafTipi;
+            const tarafTipi = String(req.query.tarafTipi).toUpperCase();
+            if ((tarafTipi === "MUSTERI" && !erisim.musteri) || (tarafTipi === "TEDARIKCI" && !erisim.tedarikci)) {
+                return res.status(403).json({ basarili: false, mesaj: "Bu cari türünü görüntüleme yetkiniz bulunmuyor." });
+            }
+            if (!["MUSTERI", "TEDARIKCI"].includes(tarafTipi)) {
+                return res.status(400).json({ basarili: false, mesaj: "Geçersiz cari türü." });
+            }
+            filter.tarafTipi = tarafTipi;
+        } else if (erisim.musteri !== erisim.tedarikci) {
+            filter.tarafTipi = erisim.musteri ? "MUSTERI" : "TEDARIKCI";
         }
 
         if (req.query.tarafId) {

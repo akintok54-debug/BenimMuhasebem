@@ -12,10 +12,10 @@ router.use(tenantKontrol);
 router.use(yetkiKontrol("reports.read"));
 
 router.get("/genel", controller.genel);
-router.get("/satis", controller.satis);
-router.get("/alis", controller.alis);
+router.get("/satis", yetkiKontrol("customer.read"), controller.satis);
+router.get("/alis", yetkiKontrol("supplier.read"), yetkiKontrol("purchase.read"), controller.alis);
 router.get("/stok", controller.stok);
-router.get("/cari", controller.cari);
+router.get("/cari", yetkiKontrol("customer.read", "supplier.read"), controller.cari);
 router.get("/personel", controller.personel);
 
 module.exports = router;

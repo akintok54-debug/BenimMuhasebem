@@ -11,21 +11,20 @@ router.get("/paylasim/:token", controller.paylasilanEkstre);
 
 router.use(kimlikKontrol);
 router.use(tenantKontrol);
-router.use(yetkiKontrol("accounting.read", "party.read"));
 
-router.get("/ozet", controller.ozet);
-router.get("/hareketler", controller.hareketler);
+router.get("/ozet", yetkiKontrol("customer.read", "supplier.read"), controller.ozet);
+router.get("/hareketler", yetkiKontrol("customer.read", "supplier.read"), controller.hareketler);
 
-router.post("/musteri/tahsilat", yetkiKontrol("accounting.write", "cash.write"), controller.musteriTahsilat);
-router.patch("/musteri/tahsilat/:id", yetkiKontrol("accounting.write", "cash.write"), controller.musteriTahsilatGuncelle);
-router.delete("/musteri/tahsilat/:id", yetkiKontrol("accounting.write", "cash.write"), controller.musteriTahsilatSil);
-router.post("/musteri/odeme", yetkiKontrol("accounting.write", "cash.write"), controller.musteriOdeme);
-router.patch("/musteri/:musteriId/bakiye", yetkiKontrol("balance.adjust"), controller.musteriBakiyeDuzelt);
-router.post("/musteri/hareket", yetkiKontrol("accounting.write"), controller.musteriManuelHareket);
-router.post("/musteri/:musteriId/ekstre-paylas", controller.ekstrePaylas);
-router.post("/tedarikci/odeme", yetkiKontrol("accounting.write", "cash.write"), controller.tedarikciOdeme);
-router.post("/tedarikci/tahsilat", yetkiKontrol("accounting.write", "cash.write"), controller.tedarikciTahsilat);
-router.post("/tedarikci/hareket", yetkiKontrol("accounting.write"), controller.tedarikciManuelHareket);
-router.patch("/tedarikci/:tedarikciId/bakiye", yetkiKontrol("balance.adjust"), controller.tedarikciBakiyeDuzelt);
+router.post("/musteri/tahsilat", yetkiKontrol("customer.write"), yetkiKontrol("accounting.write", "cash.write"), controller.musteriTahsilat);
+router.patch("/musteri/tahsilat/:id", yetkiKontrol("customer.write"), yetkiKontrol("accounting.write", "cash.write"), controller.musteriTahsilatGuncelle);
+router.delete("/musteri/tahsilat/:id", yetkiKontrol("customer.write"), yetkiKontrol("accounting.write", "cash.write"), controller.musteriTahsilatSil);
+router.post("/musteri/odeme", yetkiKontrol("customer.write"), yetkiKontrol("accounting.write", "cash.write"), controller.musteriOdeme);
+router.patch("/musteri/:musteriId/bakiye", yetkiKontrol("customer.write"), yetkiKontrol("balance.adjust"), controller.musteriBakiyeDuzelt);
+router.post("/musteri/hareket", yetkiKontrol("customer.write"), yetkiKontrol("accounting.write"), controller.musteriManuelHareket);
+router.post("/musteri/:musteriId/ekstre-paylas", yetkiKontrol("customer.read"), controller.ekstrePaylas);
+router.post("/tedarikci/odeme", yetkiKontrol("supplier.write"), yetkiKontrol("accounting.write", "cash.write"), controller.tedarikciOdeme);
+router.post("/tedarikci/tahsilat", yetkiKontrol("supplier.write"), yetkiKontrol("accounting.write", "cash.write"), controller.tedarikciTahsilat);
+router.post("/tedarikci/hareket", yetkiKontrol("supplier.write"), yetkiKontrol("accounting.write"), controller.tedarikciManuelHareket);
+router.patch("/tedarikci/:tedarikciId/bakiye", yetkiKontrol("supplier.write"), yetkiKontrol("balance.adjust"), controller.tedarikciBakiyeDuzelt);
 
 module.exports = router;

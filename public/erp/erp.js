@@ -116,21 +116,23 @@
 
     let oturumKullanici = null;
     const rolYetkileri = {
-        MANAGER: ["sales.", "purchase.", "stock.", "party.", "reports.read"],
-        SALES: ["sales.", "party.read", "party.write", "stock.read", "reports.read"],
-        CASHIER: ["cash.", "party.read", "sales.read"],
-        ACCOUNTING: ["cash.", "accounting.", "party.", "reports.read", "sales.read", "purchase.read"],
-        WAREHOUSE: ["stock.", "sales.read", "purchase.read"], DEPO: ["stock.", "sales.read", "purchase.read"],
-        ECOMMERCE: ["sales.", "party.read", "stock.read"], ETICARET: ["sales.", "party.read", "stock.read"]
+        MANAGER: ["sales.", "purchase.", "stock.", "customer.", "supplier.", "reports.read"],
+        SALES: ["sales.", "customer.read", "customer.write", "stock.read"], SATIS: ["sales.", "customer.read", "customer.write", "stock.read"],
+        CASHIER: ["cash.", "customer.read", "sales.read"],
+        ACCOUNTING: ["cash.", "accounting.", "customer.", "supplier.", "reports.read", "sales.read", "purchase.read"], MUHASEBE: ["cash.", "accounting.", "customer.", "supplier.", "reports.read", "sales.read", "purchase.read"],
+        WAREHOUSE: ["stock.", "sales.read", "purchase.read", "supplier.read"], DEPO: ["stock.", "sales.read", "purchase.read", "supplier.read"],
+        ECOMMERCE: ["sales.", "customer.read", "stock.read"], ETICARET: ["sales.", "customer.read", "stock.read"]
     };
     function oturumYetkisiVar(gerekli) {
         const rol = String(oturumKullanici?.rol || "").toUpperCase();
         if (["OWNER", "ADMIN"].includes(rol)) return true;
         const izinler = oturumKullanici?.yetkiModu === "OZEL" ? (oturumKullanici.ozelYetkiler || []) : (rolYetkileri[rol] || []);
-        return izinler.some(izin => izin === gerekli || (izin.endsWith(".") && gerekli.startsWith(izin)));
+        const eskiCari = { "customer.read": "party.read", "customer.write": "party.write", "supplier.read": "party.read", "supplier.write": "party.write" };
+        return izinler.some(izin => izin === gerekli || (!(["SALES", "SATIS"].includes(rol) && gerekli.startsWith("supplier.")) && izin === eskiCari[gerekli]) || (izin.endsWith(".") && gerekli.startsWith(izin)));
     }
     function sayfaErisimiVar(page) {
-        const esleme = { musteriler: ["party.read"], tedarikciler: ["party.read"], urunler: ["stock.read"], stok: ["stock.read"], alis: ["purchase.read"], satis: ["sales.read"], teklifler: ["sales.read"], siparisler: ["sales.read"], eticaret: ["sales.read"], whatsapp: ["sales.read"], cari: ["party.read", "accounting.read"], finans: ["cash.read"], masraflar: ["accounting.read"], personeller: ["tenant.users"], kullanicilar: ["tenant.users"], raporlar: ["reports.read"], ayarlar: ["tenant.settings"] };
+        const esleme = { musteriler: ["customer.read"], tedarikciler: ["supplier.read"], urunler: ["stock.read"], stok: ["stock.read"], alis: ["purchase.read", "supplier.read"], satis: ["sales.read"], teklifler: ["sales.read"], siparisler: ["sales.read"], eticaret: ["sales.read"], whatsapp: ["sales.read"], cari: ["customer.read", "supplier.read"], finans: ["cash.read"], masraflar: ["accounting.read"], personeller: ["tenant.users"], kullanicilar: ["tenant.users"], raporlar: ["reports.read"], ayarlar: ["tenant.settings"] };
+        if (page === "alis") return esleme.alis.every(oturumYetkisiVar);
         return !esleme[page] || esleme[page].some(oturumYetkisiVar);
     }
     function mobilYetkiMenusunuUygula() {
@@ -712,11 +714,11 @@
         try {
             const [finans, rapor, satisData, masrafData, cari] =
                 await Promise.all([
-                    api("/api/tenant/finans/ozet"),
-                    api("/api/tenant/raporlar/genel"),
-                    api("/api/tenant/satis"),
-                    api("/api/tenant/masraflar/ozet"),
-                    api("/api/tenant/cari/ozet")
+                    oturumYetkisiVar("cash.read") ? api("/api/tenant/finans/ozet") : Promise.resolve({}),
+                    oturumYetkisiVar("reports.read") ? api("/api/tenant/raporlar/genel") : Promise.resolve({}),
+                    oturumYetkisiVar("sales.read") ? api("/api/tenant/satis") : Promise.resolve({ satislar: [] }),
+                    oturumYetkisiVar("accounting.read") ? api("/api/tenant/masraflar/ozet") : Promise.resolve({}),
+                    (oturumYetkisiVar("customer.read") || oturumYetkisiVar("supplier.read")) ? api("/api/tenant/cari/ozet") : Promise.resolve({})
                 ]);
 
             const satislar = Array.isArray(satisData.satislar)
@@ -877,7 +879,7 @@
                 );
             }
 
-            if (cari.tedarikciBorc > 0) {
+            if (oturumYetkisiVar("supplier.read") && cari.tedarikciBorc > 0) {
                 oneriler.push(
                     "Vadesi yaklaşan tedarikçi borçlarını kontrol et."
                 );
@@ -1112,7 +1114,7 @@
 
                     </div>
 
-                    <div class="dashboard-card">
+                    ${oturumYetkisiVar("supplier.read") ? `<div class="dashboard-card">
 
                         <div class="dashboard-card-title">
                             Tedarikçi Borcu
@@ -1126,9 +1128,9 @@
                             Ödenmemiş
                         </div>
 
-                    </div>
+                    </div>` : ""}
 
-                    <div class="dashboard-card positive">
+                    ${oturumYetkisiVar("customer.read") && oturumYetkisiVar("supplier.read") ? `<div class="dashboard-card positive">
 
                         <div class="dashboard-card-title">
                             Net Cari
@@ -1142,7 +1144,7 @@
                             Alacak - borç
                         </div>
 
-                    </div>
+                    </div>` : ""}
 
                     <div class="dashboard-card">
 
@@ -1399,6 +1401,7 @@
 
             dashboardKartlariniBagla();
             document.querySelectorAll("[data-dashboard-page]").forEach(button => {
+                button.hidden = !sayfaErisimiVar(button.dataset.dashboardPage);
                 button.addEventListener("click", () => sayfaYukle(button.dataset.dashboardPage));
             });
             const hizliSayfalar = { "Müşteriler": "musteriler", "Stok": "stok", "Satış": "satis", "Masraflar": "masraflar", "Raporlar": "raporlar" };
@@ -3354,11 +3357,13 @@
         loading();
 
         try {
+            const musteriErisimi = oturumYetkisiVar("customer.read");
+            const tedarikciErisimi = oturumYetkisiVar("supplier.read");
             const [ozetData, musteriData, tedarikciData, profilData] =
                 await Promise.all([
                     api("/api/tenant/cari/ozet"),
-                    api("/api/tenant/musteriler"),
-                    api("/api/tenant/tedarikciler"),
+                    musteriErisimi ? api("/api/tenant/musteriler") : Promise.resolve({ musteriler: [] }),
+                    tedarikciErisimi ? api("/api/tenant/tedarikciler") : Promise.resolve({ tedarikciler: [] }),
                     api("/api/auth/profil")
                 ]);
 
@@ -3368,25 +3373,24 @@
 
             content.innerHTML = `
                 <div class="dashboard-panel">
-                    <div class="dashboard-grid"
-                         style="grid-template-columns:repeat(3,minmax(0,1fr));">
-                        <div class="dashboard-card">
+                    <div class="dashboard-grid">
+                        ${musteriErisimi ? `<div class="dashboard-card">
                             <div class="dashboard-card-title">Müşteri Alacağı</div>
                             <div id="cariMusteriAlacak" class="dashboard-card-value">
                                 ${para(ozetData.musteriAlacak)}
                             </div>
                             <div class="dashboard-card-info">Tahsil edilmemiş</div>
-                        </div>
+                        </div>` : ""}
 
-                        <div class="dashboard-card">
+                        ${tedarikciErisimi ? `<div class="dashboard-card">
                             <div class="dashboard-card-title">Tedarikçi Borcu</div>
                             <div id="cariTedarikciBorc" class="dashboard-card-value">
                                 ${para(ozetData.tedarikciBorc)}
                             </div>
                             <div class="dashboard-card-info">Ödenmemiş</div>
-                        </div>
+                        </div>` : ""}
 
-                        <div class="dashboard-card positive">
+                        ${musteriErisimi && tedarikciErisimi ? `<div class="dashboard-card positive">
                             <div class="dashboard-card-title">Net Cari</div>
                             <div id="cariNet" class="dashboard-card-value">
                                 ${para(ozetData.netCari)}
@@ -3394,7 +3398,7 @@
                             <div class="dashboard-card-info">
                                 Müşteri alacağı - tedarikçi borcu
                             </div>
-                        </div>
+                        </div>` : ""}
                     </div>
 
                     <div style="
@@ -3406,12 +3410,12 @@
                         flex-wrap:wrap;
                     ">
                         <div class="cari-tabs" style="display:flex;gap:8px;">
-                        <button type="button" class="erp-small-button cari-tab active" data-cari-tab="musteri">
+                        ${musteriErisimi ? `<button type="button" class="erp-small-button cari-tab active" data-cari-tab="musteri">
                             Müşteriler
-                        </button>
-                        <button type="button" class="erp-small-button cari-tab" data-cari-tab="tedarikci">
+                        </button>` : ""}
+                        ${tedarikciErisimi ? `<button type="button" class="erp-small-button cari-tab ${musteriErisimi ? "" : "active"}" data-cari-tab="tedarikci">
                             Tedarikçiler
-                        </button>
+                        </button>` : ""}
                         </div>
 
                         <button
@@ -3431,7 +3435,7 @@
                 </div>
             `;
 
-            let aktif = "musteri";
+            let aktif = musteriErisimi ? "musteri" : "tedarikci";
             const arama = document.getElementById("cariArama");
             const yeniCariBtn = document.getElementById("yeniMusteriBtn");
 
@@ -4329,6 +4333,7 @@
         document.getElementById("kullaniciModal")?.remove(); const yonetici = mevcut && ["OWNER", "ADMIN"].includes(mevcut.rol), overlay = document.createElement("div"); overlay.id = "kullaniciModal"; overlay.className = "erp-modal-overlay";
         const rol = mevcut?.rol || "SALES", secili = new Set(mevcut?.etkinYetkiler || data.roller.find(x => x.kod === rol)?.varsayilanYetkiler || []), gruplar = [...new Set(data.yetkiKatalogu.map(x => x.grup))];
         overlay.innerHTML = `<div class="erp-modal" style="max-width:980px"><div class="erp-modal-header"><div><h2>${mevcut ? "Kullanıcı ve Yetkileri" : "Yeni Saha Kullanıcısı"}</h2><p>E-posta veya telefonla mobil giriş; yetkiler kutucuklarla anında uygulanır.</p></div><button class="erp-modal-close">×</button></div><form><div class="erp-form-grid"><label>Ad Soyad<input name="adSoyad" minlength="2" maxlength="100" required value="${escapeHtml(mevcut?.adSoyad || "")}"></label><label>Görev / Ünvan<input name="unvan" maxlength="100" value="${escapeHtml(mevcut?.unvan || "")}" placeholder="Saha Satış Elemanı"></label>${mevcut ? `<label>E-posta / Telefon<input disabled value="${escapeHtml(mevcut.email || mevcut.telefon || "-")}"></label>` : `<label>E-posta<input name="email" type="email" maxlength="254" placeholder="Telefon varsa isteğe bağlı"></label><label>Cep Telefonu<input name="telefon" type="tel" maxlength="30" placeholder="05xx xxx xx xx"></label><label>Başlangıç Parolası<input name="sifre" type="password" minlength="8" maxlength="128" autocomplete="new-password" required></label>`}<label>Rol<select name="rol" ${yonetici ? "disabled" : ""}>${data.roller.map(x => `<option value="${x.kod}" ${x.kod === rol ? "selected" : ""}>${escapeHtml(x.ad)}</option>`).join("")}${mevcut?.rol === "OWNER" ? '<option value="OWNER" selected>İşletme Sahibi</option>' : ""}</select></label>${mevcut ? `<label>Hesap Durumu<select name="aktif" ${yonetici ? "disabled" : ""}><option value="true" ${mevcut.aktif ? "selected" : ""}>Aktif</option><option value="false" ${!mevcut.aktif ? "selected" : ""}>Pasif — girişi engelle</option></select></label>` : ""}</div><div class="permission-section"><div class="panel-heading"><div><h3>Modül ve İşlem Yetkileri</h3><p>İşaretli kutulara izin verilir. Kritik yetkileri yalnızca gerektiğinde açın.</p></div>${!yonetici ? '<button type="button" id="rolYetkileriniUygula" class="erp-small-button">Rol Önerisini Uygula</button>' : ""}</div><div class="permission-grid">${gruplar.map(grup => `<fieldset><legend>${escapeHtml(grup)}</legend>${data.yetkiKatalogu.filter(x => x.grup === grup).map(x => `<label class="permission-toggle"><input type="checkbox" name="yetki" value="${x.kod}" ${secili.has(x.kod) ? "checked" : ""} ${yonetici ? "disabled" : ""}><span>${escapeHtml(x.ad)}</span></label>`).join("")}</fieldset>`).join("")}</div></div><div id="kullaniciMesaj"></div><div class="erp-modal-footer"><button type="button" data-kapat class="erp-small-button">Vazgeç</button><button class="erp-primary-button" ${yonetici ? "disabled" : ""}>${mevcut ? "Değişiklikleri Kaydet" : "Kullanıcıyı Oluştur"}</button></div></form></div>`;
+        overlay.querySelector(".erp-modal")?.classList.add("user-permission-modal");
         document.body.appendChild(overlay); const form = overlay.querySelector("form"), kapat = () => overlay.remove(), rolUygula = () => { const r = data.roller.find(x => x.kod === form.elements.rol.value), izinler = new Set(r?.varsayilanYetkiler || []); form.querySelectorAll('[name="yetki"]').forEach(x => x.checked = izinler.has(x.value)); }; overlay.querySelectorAll(".erp-modal-close,[data-kapat]").forEach(x => x.onclick = kapat); overlay.querySelector("#rolYetkileriniUygula")?.addEventListener("click", rolUygula); if (!mevcut) form.elements.rol.onchange = rolUygula;
         form.onsubmit = async e => { e.preventDefault(); const f = e.currentTarget, body = { adSoyad: f.elements.adSoyad.value, unvan: f.elements.unvan.value, rol: f.elements.rol.value, ozelYetkiler: [...f.querySelectorAll('[name="yetki"]:checked')].map(x => x.value) }; if (mevcut) body.aktif = f.elements.aktif.value === "true"; else { body.email = f.elements.email.value; body.telefon = f.elements.telefon.value; body.sifre = f.elements.sifre.value; } try { const sonuc = await api(mevcut ? `/api/tenant/kullanicilar/${encodeURIComponent(mevcut.id)}` : "/api/tenant/kullanicilar", { method: mevcut ? "PATCH" : "POST", body: JSON.stringify(body) }); overlay.querySelector("#kullaniciMesaj").innerHTML = `<div class="success">${escapeHtml(sonuc.mesaj)}</div>`; setTimeout(() => { kapat(); kullanicilarYukle(); }, 650); } catch (error) { overlay.querySelector("#kullaniciMesaj").innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } };
     }

@@ -10,6 +10,7 @@ const router = express.Router();
 router.use(kimlikKontrol);
 router.use(tenantKontrol);
 router.use(yetkiKontrol("purchase.read"));
+router.use(yetkiKontrol("supplier.read"));
 
 router.get("/", controller.listele);
 router.get("/iade", controller.iadeleriListele);

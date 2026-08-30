@@ -5,6 +5,7 @@ const Alis = require("../models/Alis");
 const Stok = require("../models/Stok");
 const CariHareket = require("../models/CariHareket");
 const Personel = require("../models/Personel");
+const { etkinYetkiler } = require("../middleware/yetkiKontrol");
 
 function tenantId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
@@ -39,6 +40,9 @@ async function genel(req, res, next) {
     try {
         const tId = tenantId(req);
         const tarih = tarihFiltresi(req);
+        const izinler = new Set(etkinYetkiler(req.currentUser || {}));
+        const musteriGorebilir = izinler.has("customer.read");
+        const tedarikciGorebilir = izinler.has("supplier.read");
 
         const satisFilter = { tenantId: tId };
         const alisFilter = { tenantId: tId };
@@ -49,6 +53,11 @@ async function genel(req, res, next) {
             alisFilter.tarih = tarih;
             cariFilter.tarih = tarih;
         }
+        if (musteriGorebilir !== tedarikciGorebilir) {
+            cariFilter.tarafTipi = musteriGorebilir ? "MUSTERI" : "TEDARIKCI";
+        } else if (!musteriGorebilir && !tedarikciGorebilir) {
+            cariFilter.tarafTipi = "ERISIM_YOK";
+        }
 
         const [
             satislar,
@@ -58,7 +67,7 @@ async function genel(req, res, next) {
             personelSayisi
         ] = await Promise.all([
             Satis.find(satisFilter).select("araToplam toplamKdv genelToplam").lean(),
-            Alis.find(alisFilter).select("araToplam toplamKdv genelToplam").lean(),
+            tedarikciGorebilir ? Alis.find(alisFilter).select("araToplam toplamKdv genelToplam").lean() : [],
             Stok.find({ tenantId: tId }).select("miktar maliyet urunId depoId").lean(),
             CariHareket.find(cariFilter).select("tarafTipi tip tutar").lean(),
             Personel.countDocuments({ tenantId: tId, aktif: true })
@@ -109,10 +118,10 @@ async function genel(req, res, next) {
                     toplam: satisToplam
                 },
 
-                alis: {
+                ...(tedarikciGorebilir ? { alis: {
                     belgeSayisi: alislar.length,
                     toplam: alisToplam
-                },
+                } } : {}),
 
                 stok: {
                     satirSayisi: stoklar.length,
@@ -120,11 +129,11 @@ async function genel(req, res, next) {
                     toplamMaliyet: stokMaliyeti
                 },
 
-                cari: {
+                ...((musteriGorebilir || tedarikciGorebilir) ? { cari: {
                     tahsilat,
                     odeme,
                     netNakitHareketi: tahsilat - odeme
-                },
+                } } : {}),
 
                 personel: {
                     aktif: personelSayisi
@@ -220,12 +229,24 @@ async function stok(req, res, next) {
 
 async function cari(req, res, next) {
     try {
+        const izinler = new Set(etkinYetkiler(req.currentUser || {}));
+        const musteriGorebilir = izinler.has("customer.read");
+        const tedarikciGorebilir = izinler.has("supplier.read");
         const filtre = {
             tenantId: tenantId(req)
         };
 
         if (req.query.tarafTipi) {
-            filtre.tarafTipi = req.query.tarafTipi;
+            const tarafTipi = String(req.query.tarafTipi).toUpperCase();
+            if ((tarafTipi === "MUSTERI" && !musteriGorebilir) || (tarafTipi === "TEDARIKCI" && !tedarikciGorebilir)) {
+                return res.status(403).json({ basarili: false, mesaj: "Bu cari türünü raporlama yetkiniz bulunmuyor." });
+            }
+            if (!["MUSTERI", "TEDARIKCI"].includes(tarafTipi)) return res.status(400).json({ basarili: false, mesaj: "Geçersiz cari türü." });
+            filtre.tarafTipi = tarafTipi;
+        } else if (musteriGorebilir !== tedarikciGorebilir) {
+            filtre.tarafTipi = musteriGorebilir ? "MUSTERI" : "TEDARIKCI";
+        } else if (!musteriGorebilir && !tedarikciGorebilir) {
+            return res.status(403).json({ basarili: false, mesaj: "Cari raporu yetkiniz bulunmuyor." });
         }
 
         if (req.query.tarafId) {
