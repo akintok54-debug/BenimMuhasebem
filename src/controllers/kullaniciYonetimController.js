@@ -19,13 +19,14 @@ function guvenliKullanici(k) {
 }
 function yonetilebilirRol(req, rol) {
     const actorRol = String(req.currentUser?.rol || "").toUpperCase();
-    return ROLLER.includes(rol) && !(actorRol === "ADMIN" && rol === "ADMIN");
+    return ROLLER.includes(rol) && (rol !== "ADMIN" || actorRol === "OWNER");
 }
 
 async function listele(req, res, next) {
     try {
         const kullanicilar = await Kullanici.find({ tenantId: tenantId(req), silinmeTarihi: null }).select("adSoyad email telefon unvan rol aktif ozelYetkiler yetkiModu sonGirisTarihi createdAt").sort({ aktif: -1, adSoyad: 1 });
-        return res.json({ basarili: true, kullanicilar: kullanicilar.map(guvenliKullanici), yetkiKatalogu: YETKI_KATALOGU, roller: ROLLER.map(kod => ({ kod, ad: ROL_ETIKETLERI[kod], varsayilanYetkiler: varsayilanYetkiler(kod) })) });
+        const atanabilirRoller = ROLLER.filter(rol => yonetilebilirRol(req, rol));
+        return res.json({ basarili: true, aktifKullaniciId: req.currentUser?._id, kullanicilar: kullanicilar.map(guvenliKullanici), yetkiKatalogu: YETKI_KATALOGU, roller: atanabilirRoller.map(kod => ({ kod, ad: ROL_ETIKETLERI[kod], varsayilanYetkiler: varsayilanYetkiler(kod) })) });
     } catch (error) { next(error); }
 }
 
