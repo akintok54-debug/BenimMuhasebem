@@ -19,6 +19,7 @@ router.get("/ozet", controller.ozet);
 
 router.get("/kasalar", controller.kasaListele);
 router.get("/kasalar/:id/ekstre", controller.kasaEkstresi);
+router.get("/kasalar/:id/rapor", controller.kasaRaporu);
 router.post("/kasalar", yetkiKontrol("cash.write"), controller.kasaOlustur);
 
 router.get("/bankalar", controller.bankaListele);

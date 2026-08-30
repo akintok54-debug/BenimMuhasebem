@@ -16,6 +16,7 @@ const SatinAlmaSiparis = require("../models/SatinAlmaSiparis");
 function tenantObjectId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
 }
+function kullaniciId(req) { return req.currentUser?._id || req.kullanici?.kullaniciId || req.user?.kullaniciId || req.kullanici?._id || req.user?._id || null; }
 
 function hesaplaKalem(kalem) {
     const miktar = Number(kalem.miktar || 0);
@@ -325,13 +326,13 @@ async function olustur(req, res, next) {
         tedarikci.bakiye += kalanTutar;
         await tedarikci.save();
 
-        await CariHareket.create({ tenantId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id, tip: "ALACAK", tutar: genelToplam, belgeNo, aciklama: `Alış ${belgeNo}`, kaynak: "ALIS", kaynakId: alis._id, tarih: body.tarih || new Date(), kullaniciId: req.kullanici?._id || req.user?._id || null });
+        await CariHareket.create({ tenantId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id, tip: "ALACAK", tutar: genelToplam, belgeNo, aciklama: `Alış ${belgeNo}`, kaynak: "ALIS", kaynakId: alis._id, tarih: body.tarih || new Date(), kullaniciId: kullaniciId(req) });
 
         if (odenenTutar > 0) {
             odemeHesabi.bakiye -= odenenTutar;
             await odemeHesabi.save();
-            const odemeCari = await CariHareket.create({ tenantId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id, tip: "ODEME", tutar: odenenTutar, belgeNo, aciklama: `Alış ödemesi ${belgeNo}`, kaynak: "ALIS_ODEME", kaynakId: alis._id, tarih: body.tarih || new Date(), kullaniciId: req.kullanici?._id || req.user?._id || null });
-            await ParaHareket.create({ tenantId, hesapTipi, hesapId: odemeHesabi._id, tip: "CIKIS", tutar: odenenTutar, paraBirimi: odemeHesabi.paraBirimi || "TRY", belgeNo, aciklama: `Alış ödemesi ${belgeNo}`, kaynak: "ALIS_ODEME", kaynakId: odemeCari._id, tarih: body.tarih || new Date(), kullaniciId: req.kullanici?._id || req.user?._id || null });
+            const odemeCari = await CariHareket.create({ tenantId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id, tip: "ODEME", tutar: odenenTutar, belgeNo, aciklama: `Alış ödemesi ${belgeNo}`, kaynak: "ALIS_ODEME", kaynakId: alis._id, tarih: body.tarih || new Date(), kullaniciId: kullaniciId(req) });
+            await ParaHareket.create({ tenantId, hesapTipi, hesapId: odemeHesabi._id, tip: "CIKIS", tutar: odenenTutar, paraBirimi: odemeHesabi.paraBirimi || "TRY", belgeNo, aciklama: `Alış ödemesi ${belgeNo}`, kaynak: "ALIS_ODEME", kaynakId: odemeCari._id, tarih: body.tarih || new Date(), kullaniciId: kullaniciId(req) });
         }
 
         return res.status(201).json({

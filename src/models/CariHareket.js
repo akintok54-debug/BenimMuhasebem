@@ -67,6 +67,11 @@ const CariHareketSchema = new mongoose.Schema(
         bakiyeDegisimi: { type: Number, default: null },
         oncekiBakiye: { type: Number, default: null },
         sonrakiBakiye: { type: Number, default: null },
+        durum: { type: String, enum: ["AKTIF", "IPTAL"], default: "AKTIF", index: true },
+        iptalTarihi: { type: Date, default: null },
+        iptalNedeni: { type: String, trim: true, default: "" },
+        iptalEdenKullaniciId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null },
+        iptalParaHareketId: { type: mongoose.Schema.Types.ObjectId, ref: "ParaHareket", default: null },
 
         kullaniciId: {
             type: mongoose.Schema.Types.ObjectId,

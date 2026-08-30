@@ -1611,17 +1611,37 @@ th {
 .invoice-template-kompakt .invoice-table th, .invoice-template-kompakt .invoice-table td { padding: 6px 5px; font-size: 10px; }
 .invoice-template-kompakt .invoice-header { border-left: 8px solid var(--invoice-primary); padding-left: 15px; }
 
+.cash-daily-panel { overflow: hidden; }
+.cash-daily-filters { display: grid; grid-template-columns: minmax(230px, 1.35fr) minmax(155px, .7fr) minmax(155px, .7fr) auto; align-items: end; gap: 12px; margin: 16px 0 20px; }
+.cash-daily-filters label { display: flex; flex-direction: column; gap: 6px; color: #475569; font-size: 12px; font-weight: 800; }
+.cash-daily-filters select, .cash-daily-filters input { min-height: 42px; border: 1px solid #dbe3ed; border-radius: 10px; padding: 0 12px; background: #fff; color: #0f172a; }
+.cash-daily-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+.cash-daily-kpis { margin-bottom: 16px; }
+.cash-period-table { margin: 4px 0 16px; }
+.cash-daily-table td { vertical-align: middle; }
+.cash-daily-table td > small { display: block; margin-top: 4px; color: #64748b; white-space: nowrap; }
+.cash-type { display: inline-flex; align-items: center; min-height: 27px; padding: 4px 9px; border-radius: 999px; background: #e0f2fe; color: #075985; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.cash-flow-example { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin: 12px 0 16px; padding: 13px 15px; border: 1px solid #bae6fd; border-radius: 12px; background: #f0f9ff; color: #0c4a6e; }
+.cash-flow-example span { text-align: right; }
+
 @media (max-width: 900px) {
     .settings-template-grid, .settings-integration-grid { grid-template-columns: 1fr; }
     .personnel-toolbar { align-items: stretch; flex-direction: column; }
     .personnel-actions { padding-left: 4px; }
     .personnel-filters { grid-template-columns: 1fr; }
     .personnel-finance-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cash-daily-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cash-daily-buttons { grid-column: 1 / -1; }
 }
 
 @media (max-width: 560px) {
     .personnel-finance-summary { grid-template-columns: 1fr; }
     .personnel-hero-actions { justify-content: flex-start; }
+    .cash-daily-filters { grid-template-columns: 1fr; }
+    .cash-daily-buttons { grid-column: auto; }
+    .cash-daily-buttons button { flex: 1 1 auto; }
+    .cash-flow-example { align-items: flex-start; flex-direction: column; }
+    .cash-flow-example span { text-align: left; }
 }
 
 @media print {

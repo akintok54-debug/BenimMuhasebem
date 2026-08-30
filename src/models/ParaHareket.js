@@ -59,6 +59,10 @@ const ParaHareketSchema = new mongoose.Schema(
             default: null
         },
 
+        islemAnahtari: { type: String, default: undefined, select: false },
+        orijinalHareketId: { type: mongoose.Schema.Types.ObjectId, ref: "ParaHareket", default: null },
+        tersHareketId: { type: mongoose.Schema.Types.ObjectId, ref: "ParaHareket", default: null },
+
         belgeNo: { type: String, trim: true, default: "" },
 
         karsiHesapTipi: {
@@ -93,6 +97,13 @@ ParaHareketSchema.index({
     hesapTipi: 1,
     hesapId: 1,
     tarih: -1
+});
+
+ParaHareketSchema.index({ tenantId: 1, islemAnahtari: 1 }, { unique: true, sparse: true });
+ParaHareketSchema.pre("validate", function () {
+    if (!this.islemAnahtari && this.kaynakId && this.kaynak && this.kaynak !== "MANUEL") {
+        this.islemAnahtari = [this.hesapTipi, this.hesapId, this.tip, this.kaynak, this.kaynakId].map(String).join(":");
+    }
 });
 
 module.exports = mongoose.model(

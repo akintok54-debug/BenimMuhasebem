@@ -189,7 +189,7 @@ async function musteriManuelHareket(req, res, next) {
                 kaynak,
                 belgeNo: String(body.belgeNo || "").trim(),
                 tarih: body.tarih || new Date(),
-                kullaniciId: req.kullanici?._id || req.user?._id || null
+                kullaniciId: aktorId(req)
             });
 
             return res.status(201).json({
@@ -362,26 +362,27 @@ async function musteriTahsilat(req, res, next) {
 }
 
 async function musteriTahsilatSil(req, res, next) {
+    let hareket = null, musteri = null, hesap = null, paraHareket = null, tersHareket = null, bakiyelerGuncellendi = false;
     try {
         const tId = tenantId(req);
-        const hareket = await CariHareket.findOne({
+        hareket = await CariHareket.findOne({
             _id: req.params.id,
             tenantId: tId,
             tarafTipi: "MUSTERI",
             tip: "TAHSILAT",
-            kaynak: "TAHSILAT"
+            kaynak: "TAHSILAT",
+            durum: { $ne: "IPTAL" }
         });
         if (!hareket) return res.status(404).json({ basarili: false, mesaj: "Tahsilat kaydı bulunamadı." });
 
-        const musteri = await Musteri.findOne({ _id: hareket.tarafId, tenantId: tId });
+        musteri = await Musteri.findOne({ _id: hareket.tarafId, tenantId: tId });
         if (!musteri) return res.status(409).json({ basarili: false, mesaj: "Tahsilatın müşteri kaydı bulunamadı." });
 
-        const paraHareket = await ParaHareket.findOne({
+        paraHareket = await ParaHareket.findOne({
             tenantId: tId,
             kaynak: "TAHSILAT",
             kaynakId: hareket._id
         });
-        let hesap = null;
         if (paraHareket) {
             hesap = paraHareket.hesapTipi === "KASA"
                 ? await Kasa.findOne({ _id: paraHareket.hesapId, tenantId: tId })
@@ -398,11 +399,22 @@ async function musteriTahsilatSil(req, res, next) {
             hesap.bakiye -= Number(paraHareket.tutar || 0);
             await hesap.save();
         }
-        if (paraHareket) await ParaHareket.deleteOne({ _id: paraHareket._id, tenantId: tId });
-        await CariHareket.deleteOne({ _id: hareket._id, tenantId: tId });
+        bakiyelerGuncellendi = true;
+        if (paraHareket) {
+            tersHareket = await ParaHareket.create({ tenantId: tId, hesapTipi: paraHareket.hesapTipi, hesapId: paraHareket.hesapId, tip: "CIKIS", tutar: paraHareket.tutar, paraBirimi: paraHareket.paraBirimi || "TRY", aciklama: `Tahsilat iptali: ${hareket.aciklama || hareket.belgeNo || "Müşteri tahsilatı"}`, kaynak: "TAHSILAT_IPTAL", kaynakId: hareket._id, belgeNo: hareket.belgeNo || paraHareket.belgeNo || "", tarih: new Date(), kullaniciId: req.currentUser?._id || req.kullanici?.kullaniciId || req.user?.kullaniciId || null, orijinalHareketId: paraHareket._id });
+        }
+        hareket.durum = "IPTAL"; hareket.iptalTarihi = new Date(); hareket.iptalNedeni = String(req.body?.neden || "Tahsilat iptal edildi").trim(); hareket.iptalEdenKullaniciId = req.currentUser?._id || req.kullanici?.kullaniciId || req.user?.kullaniciId || null; hareket.iptalParaHareketId = tersHareket?._id || null; await hareket.save();
 
-        return res.json({ basarili: true, mesaj: "Tahsilat silindi; müşteri ve hesap bakiyeleri geri alındı." });
-    } catch (error) { next(error); }
+        return res.json({ basarili: true, mesaj: "Tahsilat iptal edildi; geçmiş hareket korundu ve ters kasa hareketi oluşturuldu.", tersHareket });
+    } catch (error) {
+        const tId = tenantId(req);
+        if (tersHareket?._id) await ParaHareket.deleteOne({ _id: tersHareket._id, tenantId: tId }).catch(() => {});
+        if (bakiyelerGuncellendi) {
+            if (musteri?._id) await Musteri.updateOne({ _id: musteri._id, tenantId: tId }, { $inc: { bakiye: -Number(hareket?.tutar || 0) } }).catch(() => {});
+            if (hesap?._id) { const Model = paraHareket?.hesapTipi === "KASA" ? Kasa : Banka; await Model.updateOne({ _id: hesap._id, tenantId: tId }, { $inc: { bakiye: Number(paraHareket?.tutar || 0) } }).catch(() => {}); }
+        }
+        next(error);
+    }
 }
 
 async function musteriTahsilatGuncelle(req, res, next) {
@@ -419,7 +431,8 @@ async function musteriTahsilatGuncelle(req, res, next) {
             tenantId: tId,
             tarafTipi: "MUSTERI",
             tip: "TAHSILAT",
-            kaynak: "TAHSILAT"
+            kaynak: "TAHSILAT",
+            durum: { $ne: "IPTAL" }
         });
         if (!hareket) return res.status(404).json({ basarili: false, mesaj: "Tahsilat kaydı bulunamadı." });
 
@@ -497,13 +510,13 @@ async function musteriOdeme(req, res, next) {
                 aciklama: String(body.aciklama || "Müşteriye ödeme").trim(), kaynak: "MUSTERI_ODEME",
                 belgeNo: String(body.belgeNo || "").trim(), odemeYontemi: odeme.yontem,
                 oncekiBakiye, sonrakiBakiye: musteri.bakiye, bakiyeDegisimi: tutar,
-                tarih: body.tarih || new Date(), kullaniciId: req.kullanici?._id || req.user?._id || null
+                tarih: body.tarih || new Date(), kullaniciId: aktorId(req)
             });
             const paraHareket = hesap ? await ParaHareket.create({
                 tenantId: tId, hesapTipi: odeme.hesapTipi, hesapId: hesap._id, tip: "CIKIS", tutar, paraBirimi: hesap.paraBirimi || "TRY",
                 aciklama: String(body.aciklama || "Müşteriye ödeme").trim(), kaynak: "MUSTERI_ODEME",
                 kaynakId: cariHareket._id, belgeNo: String(body.belgeNo || "").trim(), tarih: body.tarih || new Date(),
-                kullaniciId: req.kullanici?._id || req.user?._id || null
+                kullaniciId: aktorId(req)
             }) : null;
             return res.status(201).json({ basarili: true, mesaj: "Müşteri ödemesi kaydedildi.", musteriBakiye: musteri.bakiye, cariHareket, paraHareket });
         } catch (error) {
@@ -530,7 +543,7 @@ async function musteriBakiyeDuzelt(req, res, next) {
                 tenantId: tId, tarafTipi: "MUSTERI", tarafId: musteri._id, tip: "DUZELTME", tutar: Math.abs(fark),
                 aciklama: String(body.aciklama || "Yetkili cari bakiye düzeltmesi").trim(), kaynak: "BAKIYE_DUZELTME",
                 belgeNo: String(body.belgeNo || "").trim(), bakiyeDegisimi: fark, oncekiBakiye, sonrakiBakiye: yeniBakiye,
-                tarih: body.tarih || new Date(), kullaniciId: req.kullanici?._id || req.user?._id || null
+                tarih: body.tarih || new Date(), kullaniciId: aktorId(req)
             });
             return res.json({ basarili: true, mesaj: "Cari bakiye düzeltildi.", oncekiBakiye, musteriBakiye: yeniBakiye, fark, hareket });
         } catch (error) { musteri.bakiye = oncekiBakiye; await musteri.save(); throw error; }
@@ -650,7 +663,7 @@ async function tedarikciManuelHareket(req, res, next) {
         const tedarikci = await Tedarikci.findOneAndUpdate({ _id: body.tedarikciId, tenantId: tId }, { $inc: { bakiye: degisim } }, { new: true });
         if (!tedarikci) return res.status(404).json({ basarili: false, mesaj: "Tedarikçi bulunamadı." });
         try {
-            const hareket = await CariHareket.create({ tenantId: tId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id, tip: hareketTipi, tutar, bakiyeDegisimi: degisim, sonrakiBakiye: tedarikci.bakiye, oncekiBakiye: Number(tedarikci.bakiye) - degisim, aciklama: String(body.aciklama || "Manuel tedarikçi cari işlemi").trim(), kaynak: tip === "MASRAF" ? "MASRAF" : "MANUEL", belgeNo: String(body.belgeNo || "").trim(), tarih: body.tarih || new Date(), kullaniciId: req.kullanici?._id || req.user?._id || null });
+            const hareket = await CariHareket.create({ tenantId: tId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id, tip: hareketTipi, tutar, bakiyeDegisimi: degisim, sonrakiBakiye: tedarikci.bakiye, oncekiBakiye: Number(tedarikci.bakiye) - degisim, aciklama: String(body.aciklama || "Manuel tedarikçi cari işlemi").trim(), kaynak: tip === "MASRAF" ? "MASRAF" : "MANUEL", belgeNo: String(body.belgeNo || "").trim(), tarih: body.tarih || new Date(), kullaniciId: aktorId(req) });
             return res.status(201).json({ basarili: true, mesaj: "Tedarikçi cari hareketi kaydedildi.", tedarikciBakiye: tedarikci.bakiye, hareket });
         } catch (error) { await Tedarikci.updateOne({ _id: tedarikci._id, tenantId: tId }, { $inc: { bakiye: -degisim } }); throw error; }
     } catch (error) { next(error); }
@@ -665,7 +678,7 @@ async function tedarikciBakiyeDuzelt(req, res, next) {
         const oncekiBakiye = Number(tedarikci.bakiye || 0), fark = yeniBakiye - oncekiBakiye;
         if (Math.abs(fark) < 0.000001) return res.status(409).json({ basarili: false, mesaj: "Yeni bakiye mevcut bakiyeyle aynı." });
         tedarikci.bakiye = yeniBakiye; await tedarikci.save();
-        try { const hareket = await CariHareket.create({ tenantId: tId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id, tip: "DUZELTME", tutar: Math.abs(fark), bakiyeDegisimi: fark, oncekiBakiye, sonrakiBakiye: yeniBakiye, aciklama: String(body.aciklama || "Yetkili tedarikçi bakiye düzeltmesi").trim(), kaynak: "BAKIYE_DUZELTME", belgeNo: String(body.belgeNo || "").trim(), tarih: body.tarih || new Date(), kullaniciId: req.kullanici?._id || req.user?._id || null }); return res.json({ basarili: true, mesaj: "Tedarikçi bakiyesi düzeltildi.", tedarikciBakiye: yeniBakiye, hareket }); }
+        try { const hareket = await CariHareket.create({ tenantId: tId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id, tip: "DUZELTME", tutar: Math.abs(fark), bakiyeDegisimi: fark, oncekiBakiye, sonrakiBakiye: yeniBakiye, aciklama: String(body.aciklama || "Yetkili tedarikçi bakiye düzeltmesi").trim(), kaynak: "BAKIYE_DUZELTME", belgeNo: String(body.belgeNo || "").trim(), tarih: body.tarih || new Date(), kullaniciId: aktorId(req) }); return res.json({ basarili: true, mesaj: "Tedarikçi bakiyesi düzeltildi.", tedarikciBakiye: yeniBakiye, hareket }); }
         catch (error) { tedarikci.bakiye = oncekiBakiye; await tedarikci.save(); throw error; }
     } catch (error) { next(error); }
 }
@@ -677,7 +690,7 @@ async function tedarikciTahsilat(req, res, next) {
         const tedarikci = await Tedarikci.findOne({ _id: body.tedarikciId, tenantId: tId }); if (!tedarikci) return res.status(404).json({ basarili: false, mesaj: "Tedarikçi bulunamadı." });
         const hesap = odeme.hesapTipi ? await hesapBul(req, odeme.hesapTipi, body.hesapId) : null; if (odeme.hesapTipi && !hesap) return res.status(404).json({ basarili: false, mesaj: "Tahsilat hesabı bulunamadı." });
         const oncekiBakiye = Number(tedarikci.bakiye || 0); tedarikci.bakiye = oncekiBakiye + tutar; if (hesap) hesap.bakiye += tutar; await tedarikci.save(); if (hesap) await hesap.save();
-        try { const cariHareket = await CariHareket.create({ tenantId: tId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id, tip: "TAHSILAT", tutar, bakiyeDegisimi: tutar, oncekiBakiye, sonrakiBakiye: tedarikci.bakiye, odemeYontemi: odeme.yontem, aciklama: String(body.aciklama || "Tedarikçiden tahsilat").trim(), kaynak: "TEDARIKCI_TAHSILAT", belgeNo: String(body.belgeNo || "").trim(), tarih: body.tarih || new Date(), kullaniciId: req.kullanici?._id || req.user?._id || null }); const paraHareket = hesap ? await ParaHareket.create({ tenantId: tId, hesapTipi: odeme.hesapTipi, hesapId: hesap._id, tip: "GIRIS", tutar, paraBirimi: hesap.paraBirimi || "TRY", aciklama: String(body.aciklama || "Tedarikçiden tahsilat").trim(), kaynak: "TEDARIKCI_TAHSILAT", kaynakId: cariHareket._id, belgeNo: String(body.belgeNo || "").trim(), tarih: body.tarih || new Date(), kullaniciId: req.kullanici?._id || req.user?._id || null }) : null; return res.status(201).json({ basarili: true, mesaj: "Tedarikçi tahsilatı kaydedildi.", tedarikciBakiye: tedarikci.bakiye, cariHareket, paraHareket }); }
+        try { const cariHareket = await CariHareket.create({ tenantId: tId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id, tip: "TAHSILAT", tutar, bakiyeDegisimi: tutar, oncekiBakiye, sonrakiBakiye: tedarikci.bakiye, odemeYontemi: odeme.yontem, aciklama: String(body.aciklama || "Tedarikçiden tahsilat").trim(), kaynak: "TEDARIKCI_TAHSILAT", belgeNo: String(body.belgeNo || "").trim(), tarih: body.tarih || new Date(), kullaniciId: aktorId(req) }); const paraHareket = hesap ? await ParaHareket.create({ tenantId: tId, hesapTipi: odeme.hesapTipi, hesapId: hesap._id, tip: "GIRIS", tutar, paraBirimi: hesap.paraBirimi || "TRY", aciklama: String(body.aciklama || "Tedarikçiden tahsilat").trim(), kaynak: "TEDARIKCI_TAHSILAT", kaynakId: cariHareket._id, belgeNo: String(body.belgeNo || "").trim(), tarih: body.tarih || new Date(), kullaniciId: aktorId(req) }) : null; return res.status(201).json({ basarili: true, mesaj: "Tedarikçi tahsilatı kaydedildi.", tedarikciBakiye: tedarikci.bakiye, cariHareket, paraHareket }); }
         catch (error) { tedarikci.bakiye = oncekiBakiye; await tedarikci.save(); if (hesap) { hesap.bakiye -= tutar; await hesap.save(); } throw error; }
     } catch (error) { next(error); }
 }

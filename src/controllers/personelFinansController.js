@@ -16,7 +16,7 @@ const ETIKET = {
 };
 
 const tenantId = req => new mongoose.Types.ObjectId(String(req.tenantId));
-const kullaniciId = req => req.kullanici?.kullaniciId || req.kullanici?._id || req.user?.kullaniciId || req.user?._id || null;
+const kullaniciId = req => req.currentUser?._id || req.kullanici?.kullaniciId || req.kullanici?._id || req.user?.kullaniciId || req.user?._id || null;
 const metin = (value, max = 500) => String(value ?? "").trim().slice(0, max);
 const hesapModeli = tip => tip === "KASA" ? Kasa : tip === "BANKA" ? Banka : null;
 
@@ -172,7 +172,7 @@ async function iptalEt(req, res, next) {
             if (tersYon < 0) filter.bakiye = { $gte: islem.tutar };
             hesap = await Model.findOneAndUpdate(filter, { $inc: { bakiye: tersYon * islem.tutar } }, { new: true });
             if (!hesap) return res.status(409).json({ basarili: false, mesaj: "İptal için bağlı hesap bulunamadı veya hesap bakiyesi yetersiz." });
-            tersHareket = await ParaHareket.create({ tenantId: tId, hesapTipi: islem.hesapTipi, hesapId: islem.hesapId, tip: tersYon > 0 ? "GIRIS" : "CIKIS", tutar: islem.tutar, paraBirimi: islem.paraBirimi, aciklama: `İptal: ${islem.aciklama}`, kaynak: "PERSONEL_IPTAL", kaynakId: islem._id, belgeNo: islem.belgeNo, tarih: new Date(), kullaniciId: kullaniciId(req) });
+            tersHareket = await ParaHareket.create({ tenantId: tId, hesapTipi: islem.hesapTipi, hesapId: islem.hesapId, tip: tersYon > 0 ? "GIRIS" : "CIKIS", tutar: islem.tutar, paraBirimi: islem.paraBirimi, aciklama: `İptal: ${islem.aciklama}`, kaynak: "PERSONEL_IPTAL", kaynakId: islem._id, belgeNo: islem.belgeNo, tarih: new Date(), kullaniciId: kullaniciId(req), orijinalHareketId: islem.paraHareketId || null });
         }
         if (islem.masrafId) {
             await Masraf.updateOne({ _id: islem.masrafId, tenantId: tId, durum: "AKTIF" }, { $set: { durum: "IPTAL", iptalTarihi: new Date(), iptalNedeni: neden, iptalEdenKullaniciId: kullaniciId(req), iptalParaHareketId: tersHareket?._id || null } });

@@ -3,6 +3,13 @@ const mongoose = require("mongoose");
 const Kasa = require("../models/Kasa");
 const Banka = require("../models/Banka");
 const ParaHareket = require("../models/ParaHareket");
+const CariHareket = require("../models/CariHareket");
+const Musteri = require("../models/Musteri");
+const Tedarikci = require("../models/Tedarikci");
+const Satis = require("../models/Satis");
+const Masraf = require("../models/Masraf");
+const PersonelFinansIslem = require("../models/PersonelFinansIslem");
+const Personel = require("../models/Personel");
 
 function tenantId(req) { return new mongoose.Types.ObjectId(String(req.tenantId)); }
 function metin(value) { return String(value ?? "").trim(); }
@@ -21,7 +28,30 @@ function hesapModeli(tip) {
     if (tip === "BANKA") return Banka;
     throw Object.assign(new Error("Hesap tipi KASA veya BANKA olmalıdır."), { status: 400 });
 }
-function kullaniciId(req) { return req.kullanici?._id || req.user?._id || null; }
+function kullaniciId(req) { return req.currentUser?._id || req.kullanici?.kullaniciId || req.user?.kullaniciId || req.kullanici?._id || req.user?._id || null; }
+
+function tarihAnahtari(value) {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value));
+}
+
+function hareketTuruBelirle(hareket) {
+    const kaynak = String(hareket.kaynak || "MANUEL").toUpperCase();
+    if (["TRANSFER", "SAHA_KASA_TESLIM"].includes(kaynak)) {
+        if (hareket.hesapTipi === "KASA" && hareket.karsiHesapTipi === "BANKA") return hareket.tip === "CIKIS" ? "Kasa → Banka Transferi" : "Banka → Kasa Transferi";
+        return "Kasalar Arası Transfer";
+    }
+    if (["TAHSILAT", "TEDARIKCI_TAHSILAT"].includes(kaynak)) return kaynak === "TAHSILAT" ? "Müşteri Tahsilatı" : "Diğer Para Girişi";
+    if (["TAHSILAT_IPTAL", "MUSTERI_ODEME"].includes(kaynak)) return kaynak === "TAHSILAT_IPTAL" ? "Müşteri Tahsilatı İptali" : "Diğer Para Çıkışı";
+    if (kaynak === "ODEME") return "Tedarikçi Ödemesi";
+    if (["MASRAF", "SAHA_MASRAF"].includes(kaynak)) return "Masraf / Gider";
+    if (kaynak === "MASRAF_IPTAL") return "Masraf / Gider İptali";
+    if (kaynak === "SATIS") return "Satış Tahsilatı";
+    if (kaynak === "ALIS_ODEME") return "Alış Ödemesi";
+    if (kaynak === "PERSONEL") return "Personel Avans / Maaş Ödemesi";
+    if (kaynak === "PERSONEL_IPTAL") return "Personel Ödemesi İptali";
+    if (["ACILIS", "BAKIYE_DUZELTME", "DEVIR", "DUZELTME"].includes(kaynak)) return "Devir / Düzeltme";
+    return hareket.tip === "GIRIS" ? "Diğer Para Girişi" : "Diğer Para Çıkışı";
+}
 
 function tarihSinirlari(query = {}) {
     const simdi = new Date();
@@ -32,8 +62,8 @@ function tarihSinirlari(query = {}) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(baslangicMetni) || !/^\d{4}-\d{2}-\d{2}$/.test(bitisMetni)) {
         throw Object.assign(new Error("Tarih aralığı YYYY-AA-GG biçiminde olmalıdır."), { status: 400 });
     }
-    const baslangic = new Date(`${baslangicMetni}T00:00:00`);
-    const bitis = new Date(`${bitisMetni}T23:59:59.999`);
+    const baslangic = new Date(`${baslangicMetni}T00:00:00+03:00`);
+    const bitis = new Date(`${bitisMetni}T23:59:59.999+03:00`);
     if (Number.isNaN(baslangic.getTime()) || Number.isNaN(bitis.getTime()) || bitis < baslangic) {
         throw Object.assign(new Error("Geçerli bir tarih aralığı seçin."), { status: 400 });
     }
@@ -49,6 +79,76 @@ function ekstreOzetle(hareketler, devredenBakiye) {
         return { ...hareket, yuruyenBakiye };
     });
     return { satirlar, toplamGiris, toplamCikis, kapanisBakiyesi: yuruyenBakiye };
+}
+
+async function hareketleriZenginlestir(tId, hareketler) {
+    const ids = [...new Set(hareketler.map(x => String(x.kaynakId || "")).filter(mongoose.Types.ObjectId.isValid))].map(x => new mongoose.Types.ObjectId(x));
+    const karsiKasaIds = hareketler.filter(x => x.karsiHesapTipi === "KASA" && x.karsiHesapId).map(x => x.karsiHesapId);
+    const karsiBankaIds = hareketler.filter(x => x.karsiHesapTipi === "BANKA" && x.karsiHesapId).map(x => x.karsiHesapId);
+    const [cariler, satislar, masraflar, personelIslemleri, karsiKasalar, karsiBankalar] = await Promise.all([
+        CariHareket.find({ _id: { $in: ids }, tenantId: tId }).select("tarafTipi tarafId belgeNo kaynak kaynakId").lean(),
+        Satis.find({ _id: { $in: ids }, tenantId: tId }).select("musteriId belgeNo").lean(),
+        Masraf.find({ _id: { $in: ids }, tenantId: tId }).select("personelId firma fisNo kategori").lean(),
+        PersonelFinansIslem.find({ _id: { $in: ids }, tenantId: tId }).select("personelId belgeNo tur").lean(),
+        Kasa.find({ _id: { $in: karsiKasaIds }, tenantId: tId }).select("kod ad").lean(),
+        Banka.find({ _id: { $in: karsiBankaIds }, tenantId: tId }).select("kod bankaAdi").lean()
+    ]);
+    const musteriIds = [...cariler.filter(x => x.tarafTipi === "MUSTERI").map(x => x.tarafId), ...satislar.map(x => x.musteriId)];
+    const tedarikciIds = cariler.filter(x => x.tarafTipi === "TEDARIKCI").map(x => x.tarafId);
+    const personelIds = [...masraflar.map(x => x.personelId).filter(Boolean), ...personelIslemleri.map(x => x.personelId).filter(Boolean)];
+    const [musteriler, tedarikciler, personeller] = await Promise.all([
+        Musteri.find({ _id: { $in: musteriIds }, tenantId: tId }).select("kod unvan adSoyad").lean(),
+        Tedarikci.find({ _id: { $in: tedarikciIds }, tenantId: tId }).select("kod unvan adSoyad").lean(),
+        Personel.find({ _id: { $in: personelIds }, tenantId: tId }).select("kod adSoyad").lean()
+    ]);
+    const map = rows => new Map(rows.map(x => [String(x._id), x]));
+    const cariMap = map(cariler), satisMap = map(satislar), masrafMap = map(masraflar), personelIslemMap = map(personelIslemleri), musteriMap = map(musteriler), tedarikciMap = map(tedarikciler), personelMap = map(personeller), kasaMap = map(karsiKasalar), bankaMap = map(karsiBankalar);
+    return hareketler.map(h => {
+        const kaynakId = String(h.kaynakId || ""), cari = cariMap.get(kaynakId), satis = satisMap.get(kaynakId), masraf = masrafMap.get(kaynakId), personelIslem = personelIslemMap.get(kaynakId);
+        let ilgiliTip = "", ilgiliAd = "", ilgiliKod = "", belgeNo = h.belgeNo || "";
+        if (cari) {
+            const taraf = cari.tarafTipi === "MUSTERI" ? musteriMap.get(String(cari.tarafId)) : tedarikciMap.get(String(cari.tarafId));
+            ilgiliTip = cari.tarafTipi; ilgiliAd = taraf?.unvan || taraf?.adSoyad || ""; ilgiliKod = taraf?.kod || ""; belgeNo ||= cari.belgeNo || "";
+        } else if (satis) {
+            const musteri = musteriMap.get(String(satis.musteriId)); ilgiliTip = "MUSTERI"; ilgiliAd = musteri?.unvan || musteri?.adSoyad || ""; ilgiliKod = musteri?.kod || ""; belgeNo ||= satis.belgeNo || "";
+        } else if (personelIslem || masraf?.personelId) {
+            const personel = personelMap.get(String(personelIslem?.personelId || masraf.personelId)); ilgiliTip = "PERSONEL"; ilgiliAd = personel?.adSoyad || masraf?.firma || ""; ilgiliKod = personel?.kod || ""; belgeNo ||= personelIslem?.belgeNo || masraf?.fisNo || "";
+        } else if (masraf) {
+            ilgiliTip = "GIDER"; ilgiliAd = masraf.firma || ""; belgeNo ||= masraf.fisNo || "";
+        } else if (h.karsiHesapId) {
+            const karsi = h.karsiHesapTipi === "KASA" ? kasaMap.get(String(h.karsiHesapId)) : bankaMap.get(String(h.karsiHesapId)); ilgiliTip = h.karsiHesapTipi || ""; ilgiliAd = karsi?.ad || karsi?.bankaAdi || ""; ilgiliKod = karsi?.kod || "";
+        }
+        return { ...h, islemTuru: hareketTuruBelirle(h), ilgiliTip, ilgiliAd, ilgiliKod, belgeNo };
+    });
+}
+
+function donemSinirlari(query = {}) {
+    const gun = /^\d{4}-\d{2}-\d{2}$/.test(String(query.tarih || "")) ? String(query.tarih) : tarihAnahtari(new Date());
+    const donem = ["GUNLUK", "HAFTALIK", "AYLIK"].includes(String(query.donem || "").toUpperCase()) ? String(query.donem).toUpperCase() : "GUNLUK";
+    const secili = new Date(`${gun}T12:00:00+03:00`);
+    let baslangicGun = gun, bitisGun = gun;
+    if (donem === "HAFTALIK") {
+        const haftaninGunu = secili.getUTCDay() || 7, bas = new Date(secili.getTime() - (haftaninGunu - 1) * 86400000), son = new Date(bas.getTime() + 6 * 86400000);
+        baslangicGun = tarihAnahtari(bas); bitisGun = tarihAnahtari(son);
+    } else if (donem === "AYLIK") {
+        baslangicGun = `${gun.slice(0, 7)}-01`; const sonrakiAy = new Date(`${baslangicGun}T12:00:00+03:00`); sonrakiAy.setUTCMonth(sonrakiAy.getUTCMonth() + 1); sonrakiAy.setUTCDate(0); bitisGun = tarihAnahtari(sonrakiAy);
+    }
+    return { donem, baslangicGun, bitisGun, baslangic: new Date(`${baslangicGun}T00:00:00+03:00`), bitis: new Date(`${bitisGun}T23:59:59.999+03:00`) };
+}
+
+async function kasaRaporVerisi(req, kasa, sinir) {
+    const tId = tenantId(req), ortak = { tenantId: tId, hesapTipi: "KASA", hesapId: kasa._id };
+    const [hamHareketler, baslangicSonrasi] = await Promise.all([
+        ParaHareket.find({ ...ortak, tarih: { $gte: sinir.baslangic, $lte: sinir.bitis } }).populate("kullaniciId", "adSoyad email").sort({ tarih: 1, createdAt: 1 }).lean(),
+        ParaHareket.aggregate([{ $match: { ...ortak, tarih: { $gte: sinir.baslangic } } }, { $group: { _id: "$tip", toplam: { $sum: "$tutar" } } }])
+    ]);
+    const sonNet = baslangicSonrasi.reduce((n, x) => n + (x._id === "GIRIS" ? 1 : -1) * Number(x.toplam || 0), 0), devredenBakiye = Number(kasa.bakiye || 0) - sonNet;
+    const ekstre = ekstreOzetle(hamHareketler, devredenBakiye), hareketler = await hareketleriZenginlestir(tId, ekstre.satirlar);
+    const gunMap = new Map(); let yuruyen = devredenBakiye;
+    for (let cursor = new Date(sinir.baslangic); cursor <= sinir.bitis; cursor = new Date(cursor.getTime() + 86400000)) { const key = tarihAnahtari(cursor); gunMap.set(key, { gun: key, devredenBakiye: yuruyen, toplamGiris: 0, toplamCikis: 0, kapanisBakiyesi: yuruyen, hareketSayisi: 0 }); }
+    for (const h of hareketler) { const key = tarihAnahtari(h.tarih), row = gunMap.get(key); if (!row) continue; row.hareketSayisi++; if (h.tip === "GIRIS") row.toplamGiris += Number(h.tutar || 0); else row.toplamCikis += Number(h.tutar || 0); }
+    for (const row of gunMap.values()) { row.devredenBakiye = yuruyen; yuruyen += row.toplamGiris - row.toplamCikis; row.kapanisBakiyesi = yuruyen; }
+    return { tarih: { baslangic: sinir.baslangicGun, bitis: sinir.bitisGun }, donem: sinir.donem, ozet: { devredenBakiye, toplamGiris: ekstre.toplamGiris, toplamCikis: ekstre.toplamCikis, kapanisBakiyesi: ekstre.kapanisBakiyesi, guncelBakiye: Number(kasa.bakiye || 0) }, gunler: [...gunMap.values()], hareketler };
 }
 
 async function acilisHareketi(req, hesapTipi, hesap) {
@@ -88,27 +188,19 @@ async function kasaEkstresi(req, res, next) {
         if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).json({ basarili: false, mesaj: "Geçersiz kasa hesabı." });
         const kasa = await Kasa.findOne({ _id: req.params.id, tenantId: tId }).lean();
         if (!kasa) return res.status(404).json({ basarili: false, mesaj: "Kasa hesabı bulunamadı." });
-        const tarih = tarihSinirlari(req.query);
-        const ortak = { tenantId: tId, hesapTipi: "KASA", hesapId: kasa._id };
-        const [donemHareketleri, baslangicSonrasi] = await Promise.all([
-            ParaHareket.find({ ...ortak, tarih: { $gte: tarih.baslangic, $lte: tarih.bitis } })
-                .populate("kullaniciId", "adSoyad email").sort({ tarih: 1, createdAt: 1 }).lean(),
-            ParaHareket.aggregate([
-                { $match: { ...ortak, tarih: { $gte: tarih.baslangic } } },
-                { $group: { _id: "$tip", toplam: { $sum: "$tutar" } } }
-            ])
-        ]);
-        const sonNet = baslangicSonrasi.reduce((toplam, row) => toplam + (row._id === "GIRIS" ? 1 : -1) * Number(row.toplam || 0), 0);
-        const devredenBakiye = Number(kasa.bakiye || 0) - sonNet;
-        const ekstre = ekstreOzetle(donemHareketleri, devredenBakiye);
-        res.json({
-            basarili: true,
-            kasa,
-            tarih: { baslangic: tarih.baslangicMetni, bitis: tarih.bitisMetni },
-            ozet: { devredenBakiye, toplamGiris: ekstre.toplamGiris, toplamCikis: ekstre.toplamCikis, kapanisBakiyesi: ekstre.kapanisBakiyesi, guncelBakiye: Number(kasa.bakiye || 0) },
-            toplam: ekstre.satirlar.length,
-            hareketler: ekstre.satirlar
-        });
+        const tarih = tarihSinirlari(req.query), rapor = await kasaRaporVerisi(req, kasa, { donem: "OZEL", baslangicGun: tarih.baslangicMetni, bitisGun: tarih.bitisMetni, baslangic: tarih.baslangic, bitis: tarih.bitis });
+        res.json({ basarili: true, kasa, ...rapor, toplam: rapor.hareketler.length });
+    } catch (error) { next(error); }
+}
+
+async function kasaRaporu(req, res, next) {
+    try {
+        const tId = tenantId(req);
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).json({ basarili: false, mesaj: "Geçersiz kasa hesabı." });
+        const kasa = await Kasa.findOne({ _id: req.params.id, tenantId: tId }).lean();
+        if (!kasa) return res.status(404).json({ basarili: false, mesaj: "Kasa hesabı bulunamadı." });
+        const rapor = await kasaRaporVerisi(req, kasa, donemSinirlari(req.query));
+        res.json({ basarili: true, kasa, ...rapor, toplam: rapor.hareketler.length, disaAktarim: { excel: true, pdf: true, formatSurumu: 1 } });
     } catch (error) { next(error); }
 }
 
@@ -162,15 +254,15 @@ async function paraHareketleri(req, res, next) {
         if (req.query.kaynak) filter.kaynak = metin(req.query.kaynak);
         if (req.query.baslangic || req.query.bitis) {
             filter.tarih = {};
-            if (req.query.baslangic) filter.tarih.$gte = new Date(`${req.query.baslangic}T00:00:00`);
-            if (req.query.bitis) filter.tarih.$lte = new Date(`${req.query.bitis}T23:59:59.999`);
+            if (req.query.baslangic) filter.tarih.$gte = new Date(`${req.query.baslangic}T00:00:00+03:00`);
+            if (req.query.bitis) filter.tarih.$lte = new Date(`${req.query.bitis}T23:59:59.999+03:00`);
         }
         const limit = Math.min(500, Math.max(1, Number(req.query.limit || 200)));
         const [hareketler, toplam] = await Promise.all([
             ParaHareket.find(filter).populate("kullaniciId", "adSoyad email").sort({ tarih: -1, createdAt: -1 }).limit(limit).lean(),
             ParaHareket.countDocuments(filter)
         ]);
-        res.json({ basarili: true, toplam, gosterilen: hareketler.length, hareketler });
+        res.json({ basarili: true, toplam, gosterilen: hareketler.length, hareketler: await hareketleriZenginlestir(tenantId(req), hareketler) });
     } catch (error) { next(error); }
 }
 
@@ -248,4 +340,4 @@ async function ozet(req, res, next) {
     } catch (error) { next(error); }
 }
 
-module.exports = { kasaListele, kasaOlustur, kasaEkstresi, bankaListele, bankaOlustur, hesapGuncelle, paraHareketleri, hesapHareketi, transfer, ozet, ekstreOzetle };
+module.exports = { kasaListele, kasaOlustur, kasaEkstresi, kasaRaporu, bankaListele, bankaOlustur, hesapGuncelle, paraHareketleri, hesapHareketi, transfer, ozet, ekstreOzetle, hareketTuruBelirle, donemSinirlari };

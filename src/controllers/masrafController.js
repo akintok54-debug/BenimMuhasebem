@@ -5,7 +5,7 @@ const Banka = require("../models/Banka");
 const ParaHareket = require("../models/ParaHareket");
 
 function tenantId(req) { return new mongoose.Types.ObjectId(String(req.tenantId)); }
-function kullaniciId(req) { return req.kullanici?._id || req.user?._id || null; }
+function kullaniciId(req) { return req.currentUser?._id || req.kullanici?.kullaniciId || req.user?.kullaniciId || req.kullanici?._id || req.user?._id || null; }
 function metin(value, max = 500) { return String(value ?? "").trim().slice(0, max); }
 function hesapModeli(tip) { return tip === "KASA" ? Kasa : tip === "BANKA" ? Banka : null; }
 function regexGuvenli(value) { return metin(value, 100).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
@@ -133,7 +133,7 @@ async function iptalEt(req, res, next) {
         const hesap = await Model.findOneAndUpdate({ _id: masraf.hesapId, tenantId: tId }, { $inc: { bakiye: masraf.tutar } }, { new: true });
         if (!hesap) throw Object.assign(new Error("Masraf hesabı bulunamadığı için iptal tamamlanamadı."), { status: 409 });
         hesapGuncellendi = true;
-        hareket = await ParaHareket.create({ tenantId: tId, hesapTipi: masraf.hesapTipi, hesapId: masraf.hesapId, tip: "GIRIS", tutar: masraf.tutar, paraBirimi: masraf.paraBirimi || "TRY", aciklama: `Masraf iptali: ${masraf.aciklama}`, kaynak: "MASRAF_IPTAL", kaynakId: masraf._id, belgeNo: masraf.fisNo || "", tarih: new Date(), kullaniciId: kullaniciId(req) });
+        hareket = await ParaHareket.create({ tenantId: tId, hesapTipi: masraf.hesapTipi, hesapId: masraf.hesapId, tip: "GIRIS", tutar: masraf.tutar, paraBirimi: masraf.paraBirimi || "TRY", aciklama: `Masraf iptali: ${masraf.aciklama}`, kaynak: "MASRAF_IPTAL", kaynakId: masraf._id, belgeNo: masraf.fisNo || "", tarih: new Date(), kullaniciId: kullaniciId(req), orijinalHareketId: masraf.paraHareketId || null });
         masraf.iptalParaHareketId = hareket._id; await masraf.save();
         res.json({ basarili: true, mesaj: "Masraf iptal edildi ve tutar hesaba iade edildi.", masraf, hesap, hareket });
     } catch (error) {
