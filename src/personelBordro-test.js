@@ -68,4 +68,5 @@ test("Toplu tahakkuk rotası dinamik personel rotasından önce tanımlıdır", 
 test("Personel satırı finans profiline; avans, prim, maaş ve ödeme işlemlerine bağlıdır", () => {
     const js = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
     for (const metin of ["personelFinansDetayAc", "Toplu Maaş Tahakkuku", "Maaş Öde", "Prim Öde", "Avans Ver", "Ödeme Al", "/finans/islem", "/bordro/tahakkuk"]) assert.ok(js.includes(metin), metin);
+    assert.match(js, /finans\/ozet\?_=/);
 });
