@@ -72,12 +72,15 @@ async function finansDetay(req, res, next) {
     try {
         const tId = tenantId(req), personel = await personelBul(tId, req.params.id);
         if (!personel) return res.status(404).json({ basarili: false, mesaj: "Personel bulunamadı." });
-        const islemler = await PersonelFinansIslem.find({ tenantId: tId, personelId: personel._id })
-            .populate("olusturanKullaniciId", "adSoyad email").populate("iptalEdenKullaniciId", "adSoyad email")
-            .sort({ tarih: -1, createdAt: -1 }).limit(500).lean();
+        const [islemler, kasalar, bankalar] = await Promise.all([
+            PersonelFinansIslem.find({ tenantId: tId, personelId: personel._id }).populate("olusturanKullaniciId", "adSoyad email").populate("iptalEdenKullaniciId", "adSoyad email").sort({ tarih: -1, createdAt: -1 }).limit(500).lean(),
+            Kasa.find({ tenantId: tId, aktif: true }).sort({ ad: 1 }).lean(),
+            Banka.find({ tenantId: tId, aktif: true }).sort({ bankaAdi: 1 }).lean()
+        ]);
         const paraBirimleri = [...new Set([personel.maasParaBirimi || "TRY", ...islemler.map(x => x.paraBirimi || "TRY")])];
         const ozetler = Object.fromEntries(paraBirimleri.map(kod => [kod, ozetHesapla(islemler, kod)]));
-        res.json({ basarili: true, personel, islemler, ozetler });
+        const hesaplar = [...kasalar.map(x => ({ ...x, tip: "KASA", adGoster: x.ad })), ...bankalar.map(x => ({ ...x, tip: "BANKA", adGoster: x.bankaAdi }))];
+        res.json({ basarili: true, personel, islemler, ozetler, hesaplar });
     } catch (error) { next(error); }
 }
 
