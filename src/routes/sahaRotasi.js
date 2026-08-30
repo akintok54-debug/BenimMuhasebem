@@ -11,6 +11,7 @@ router.use(yetkiKontrol("field.read"));
 router.use((req, res, next) => { res.set("Cache-Control", "private, no-store"); next(); });
 
 router.get("/panel", controller.panel);
+router.get("/musteriler/:id/finans", controller.musteriFinans);
 router.post("/gun/baslat", yetkiKontrol("field.write"), controller.gunBaslat);
 router.post("/gun/bitir", yetkiKontrol("field.write"), controller.gunBitir);
 router.patch("/rota", yetkiKontrol("field.write"), controller.rotaGuncelle);

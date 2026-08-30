@@ -4,6 +4,7 @@ const Kullanici = require("../models/Kullanici");
 const Musteri = require("../models/Musteri");
 const Satis = require("../models/Satis");
 const SatisIade = require("../models/SatisIade");
+const Siparis = require("../models/Siparis");
 const Masraf = require("../models/Masraf");
 const CariHareket = require("../models/CariHareket");
 const Kasa = require("../models/Kasa");
@@ -70,6 +71,7 @@ async function tesellumHesapla(req, kullaniciId, gun) {
     for (const h of tahsilatlar) {
         if (h.odemeYontemi === "NAKIT") odemeler.nakit += Number(h.tutar || 0);
         else if (h.odemeYontemi === "KREDI_KARTI") odemeler.posKrediKarti += Number(h.tutar || 0);
+        else if (h.odemeYontemi === "IBAN") odemeler.iban += Number(h.tutar || 0);
         else if (h.odemeYontemi === "CEK") odemeler.cek += Number(h.tutar || 0);
         else if (h.odemeYontemi === "SENET") odemeler.senet += Number(h.tutar || 0);
     }
@@ -90,13 +92,32 @@ async function panel(req, res, next) {
         const [sahaGun, temsilciler, musteriler, kasalar, bankalar] = await Promise.all([
             SahaGun.findOne({ tenantId, kullaniciId, gun }).populate("kullaniciId", "adSoyad email telefon").populate("rota.musteriId", "kod unvan adSoyad adres konum").populate("ziyaretler.musteriId", "kod unvan adSoyad whatsapp telefon").lean(),
             yonetici(req) ? Kullanici.find({ tenantId, rol: { $in: ["SALES", "SATIS"] }, aktif: true, silinmeTarihi: null }).select("adSoyad email telefon").sort({ adSoyad: 1 }).lean() : [],
-            Musteri.find({ tenantId, aktif: { $ne: false }, ...(yonetici(req) ? {} : { $or: [{ temsilciId: kullaniciId }, { olusturanKullaniciId: kullaniciId }] }) }).select("kod unvan adSoyad telefon whatsapp adres il ilce konum temsilciId").sort({ unvan: 1, adSoyad: 1 }).lean(),
+            Musteri.find({ tenantId, aktif: { $ne: false }, ...(yonetici(req) ? {} : { $or: [{ temsilciId: kullaniciId }, { olusturanKullaniciId: kullaniciId }] }) }).select("kod unvan adSoyad telefon whatsapp email adres il ilce konum temsilciId bakiye notlar").sort({ unvan: 1, adSoyad: 1 }).lean(),
             Kasa.find({ tenantId, aktif: true, paraBirimi: "TRY" }).select("kod ad kasaTuru").sort({ ad: 1 }).lean(),
             Banka.find({ tenantId, aktif: true, paraBirimi: "TRY" }).select("kod bankaAdi iban").sort({ bankaAdi: 1 }).lean()
         ]);
         const tesellum = await tesellumHesapla(req, kullaniciId, gun);
         res.set("Cache-Control", "private, no-store");
         res.json({ basarili: true, gun, sahaGun, tesellum, temsilciler, musteriler, kasalar, bankalar, seciliKullaniciId: kullaniciId, yonetici: yonetici(req) });
+    } catch (error) { next(error); }
+}
+
+async function musteriFinans(req, res, next) {
+    try {
+        const tenantId = tId(req), musteriId = String(req.params.id || "");
+        if (!mongoose.Types.ObjectId.isValid(musteriId)) return res.status(400).json({ basarili: false, mesaj: "Geçerli müşteri zorunludur." });
+        const musteri = await Musteri.findOne({ _id: musteriId, tenantId, aktif: { $ne: false }, ...musteriSahiplik(req) })
+            .select("kod unvan adSoyad telefon whatsapp email adres il ilce konum bakiye notlar")
+            .lean();
+        if (!musteri) return res.status(404).json({ basarili: false, mesaj: "Müşteri bulunamadı veya bu müşteriye erişim yetkiniz yok." });
+        const [cariHareketler, satislar, siparisler] = await Promise.all([
+            CariHareket.find({ tenantId, tarafTipi: "MUSTERI", tarafId: musteri._id })
+                .select("tip tutar aciklama kaynak belgeNo odemeYontemi bakiyeDegisimi oncekiBakiye sonrakiBakiye durum tarih kullaniciId")
+                .populate("kullaniciId", "adSoyad email").sort({ tarih: -1, createdAt: -1 }).limit(100).lean(),
+            Satis.find({ tenantId, musteriId: musteri._id }).select("belgeNo tarih genelToplam odenenTutar kalanTutar odemeTipi durum kullaniciId").sort({ tarih: -1 }).limit(50).lean(),
+            Siparis.find({ tenantId, musteriId: musteri._id }).select("siparisNo tarih genelToplam durum paraBirimi kullaniciId").sort({ tarih: -1 }).limit(50).lean()
+        ]);
+        return res.json({ basarili: true, musteri, cariHareketler, satislar, siparisler });
     } catch (error) { next(error); }
 }
 
@@ -243,4 +264,4 @@ async function tesellumPaylas(req, res, next) {
     } catch (error) { next(error); }
 }
 
-module.exports = { panel, gunBaslat, gunBitir, rotaGuncelle, ziyaretBaslat, ziyaretBitir, molaBaslat, molaBitir, masrafOlustur, kasaTeslim, tesellumPaylas, tesellumHesapla };
+module.exports = { panel, musteriFinans, gunBaslat, gunBitir, rotaGuncelle, ziyaretBaslat, ziyaretBitir, molaBaslat, molaBitir, masrafOlustur, kasaTeslim, tesellumPaylas, tesellumHesapla };

@@ -60,7 +60,7 @@ const CariHareketSchema = new mongoose.Schema(
 
         odemeYontemi: {
             type: String,
-            enum: ["NAKIT", "KREDI_KARTI", "SENET", "CEK", null],
+            enum: ["NAKIT", "KREDI_KARTI", "IBAN", "SENET", "CEK", null],
             default: null
         },
 

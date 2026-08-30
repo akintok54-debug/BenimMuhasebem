@@ -46,3 +46,22 @@ test("mobil tek akış ekranında gerekli saha işlemleri bulunur", () => {
     for (const ifade of ["Güne Başla", "Günü Bitir", "Ziyaret Başlat", "Mola Başlat", "Kasa Teslimi", "PDF Tesellüm", "WhatsApp Tesellüm", "sahaGpsAl"]) assert.match(js, new RegExp(ifade));
     assert.match(html, /data-page="saha"/);
 });
+
+test("saha müşteri kartı cari bakiye, bağımsız tahsilat, sipariş ve birleşik finans detayını sunar", () => {
+    const js = oku("../public/erp/erp.js"), controller = oku("controllers/sahaController.js"), rota = oku("routes/sahaRotasi.js"), cariRota = oku("routes/cariRotasi.js");
+    for (const ifade of ["Cari Bakiye", "Tahsilat / Ödeme Al", "Sipariş Oluştur", "IBAN / Havale", "sahaMusteriDetayAc", "sahaTahsilatFormu"]) assert.match(js, new RegExp(ifade));
+    assert.match(controller, /select\("kod unvan adSoyad telefon whatsapp email adres il ilce konum temsilciId bakiye notlar"\)/);
+    assert.match(controller, /async function musteriFinans/);
+    assert.match(controller, /CariHareket\.find\(\{ tenantId, tarafTipi: "MUSTERI", tarafId: musteri\._id \}\)/);
+    assert.match(controller, /Siparis\.find\(\{ tenantId, musteriId: musteri\._id \}\)/);
+    assert.match(rota, /musteriler\/:id\/finans/);
+    assert.match(cariRota, /"field\.write"/);
+});
+
+test("saha tahsilatı temsilci sahipliğini, işlem kullanıcısını ve IBAN tesellümünü korur", () => {
+    const cari = oku("controllers/cariController.js"), saha = oku("controllers/sahaController.js"), hareket = oku("models/CariHareket.js");
+    assert.match(cari, /tenantId: tId,\s*\.\.\.musteriSahiplik\(req\)/);
+    assert.match(cari, /kullaniciId: aktorId\(req\)/);
+    assert.match(hareket, /"IBAN"/);
+    assert.match(saha, /h\.odemeYontemi === "IBAN"/);
+});
