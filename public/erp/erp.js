@@ -4652,7 +4652,7 @@
         overlay.innerHTML = '<div class="erp-modal personnel-modal"><div class="erp-modal-header"><div><h2>Personel Finans Profili</h2><p>Tahakkuk ve ödeme bilgileri hazırlanıyor...</p></div><button class="erp-modal-close">×</button></div><div class="empty-state">Yükleniyor...</div></div>';
         document.body.appendChild(overlay); overlay.querySelector(".erp-modal-close").onclick = personelModalKapat;
         try {
-            const data = await api(`/api/tenant/personeller/${personelId}/finans`);
+            const data = await api(`/api/tenant/personeller/${personelId}/finans?_=${Date.now()}`);
             const p = data.personel, kod = p.maasParaBirimi || "TRY", o = data.ozetler?.[kod] || {}, islemler = data.islemler || [];
             const hesaplar = data.hesaplar || [];
             overlay.querySelector(".erp-modal").innerHTML = `<div class="erp-modal-header"><div><h2>${escapeHtml(p.adSoyad)}</h2><p>${escapeHtml(p.kod)} · ${escapeHtml(p.gorev || "Görev belirtilmemiş")} · ${escapeHtml(p.departman || "Departman belirtilmemiş")}</p></div><button class="erp-modal-close">×</button></div>

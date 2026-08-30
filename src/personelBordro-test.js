@@ -62,6 +62,7 @@ test("Nakit personel ödemeleri güvenli bakiye, para hareketi, masraf ve rollba
 test("Toplu tahakkuk rotası dinamik personel rotasından önce tanımlıdır", () => {
     const rota = fs.readFileSync(path.join(__dirname, "routes", "personelRotasi.js"), "utf8");
     assert.ok(rota.indexOf('router.post("/bordro/tahakkuk"') < rota.indexOf('router.get("/:id"'));
+    assert.match(rota, /Cache-Control", "private, no-store"/);
 });
 
 test("Personel satırı finans profiline; avans, prim, maaş ve ödeme işlemlerine bağlıdır", () => {

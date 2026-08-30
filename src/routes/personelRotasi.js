@@ -11,6 +11,7 @@ const router = express.Router();
 router.use(kimlikKontrol);
 router.use(tenantKontrol);
 router.use(yetkiKontrol("tenant.users"));
+router.use((req, res, next) => { res.set("Cache-Control", "private, no-store"); next(); });
 
 router.get("/panel", controller.panel);
 router.get("/", controller.listele);
