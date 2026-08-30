@@ -12,6 +12,8 @@ const authRotasi = require("./modules/auth/routes/authRotasi");
 const { rateLimit, istekKimligi, girdiTemizleme, httpsZorunlulugu, kanonikAlanAdi } = require("./middleware/guvenlikKatmani");
 const auditMiddleware = require("./middleware/auditMiddleware");
 const { csrfKontrol } = require("./services/oturumGuvenligi");
+const kimlikKontrol = require("./middleware/kimlikKontrol");
+const superAdminKontrol = require("./modules/platform/middleware/superAdmin");
 
 const uygulama = express();
 if (process.env.NODE_ENV === "production") uygulama.set("trust proxy", 1);
@@ -55,6 +57,12 @@ uygulama.use(rateLimit({ pencereMs: 15 * 60 * 1000, limit: 500, anahtar: req => 
 uygulama.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev", { skip: req => req.path === "/api/saglik" }));
 
 const publicKlasoru = path.join(__dirname, "..", "public");
+const platformPaneliGonder = (req, res) => {
+    res.set("Cache-Control", "no-store");
+    res.sendFile(path.join(publicKlasoru, "platform", "index.html"));
+};
+uygulama.get(["/platform", "/platform/", "/platform/index.html"], kimlikKontrol, superAdminKontrol, platformPaneliGonder);
+uygulama.get(["/admin", "/admin/", "/admin/index.html"], kimlikKontrol, superAdminKontrol, (req, res) => res.redirect(302, "/platform/"));
 uygulama.use(express.static(publicKlasoru));
 uygulama.use(
     "/vendor/xlsx",

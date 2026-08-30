@@ -4,6 +4,7 @@ const kimlikKontrol = require("../../../middleware/kimlikKontrol");
 const superAdminKontrol = require("../middleware/superAdmin");
 const tenantController = require("../controllers/tenantController");
 const guvenlikController = require("../controllers/guvenlikController");
+const kullaniciController = require("../controllers/kullaniciController");
 
 const router = express.Router();
 
@@ -23,8 +24,10 @@ router.post("/tenants", tenantController.olustur);
 router.patch("/tenants/:id/status", tenantController.durumDegistir);
 router.patch("/tenants/:id/modules", tenantController.modulGuncelle);
 router.post("/tenants/:id/users", tenantController.kullaniciOlustur);
+router.get("/users", kullaniciController.listele);
 router.get("/guvenlik-merkezi", guvenlikController.merkez);
 router.get("/audit-kayitlari", guvenlikController.auditKayitlari);
+router.get("/sistem-hatalari", guvenlikController.sistemHatalari);
 
 /* PLATFORM DURUMU */
 router.get("/durum", (req, res) => {
@@ -32,7 +35,11 @@ router.get("/durum", (req, res) => {
         basarili: true,
         sistem: "BENIMMUHASEBE PLATFORM",
         domain: "benimmuhasebe.com",
-        rol: "SUPER_ADMIN"
+        rol: "SUPER_ADMIN",
+        kullanici: {
+            email: req.kullanici.email || "",
+            rol: req.kullanici.rol
+        }
     });
 });
 

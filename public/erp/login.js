@@ -95,7 +95,7 @@
 
             if (data.csrfToken) sessionStorage.setItem("bmCsrfToken", data.csrfToken);
 
-            window.location.replace("/erp/");
+            window.location.replace(data.kullanici?.rol === "SUPER_ADMIN" ? "/platform/" : "/erp/");
 
         } catch (error) {
 

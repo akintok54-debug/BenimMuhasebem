@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="robots" content="noindex,nofollow">
+    <title>Platform Yönetimi · BenimMuhasebe</title>
+    <link rel="stylesheet" href="/platform/platform.css?v=20260830-1">
+</head>
+<body>
+<div class="platform-shell">
+    <aside class="platform-sidebar">
+        <a class="platform-brand" href="/platform/" aria-label="Platform ana sayfa">
+            <span class="brand-mark">BM</span>
+            <span><strong>BenimMuhasebe</strong><small>Platform Yönetimi</small></span>
+        </a>
+        <div class="role-badge"><span></span> SUPER_ADMIN</div>
+        <nav aria-label="Platform bölümleri">
+            <button class="nav-item active" data-section="dashboard"><span>▦</span>Genel Bakış</button>
+            <button class="nav-item" data-section="tenants"><span>▣</span>Firmalar</button>
+            <button class="nav-item" data-section="users"><span>♙</span>Kullanıcılar</button>
+            <button class="nav-item" data-section="subscriptions"><span>◆</span>Abonelikler</button>
+            <button class="nav-item" data-section="errors"><span>!</span>Sistem Hataları</button>
+            <button class="nav-item" data-section="security"><span>⬡</span>Güvenlik</button>
+            <button class="nav-item" data-section="audit"><span>◷</span>Audit Log</button>
+        </nav>
+        <div class="sidebar-foot"><span class="online-dot"></span> Üretim sistemi çevrimiçi</div>
+    </aside>
+
+    <main class="platform-main">
+        <header class="platform-topbar">
+            <div><small>Platform / SUPER_ADMIN</small><h1 id="pageTitle">Genel Bakış</h1></div>
+            <div class="top-actions">
+                <span id="adminIdentity" class="identity">Platform yöneticisi</span>
+                <button id="refreshButton" class="secondary-button" type="button">Yenile</button>
+                <button id="logoutButton" class="danger-button" type="button">Çıkış</button>
+            </div>
+        </header>
+        <section id="platformContent" class="platform-content" aria-live="polite">
+            <div class="loading"><span></span>Platform verileri yükleniyor…</div>
+        </section>
+    </main>
+</div>
+<script src="/platform/platform.js?v=20260830-1"></script>
+</body>
+</html>

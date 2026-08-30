@@ -20,10 +20,34 @@ async function auditKayitlari(req, res, next) {
         const limit = Math.min(200, Math.max(1, Number(req.query.limit || 100)));
         const filter = {};
         if (req.query.category) filter.category = String(req.query.category).slice(0, 50);
-        const kayitlar = await PlatformAuditLog.find(filter).sort({ createdAt: -1 }).limit(limit).lean();
+        const kayitlar = await PlatformAuditLog.find(filter)
+            .populate("actorUserId", "adSoyad email rol")
+            .populate("tenantId", "name slug")
+            .sort({ createdAt: -1 })
+            .limit(limit)
+            .lean();
         res.set("Cache-Control", "no-store");
         return res.json({ basarili: true, kayitlar });
     } catch (error) { next(error); }
 }
 
-module.exports = { merkez, auditKayitlari };
+async function sistemHatalari(req, res, next) {
+    try {
+        const limit = Math.min(200, Math.max(1, Number(req.query.limit || 100)));
+        const son24Saat = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const filter = { $or: [{ category: "API_HATASI" }, { httpStatus: { $gte: 500 } }] };
+        const [hatalar, son24SaatToplam] = await Promise.all([
+            PlatformAuditLog.find(filter)
+                .populate("actorUserId", "adSoyad email rol")
+                .populate("tenantId", "name slug")
+                .sort({ createdAt: -1 })
+                .limit(limit)
+                .lean(),
+            PlatformAuditLog.countDocuments({ ...filter, createdAt: { $gte: son24Saat } })
+        ]);
+        res.set("Cache-Control", "no-store");
+        return res.json({ basarili: true, son24SaatToplam, toplam: hatalar.length, hatalar });
+    } catch (error) { next(error); }
+}
+
+module.exports = { merkez, auditKayitlari, sistemHatalari };
