@@ -27,6 +27,16 @@ const KasaSchema = new mongoose.Schema(
             default: 0
         },
 
+        acilisBakiyesi: {
+            type: Number,
+            default: 0
+        },
+
+        acilisTarihi: {
+            type: Date,
+            default: Date.now
+        },
+
         paraBirimi: {
             type: String,
             enum: ["TRY", "USD", "EUR"],
@@ -42,6 +52,18 @@ const KasaSchema = new mongoose.Schema(
         aktif: {
             type: Boolean,
             default: true
+        },
+
+        sorumlu: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+
+        sube: {
+            type: String,
+            trim: true,
+            default: ""
         },
 
         aciklama: {

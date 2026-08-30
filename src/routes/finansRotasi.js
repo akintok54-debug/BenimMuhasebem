@@ -9,10 +9,15 @@ const router = express.Router();
 
 router.use(kimlikKontrol);
 router.use(tenantKontrol);
+router.use((req, res, next) => {
+    res.set("Cache-Control", "private, no-store");
+    next();
+});
 
 router.get("/ozet", controller.ozet);
 
 router.get("/kasalar", controller.kasaListele);
+router.get("/kasalar/:id/ekstre", controller.kasaEkstresi);
 router.post("/kasalar", yetkiKontrol("cash.write"), controller.kasaOlustur);
 
 router.get("/bankalar", controller.bankaListele);

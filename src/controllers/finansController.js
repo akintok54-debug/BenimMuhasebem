@@ -23,6 +23,34 @@ function hesapModeli(tip) {
 }
 function kullaniciId(req) { return req.kullanici?._id || req.user?._id || null; }
 
+function tarihSinirlari(query = {}) {
+    const simdi = new Date();
+    const varsayilanBaslangic = `${simdi.getFullYear()}-${String(simdi.getMonth() + 1).padStart(2, "0")}-01`;
+    const varsayilanBitis = `${simdi.getFullYear()}-${String(simdi.getMonth() + 1).padStart(2, "0")}-${String(simdi.getDate()).padStart(2, "0")}`;
+    const baslangicMetni = metin(query.baslangic || varsayilanBaslangic);
+    const bitisMetni = metin(query.bitis || varsayilanBitis);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(baslangicMetni) || !/^\d{4}-\d{2}-\d{2}$/.test(bitisMetni)) {
+        throw Object.assign(new Error("Tarih aralığı YYYY-AA-GG biçiminde olmalıdır."), { status: 400 });
+    }
+    const baslangic = new Date(`${baslangicMetni}T00:00:00`);
+    const bitis = new Date(`${bitisMetni}T23:59:59.999`);
+    if (Number.isNaN(baslangic.getTime()) || Number.isNaN(bitis.getTime()) || bitis < baslangic) {
+        throw Object.assign(new Error("Geçerli bir tarih aralığı seçin."), { status: 400 });
+    }
+    return { baslangic, bitis, baslangicMetni, bitisMetni };
+}
+
+function ekstreOzetle(hareketler, devredenBakiye) {
+    let yuruyenBakiye = Number(devredenBakiye || 0), toplamGiris = 0, toplamCikis = 0;
+    const satirlar = hareketler.map(hareket => {
+        const tutar = Number(hareket.tutar || 0);
+        if (hareket.tip === "GIRIS") { toplamGiris += tutar; yuruyenBakiye += tutar; }
+        else { toplamCikis += tutar; yuruyenBakiye -= tutar; }
+        return { ...hareket, yuruyenBakiye };
+    });
+    return { satirlar, toplamGiris, toplamCikis, kapanisBakiyesi: yuruyenBakiye };
+}
+
 async function acilisHareketi(req, hesapTipi, hesap) {
     const bakiye = Number(hesap.bakiye || 0);
     if (!bakiye) return;
@@ -30,7 +58,7 @@ async function acilisHareketi(req, hesapTipi, hesap) {
         tenantId: tenantId(req), hesapTipi, hesapId: hesap._id,
         tip: bakiye > 0 ? "GIRIS" : "CIKIS", tutar: Math.abs(bakiye), paraBirimi: hesap.paraBirimi,
         aciklama: "Hesap açılış bakiyesi", kaynak: "ACILIS", belgeNo: `ACILIS-${hesap.kod}`,
-        kullaniciId: kullaniciId(req)
+        tarih: hesap.acilisTarihi || new Date(), kullaniciId: kullaniciId(req)
     });
 }
 
@@ -46,9 +74,41 @@ async function kasaOlustur(req, res, next) {
         if (!Number.isFinite(bakiye)) return res.status(400).json({ basarili: false, mesaj: "Açılış bakiyesi geçersizdir." });
         const kasaTuru = metin(body.kasaTuru || "NAKIT").toUpperCase();
         if (!["NAKIT", "DIGER"].includes(kasaTuru)) return res.status(400).json({ basarili: false, mesaj: "Kasa türü Nakit Kasa veya Diğer Kasa olmalıdır." });
-        const kasa = await Kasa.create({ tenantId: tenantId(req), kod: metin(body.kod).toUpperCase(), ad: metin(body.ad), bakiye, paraBirimi: paraBirimi(body.paraBirimi), kasaTuru, aktif: body.aktif !== false, aciklama: metin(body.aciklama) });
+        const acilisTarihi = body.acilisTarihi ? new Date(`${metin(body.acilisTarihi)}T12:00:00`) : new Date();
+        if (Number.isNaN(acilisTarihi.getTime())) return res.status(400).json({ basarili: false, mesaj: "Açılış tarihi geçersizdir." });
+        const kasa = await Kasa.create({ tenantId: tenantId(req), kod: metin(body.kod).toUpperCase(), ad: metin(body.ad), bakiye, acilisBakiyesi: bakiye, acilisTarihi, paraBirimi: paraBirimi(body.paraBirimi), kasaTuru, aktif: body.aktif !== false, sorumlu: metin(body.sorumlu), sube: metin(body.sube), aciklama: metin(body.aciklama) });
         await acilisHareketi(req, "KASA", kasa);
         res.status(201).json({ basarili: true, mesaj: "Kasa hesabı oluşturuldu.", kasa });
+    } catch (error) { next(error); }
+}
+
+async function kasaEkstresi(req, res, next) {
+    try {
+        const tId = tenantId(req);
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).json({ basarili: false, mesaj: "Geçersiz kasa hesabı." });
+        const kasa = await Kasa.findOne({ _id: req.params.id, tenantId: tId }).lean();
+        if (!kasa) return res.status(404).json({ basarili: false, mesaj: "Kasa hesabı bulunamadı." });
+        const tarih = tarihSinirlari(req.query);
+        const ortak = { tenantId: tId, hesapTipi: "KASA", hesapId: kasa._id };
+        const [donemHareketleri, baslangicSonrasi] = await Promise.all([
+            ParaHareket.find({ ...ortak, tarih: { $gte: tarih.baslangic, $lte: tarih.bitis } })
+                .populate("kullaniciId", "adSoyad email").sort({ tarih: 1, createdAt: 1 }).lean(),
+            ParaHareket.aggregate([
+                { $match: { ...ortak, tarih: { $gte: tarih.baslangic } } },
+                { $group: { _id: "$tip", toplam: { $sum: "$tutar" } } }
+            ])
+        ]);
+        const sonNet = baslangicSonrasi.reduce((toplam, row) => toplam + (row._id === "GIRIS" ? 1 : -1) * Number(row.toplam || 0), 0);
+        const devredenBakiye = Number(kasa.bakiye || 0) - sonNet;
+        const ekstre = ekstreOzetle(donemHareketleri, devredenBakiye);
+        res.json({
+            basarili: true,
+            kasa,
+            tarih: { baslangic: tarih.baslangicMetni, bitis: tarih.bitisMetni },
+            ozet: { devredenBakiye, toplamGiris: ekstre.toplamGiris, toplamCikis: ekstre.toplamCikis, kapanisBakiyesi: ekstre.kapanisBakiyesi, guncelBakiye: Number(kasa.bakiye || 0) },
+            toplam: ekstre.satirlar.length,
+            hareketler: ekstre.satirlar
+        });
     } catch (error) { next(error); }
 }
 
@@ -83,7 +143,7 @@ async function hesapGuncelle(req, res, next) {
             hesap.kasaTuru = kasaTuru;
         }
         if (tip === "BANKA" && body.bankaAdi !== undefined) hesap.bankaAdi = metin(body.bankaAdi);
-        for (const alan of ["sube", "hesapNo", "aciklama"]) if (tip === "BANKA" || alan === "aciklama") if (body[alan] !== undefined) hesap[alan] = metin(body[alan]);
+        for (const alan of ["sube", "hesapNo", "sorumlu", "aciklama"]) if (tip === "BANKA" || ["sube", "sorumlu", "aciklama"].includes(alan)) if (body[alan] !== undefined) hesap[alan] = metin(body[alan]);
         if (tip === "BANKA" && body.iban !== undefined) hesap.iban = metin(body.iban).replace(/\s+/g, "").toUpperCase();
         if (body.aktif !== undefined) hesap.aktif = body.aktif === true;
         if (body.paraBirimi !== undefined && Number(hesap.bakiye || 0) === 0) hesap.paraBirimi = paraBirimi(body.paraBirimi);
@@ -120,7 +180,7 @@ async function hesapHareketi(req, res, next) {
         const Model = hesapModeli(hesapTipi), tutar = tutarDogrula(body.tutar);
         if (!mongoose.Types.ObjectId.isValid(String(body.hesapId || ""))) return res.status(400).json({ basarili: false, mesaj: "Geçersiz hesap." });
         if (!["GIRIS", "CIKIS"].includes(tip)) return res.status(400).json({ basarili: false, mesaj: "İşlem türü para girişi veya para çıkışı olmalıdır." });
-        const filter = { _id: body.hesapId, tenantId: tId, aktif: true };
+        const filter = { _id: body.hesapId, tenantId: tId, aktif: { $ne: false } };
         if (tip === "CIKIS") filter.bakiye = { $gte: tutar };
         const hesap = await Model.findOneAndUpdate(filter, { $inc: { bakiye: tip === "GIRIS" ? tutar : -tutar } }, { new: true });
         if (!hesap) return res.status(409).json({ basarili: false, mesaj: tip === "CIKIS" ? "Hesap bulunamadı, pasif veya bakiye yetersiz." : "Hesap bulunamadı veya pasif." });
@@ -142,14 +202,15 @@ async function transfer(req, res, next) {
         const kaynakId = metin(body.kaynakHesapId), hedefId = metin(body.hedefHesapId);
         if (!mongoose.Types.ObjectId.isValid(kaynakId) || !mongoose.Types.ObjectId.isValid(hedefId)) return res.status(400).json({ basarili: false, mesaj: "Kaynak ve hedef hesap geçerli olmalıdır." });
         if (kaynakTip === hedefTip && kaynakId === hedefId) return res.status(400).json({ basarili: false, mesaj: "Kaynak ve hedef hesap aynı olamaz." });
-        const [kaynakKontrol, hedefKontrol] = await Promise.all([KaynakModel.findOne({ _id: kaynakId, tenantId: tId, aktif: true }), HedefModel.findOne({ _id: hedefId, tenantId: tId, aktif: true })]);
+        const [kaynakKontrol, hedefKontrol] = await Promise.all([KaynakModel.findOne({ _id: kaynakId, tenantId: tId, aktif: { $ne: false } }), HedefModel.findOne({ _id: hedefId, tenantId: tId, aktif: { $ne: false } })]);
         if (!kaynakKontrol || !hedefKontrol) return res.status(404).json({ basarili: false, mesaj: "Kaynak veya hedef hesap bulunamadı ya da pasif." });
-        if (kaynakKontrol.paraBirimi !== hedefKontrol.paraBirimi) return res.status(409).json({ basarili: false, mesaj: "Farklı para birimindeki hesaplar arasında doğrudan transfer yapılamaz." });
-        const kaynak = await KaynakModel.findOneAndUpdate({ _id: kaynakId, tenantId: tId, aktif: true, bakiye: { $gte: tutar } }, { $inc: { bakiye: -tutar } }, { new: true });
+        const kaynakParaBirimi = kaynakKontrol.paraBirimi || "TRY", hedefParaBirimi = hedefKontrol.paraBirimi || "TRY";
+        if (kaynakParaBirimi !== hedefParaBirimi) return res.status(409).json({ basarili: false, mesaj: "Farklı para birimindeki hesaplar arasında doğrudan transfer yapılamaz." });
+        const kaynak = await KaynakModel.findOneAndUpdate({ _id: kaynakId, tenantId: tId, aktif: { $ne: false }, bakiye: { $gte: tutar } }, { $inc: { bakiye: -tutar } }, { new: true });
         if (!kaynak) return res.status(409).json({ basarili: false, mesaj: "Kaynak hesap bakiyesi yetersiz." });
-        const hedef = await HedefModel.findOneAndUpdate({ _id: hedefId, tenantId: tId, aktif: true }, { $inc: { bakiye: tutar } }, { new: true });
+        const hedef = await HedefModel.findOneAndUpdate({ _id: hedefId, tenantId: tId, aktif: { $ne: false } }, { $inc: { bakiye: tutar } }, { new: true });
         if (!hedef) { await KaynakModel.updateOne({ _id: kaynakId, tenantId: tId }, { $inc: { bakiye: tutar } }); return res.status(409).json({ basarili: false, mesaj: "Hedef hesap güncellenemedi." }); }
-        const transferId = new mongoose.Types.ObjectId(), ortak = { tenantId: tId, tutar, paraBirimi: kaynak.paraBirimi, kaynak: "TRANSFER", kaynakId: transferId, belgeNo: metin(body.belgeNo) || `TRF-${Date.now()}`, aciklama: metin(body.aciklama) || "Hesaplar arası transfer", tarih: body.tarih || new Date(), kullaniciId: kullaniciId(req) };
+        const transferId = new mongoose.Types.ObjectId(), ortak = { tenantId: tId, tutar, paraBirimi: kaynak.paraBirimi || "TRY", kaynak: "TRANSFER", kaynakId: transferId, belgeNo: metin(body.belgeNo) || `TRF-${Date.now()}`, aciklama: metin(body.aciklama) || "Hesaplar arası transfer", tarih: body.tarih || new Date(), kullaniciId: kullaniciId(req) };
         try {
             const hareketler = await ParaHareket.insertMany([
                 { ...ortak, hesapTipi: kaynakTip, hesapId: kaynak._id, tip: "CIKIS", karsiHesapTipi: hedefTip, karsiHesapId: hedef._id },
@@ -187,4 +248,4 @@ async function ozet(req, res, next) {
     } catch (error) { next(error); }
 }
 
-module.exports = { kasaListele, kasaOlustur, bankaListele, bankaOlustur, hesapGuncelle, paraHareketleri, hesapHareketi, transfer, ozet };
+module.exports = { kasaListele, kasaOlustur, kasaEkstresi, bankaListele, bankaOlustur, hesapGuncelle, paraHareketleri, hesapHareketi, transfer, ozet, ekstreOzetle };

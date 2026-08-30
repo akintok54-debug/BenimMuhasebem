@@ -28,6 +28,7 @@ test("Finans yönetimi rotaları kimliksiz erişimi reddeder", async () => {
     const kontroller = [
         ["GET", "/api/tenant/finans/ozet"],
         ["GET", "/api/tenant/finans/para-hareketleri"],
+        ["GET", `/api/tenant/finans/kasalar/${id}/ekstre?baslangic=2026-08-01&bitis=2026-08-31`],
         ["POST", "/api/tenant/finans/para-hareketleri"],
         ["POST", "/api/tenant/finans/transfer"],
         ["PATCH", `/api/tenant/finans/hesaplar/KASA/${id}`]
@@ -42,6 +43,24 @@ test("Kasa, banka ve para hareketleri TL, dolar ve euro destekler", () => {
     for (const model of [Kasa, Banka, ParaHareket]) {
         assert.deepEqual(model.schema.path("paraBirimi").enumValues, ["TRY", "USD", "EUR"]);
     }
+});
+
+test("Kasa modeli açılış, sorumlu ve şube bilgisini korur", () => {
+    for (const alan of ["acilisBakiyesi", "acilisTarihi", "sorumlu", "sube"]) assert.ok(Kasa.schema.path(alan), alan);
+    assert.equal(Kasa.schema.path("aktif").defaultValue, true);
+});
+
+test("Kasa ekstresi devreden, giriş, çıkış ve yürüyen bakiyeyi doğru hesaplar", () => {
+    const { ekstreOzetle } = require("./controllers/finansController");
+    const sonuc = ekstreOzetle([
+        { tip: "GIRIS", tutar: 250, belgeNo: "G-1" },
+        { tip: "CIKIS", tutar: 80, belgeNo: "C-1" },
+        { tip: "GIRIS", tutar: 30, belgeNo: "G-2" }
+    ], 1000);
+    assert.equal(sonuc.toplamGiris, 280);
+    assert.equal(sonuc.toplamCikis, 80);
+    assert.equal(sonuc.kapanisBakiyesi, 1200);
+    assert.deepEqual(sonuc.satirlar.map(x => x.yuruyenBakiye), [1250, 1170, 1200]);
 });
 
 test("Finans servisi açılış izi, güvenli bakiye ve aynı para birimi transferi uygular", () => {
@@ -59,6 +78,11 @@ test("Profesyonel finans ekranı hesap, hareket, transfer ve Excel işlemlerini 
     assert.match(js, /\/api\/tenant\/finans\/hesaplar\//);
     assert.match(js, /Para Hareketleri/);
     assert.match(js, /nakit-hareketleri-/);
+    assert.match(js, /kasa-ekstresi-/);
+    assert.match(js, /finansKasaEkstresiAc/);
+    assert.match(js, /finansHareketGecmisiRender/);
+    assert.match(js, /Yazdır \/ PDF/);
+    assert.match(js, /baslangic=.*bitis=/);
     assert.match(js, /sonKullaniciMetinleriniDuzelt/);
 });
 
