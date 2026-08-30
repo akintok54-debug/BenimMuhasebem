@@ -15,6 +15,25 @@ test("Parola sıfırlama rotaları kimliksiz kullanıma açıktır ve rate limit
     }
 });
 
+test("Parola sıfırlama istekleri eski oturum çerezi olsa da CSRF kontrolüne takılmaz", () => {
+    const { csrfKontrol } = require("./services/oturumGuvenligi");
+    for (const requestPath of ["/api/auth/sifremi-unuttum", "/api/auth/sifre-yenile"]) {
+        let devamEtti = false;
+        const req = {
+            method: "POST",
+            path: requestPath,
+            headers: { cookie: "bm_session=eski-oturum" },
+            get() { return ""; }
+        };
+        const res = {
+            locals: {},
+            status() { throw new Error(`${requestPath} CSRF tarafından reddedildi`); }
+        };
+        csrfKontrol(req, res, () => { devamEtti = true; });
+        assert.equal(devamEtti, true);
+    }
+});
+
 test("Login ekranı şifremi unuttum bağlantısını ve reset sayfasını içerir", () => {
     const publicDir = path.join(__dirname, "..", "public", "erp");
     const loginHtml = fs.readFileSync(path.join(publicDir, "login.html"), "utf8");
