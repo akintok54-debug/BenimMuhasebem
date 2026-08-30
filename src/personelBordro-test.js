@@ -54,6 +54,7 @@ test("Nakit personel ödemeleri güvenli bakiye, para hareketi, masraf ve rollba
     assert.match(kaynak, /kategori: "PERSONEL"/);
     assert.match(kaynak, /personelFinansIslemId: finansIslem\._id/);
     assert.match(kaynak, /res\.json\(\{ basarili: true, personel, islemler, ozetler, hesaplar \}\)/);
+    assert.match(kaynak, /aktif: \{ \$ne: false \}/);
     assert.match(kaynak, /kaynak: "PERSONEL_IPTAL"/);
     assert.match(kaynak, /\$inc: \{ bakiye: -hesapYon \* islemTutari \}/);
 });

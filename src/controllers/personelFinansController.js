@@ -74,8 +74,8 @@ async function finansDetay(req, res, next) {
         if (!personel) return res.status(404).json({ basarili: false, mesaj: "Personel bulunamadı." });
         const [islemler, kasalar, bankalar] = await Promise.all([
             PersonelFinansIslem.find({ tenantId: tId, personelId: personel._id }).populate("olusturanKullaniciId", "adSoyad email").populate("iptalEdenKullaniciId", "adSoyad email").sort({ tarih: -1, createdAt: -1 }).limit(500).lean(),
-            Kasa.find({ tenantId: tId, aktif: true }).sort({ ad: 1 }).lean(),
-            Banka.find({ tenantId: tId, aktif: true }).sort({ bankaAdi: 1 }).lean()
+            Kasa.find({ tenantId: tId, aktif: { $ne: false } }).sort({ ad: 1 }).lean(),
+            Banka.find({ tenantId: tId, aktif: { $ne: false } }).sort({ bankaAdi: 1 }).lean()
         ]);
         const paraBirimleri = [...new Set([personel.maasParaBirimi || "TRY", ...islemler.map(x => x.paraBirimi || "TRY")])];
         const ozetler = Object.fromEntries(paraBirimleri.map(kod => [kod, ozetHesapla(islemler, kod)]));
@@ -111,7 +111,7 @@ async function islemOlustur(req, res, next) {
             Model = hesapModeli(hesapTipi);
             if (!Model || !mongoose.Types.ObjectId.isValid(String(body.hesapId || ""))) return res.status(400).json({ basarili: false, mesaj: "Geçerli bir kasa veya banka hesabı seçin." });
             hesapYon = NAKIT_CIKIS.includes(tur) ? -1 : 1;
-            const filter = { _id: body.hesapId, tenantId: tId, aktif: true, paraBirimi };
+            const filter = { _id: body.hesapId, tenantId: tId, aktif: { $ne: false }, paraBirimi };
             if (hesapYon < 0) filter.bakiye = { $gte: tutar };
             hesap = await Model.findOneAndUpdate(filter, { $inc: { bakiye: hesapYon * tutar } }, { new: true });
             if (!hesap) return res.status(409).json({ basarili: false, mesaj: "Hesap bulunamadı, para birimi uyuşmuyor veya bakiye yetersiz." });
