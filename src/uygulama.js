@@ -95,6 +95,7 @@ uygulama.use("/api/tenant/alis", alisRotasi);
 
 const satisRotasi = require("./routes/satisRotasi");
 uygulama.use("/api/tenant/satis", satisRotasi);
+uygulama.use("/api/tenant/saha", require("./routes/sahaRotasi"));
 
 const cariRotasi = require("./routes/cariRotasi");
 uygulama.use("/api/tenant/cari", cariRotasi);

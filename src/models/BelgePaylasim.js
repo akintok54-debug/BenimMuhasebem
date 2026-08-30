@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const BelgePaylasimSchema = new mongoose.Schema({
     tenantId: { type: mongoose.Schema.Types.ObjectId, ref: "Tenant", required: true, index: true },
     tokenHash: { type: String, required: true, unique: true, index: true, select: false },
-    tur: { type: String, enum: ["KATALOG", "TEKLIF", "SIPARIS"], required: true },
+    tur: { type: String, enum: ["KATALOG", "TEKLIF", "SIPARIS", "SATIS", "TESELLUM"], required: true },
     baslik: { type: String, required: true, trim: true, maxlength: 160 },
     firma: { type: mongoose.Schema.Types.Mixed, default: {} },
     belge: { type: mongoose.Schema.Types.Mixed, required: true },

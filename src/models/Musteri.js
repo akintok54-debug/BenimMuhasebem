@@ -139,6 +139,16 @@ const MusteriSchema = new mongoose.Schema(
         aktif: {
             type: Boolean,
             default: true
+        },
+
+        temsilciId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null, index: true },
+        olusturanKullaniciId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null },
+        konum: {
+            enlem: { type: Number, min: -90, max: 90, default: null },
+            boylam: { type: Number, min: -180, max: 180, default: null },
+            hassasiyet: { type: Number, min: 0, default: 0 },
+            adres: { type: String, trim: true, maxlength: 500, default: "" },
+            kayitTarihi: { type: Date, default: null }
         }
     },
     {

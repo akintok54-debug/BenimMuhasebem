@@ -22,6 +22,14 @@ function islemKullaniciId(req) {
     return req.kullanici?._id || req.kullanici?.kullaniciId || req.user?._id || req.user?.kullaniciId || null;
 }
 
+function yonetici(req) {
+    return ["OWNER", "ADMIN"].includes(String(req.currentUser?.rol || req.kullanici?.rol || req.user?.rol || "").toUpperCase());
+}
+
+function sahiplik(req) {
+    return yonetici(req) ? {} : { kullaniciId: islemKullaniciId(req) };
+}
+
 function hesaplaKalem(kalem) {
     const miktar = Number(kalem.miktar || 0);
     const birimFiyat = Number(kalem.birimFiyat || 0);
@@ -49,7 +57,7 @@ function hesaplaKalem(kalem) {
 async function listele(req, res, next) {
     try {
         const satislar = await Satis.find({
-            tenantId: tenantObjectId(req)
+            tenantId: tenantObjectId(req), ...sahiplik(req)
         })
             .populate("musteriId", "kod unvan adSoyad")
             .populate("depoId", "kod ad")
@@ -75,14 +83,14 @@ async function panel(req, res, next) {
         const bugun = new Date(simdi.getFullYear(), simdi.getMonth(), simdi.getDate());
         const ayBasi = new Date(simdi.getFullYear(), simdi.getMonth(), 1);
         const [satislar, acikSiparis, aktifTeklif, iadeler] = await Promise.all([
-            Satis.find({ tenantId, tarih: { $gte: ayBasi } })
+            Satis.find({ tenantId, tarih: { $gte: ayBasi }, ...sahiplik(req) })
                 .populate("musteriId", "kod unvan adSoyad bakiye")
                 .populate("kalemler.urunId", "kod ad birim alisFiyati")
                 .populate("kullaniciId", "adSoyad email")
                 .sort({ tarih: -1, createdAt: -1 }).lean(),
-            Siparis.countDocuments({ tenantId, durum: { $nin: ["TAMAMLANDI", "IPTAL"] } }),
-            Teklif.countDocuments({ tenantId, durum: { $nin: ["ONAYLANDI", "REDDEDILDI", "IPTAL", "SURESI_DOLDU", "SIPARISE_DONUSTU"] } }),
-            SatisIade.find({ tenantId, tarih: { $gte: ayBasi } }).select("genelToplam tarih").lean()
+            Siparis.countDocuments({ tenantId, durum: { $nin: ["TAMAMLANDI", "IPTAL"] }, ...sahiplik(req) }),
+            Teklif.countDocuments({ tenantId, durum: { $nin: ["ONAYLANDI", "REDDEDILDI", "IPTAL", "SURESI_DOLDU", "SIPARISE_DONUSTU"] }, ...sahiplik(req) }),
+            SatisIade.find({ tenantId, tarih: { $gte: ayBasi }, ...sahiplik(req) }).select("genelToplam tarih").lean()
         ]);
         const bugunSatis = satislar.filter(x => new Date(x.tarih) >= bugun);
         const toplam = liste => liste.reduce((n, x) => n + Number(x.genelToplam || 0), 0);
@@ -115,7 +123,7 @@ async function panel(req, res, next) {
 
 async function iadeleriListele(req, res, next) {
     try {
-        const iadeler = await SatisIade.find({ tenantId: tenantObjectId(req) })
+        const iadeler = await SatisIade.find({ tenantId: tenantObjectId(req), ...sahiplik(req) })
             .populate("musteriId", "kod unvan adSoyad email telefon whatsapp")
             .populate("depoId", "kod ad")
             .populate("kalemler.urunId", "kod ad birim")
@@ -128,7 +136,7 @@ async function detay(req, res, next) {
     try {
         const satis = await Satis.findOne({
             _id: req.params.id,
-            tenantId: tenantObjectId(req)
+            tenantId: tenantObjectId(req), ...sahiplik(req)
         })
             .populate("musteriId")
             .populate("depoId")
@@ -177,10 +185,7 @@ async function olustur(req, res, next) {
             });
         }
 
-        const musteri = await Musteri.findOne({
-            _id: body.musteriId,
-            tenantId
-        });
+        const musteri = await Musteri.findOne({ _id: body.musteriId, tenantId, ...(yonetici(req) ? {} : { $or: [{ temsilciId: islemKullaniciId(req) }, { olusturanKullaniciId: islemKullaniciId(req) }] }) });
 
         if (!musteri) {
             return res.status(404).json({
@@ -277,8 +282,8 @@ async function olustur(req, res, next) {
         }
 
         const odemeTipi = String(body.odemeTipi || "ACIK_HESAP").toUpperCase();
-        if (!["ACIK_HESAP", "NAKIT", "KART", "CEK", "SENET"].includes(odemeTipi)) {
-            return res.status(400).json({ basarili: false, mesaj: "Ödeme yöntemi açık hesap, nakit, kredi kartı, çek veya senet olmalıdır." });
+        if (!["ACIK_HESAP", "NAKIT", "KART", "BANKA", "CEK", "SENET"].includes(odemeTipi)) {
+            return res.status(400).json({ basarili: false, mesaj: "Ödeme yöntemi açık hesap, nakit, kredi kartı, IBAN, çek veya senet olmalıdır." });
         }
         const odemeDurumu = odemeTipi === "ACIK_HESAP" ? "ACIK" : "ODENDI";
         const odenenTutar = odemeTipi === "ACIK_HESAP" ? 0 : genelToplam;
@@ -514,7 +519,7 @@ async function iadeAl(req, res, next) {
         const body = req.body || {};
         if (!body.belgeNo || !body.musteriId || !body.depoId) return res.status(400).json({ basarili: false, mesaj: "İade belge no, müşteri ve depo zorunludur." });
         if (!Array.isArray(body.kalemler) || !body.kalemler.length) return res.status(400).json({ basarili: false, mesaj: "En az bir iade kalemi gerekir." });
-        const [musteri, depo] = await Promise.all([Musteri.findOne({ _id: body.musteriId, tenantId }), Depo.findOne({ _id: body.depoId, tenantId })]);
+        const [musteri, depo] = await Promise.all([Musteri.findOne({ _id: body.musteriId, tenantId, ...(yonetici(req) ? {} : { $or: [{ temsilciId: islemKullaniciId(req) }, { olusturanKullaniciId: islemKullaniciId(req) }] }) }), Depo.findOne({ _id: body.depoId, tenantId })]);
         if (!musteri || !depo) return res.status(404).json({ basarili: false, mesaj: "Müşteri veya depo bulunamadı." });
         const kalemler = []; let genelToplam = 0;
         for (const item of body.kalemler) {
@@ -524,7 +529,9 @@ async function iadeAl(req, res, next) {
             const ara = miktar * birimFiyat * (1 - iskonto / 100); const toplam = ara * (1 + kdv / 100);
             kalemler.push({ urunId: urun._id, miktar, birimFiyat, kdv, iskonto, toplam }); genelToplam += toplam;
         }
-        const iade = await SatisIade.create({ tenantId, belgeNo: String(body.belgeNo).trim().toUpperCase(), tarih: body.tarih || new Date(), musteriId: musteri._id, depoId: depo._id, kalemler, genelToplam, aciklama: body.notlar || "Müşteri satış iadesi", kullaniciId: req.kullanici?._id || req.user?._id || null });
+        const odemeTipi = String(body.odemeTipi || "ACIK_HESAP").toUpperCase();
+        if (!["ACIK_HESAP", "NAKIT", "KART", "BANKA", "CEK", "SENET", "DIGER"].includes(odemeTipi)) return res.status(400).json({ basarili: false, mesaj: "İade ödeme yöntemi geçersiz." });
+        const iade = await SatisIade.create({ tenantId, belgeNo: String(body.belgeNo).trim().toUpperCase(), tarih: body.tarih || new Date(), musteriId: musteri._id, depoId: depo._id, kalemler, genelToplam, odemeTipi, aciklama: body.notlar || "Müşteri satış iadesi", kullaniciId: islemKullaniciId(req) });
         for (const kalem of kalemler) {
             let stok = await Stok.findOne({ tenantId, urunId: kalem.urunId, depoId: depo._id });
             if (!stok) stok = new Stok({ tenantId, urunId: kalem.urunId, depoId: depo._id, miktar: 0, maliyet: 0 });
@@ -539,7 +546,7 @@ async function iadeAl(req, res, next) {
 
 async function guncelle(req, res, next) {
     try {
-        const tenantId=tenantObjectId(req), body=req.body||{}; const satis=await Satis.findOne({_id:req.params.id,tenantId});
+        const tenantId=tenantObjectId(req), body=req.body||{}; const satis=await Satis.findOne({_id:req.params.id,tenantId,...sahiplik(req)});
         if(!satis)return res.status(404).json({basarili:false,mesaj:"Satış bulunamadı."});
         if(Number(satis.odenenTutar||0)>0)return res.status(409).json({basarili:false,mesaj:"Ödeme alınmış satış doğrudan değiştirilemez; iade/düzeltme belgesi kullanın."});
         if(!Array.isArray(body.kalemler)||!body.kalemler.length)return res.status(400).json({basarili:false,mesaj:"En az bir satış kalemi gerekir."});
@@ -561,7 +568,7 @@ async function guncelle(req, res, next) {
 async function sil(req, res, next) {
     try {
         const tenantId = tenantObjectId(req);
-        const satis = await Satis.findOne({ _id: req.params.id, tenantId });
+        const satis = await Satis.findOne({ _id: req.params.id, tenantId, ...sahiplik(req) });
         if (!satis) return res.status(404).json({ basarili: false, mesaj: "Satış bulunamadı." });
         if (Number(satis.odenenTutar || 0) > 0) {
             return res.status(409).json({

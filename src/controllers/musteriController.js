@@ -6,17 +6,35 @@ function tenantObjectId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
 }
 
+function aktorId(req) {
+    return req.currentUser?._id || req.kullanici?._id || req.kullanici?.kullaniciId || req.user?._id || req.user?.kullaniciId;
+}
+
+function yonetici(req) {
+    return ["OWNER", "ADMIN"].includes(String(req.currentUser?.rol || req.kullanici?.rol || req.user?.rol || "").toUpperCase());
+}
+
+function sahiplik(req) {
+    const id = aktorId(req);
+    return yonetici(req) ? {} : { $or: [{ temsilciId: id }, { olusturanKullaniciId: id }] };
+}
+
+function konum(body) {
+    if (body?.konum === undefined) return undefined;
+    const enlem = Number(body.konum?.enlem), boylam = Number(body.konum?.boylam), hassasiyet = Number(body.konum?.hassasiyet || 0);
+    if (!Number.isFinite(enlem) || enlem < -90 || enlem > 90 || !Number.isFinite(boylam) || boylam < -180 || boylam > 180) throw Object.assign(new Error("GPS konumu geçersizdir."), { status: 400 });
+    return { enlem, boylam, hassasiyet: Math.max(0, hassasiyet), kayitTarihi: new Date() };
+}
+
 async function listele(req, res, next) {
     try {
         const tenantId = tenantObjectId(req);
         const arama = String(req.query.arama || "").trim();
 
-        const filter = {
-            tenantId
-        };
+        const filter = { tenantId, ...sahiplik(req) };
 
         if (arama) {
-            filter.$or = [
+            const aramaFiltresi = [
                 { kod: { $regex: arama, $options: "i" } },
                 { adSoyad: { $regex: arama, $options: "i" } },
                 { unvan: { $regex: arama, $options: "i" } },
@@ -24,6 +42,8 @@ async function listele(req, res, next) {
                 { telefon: { $regex: arama, $options: "i" } },
                 { whatsapp: { $regex: arama, $options: "i" } }
             ];
+            if (filter.$or) { filter.$and = [{ $or: filter.$or }, { $or: aramaFiltresi }]; delete filter.$or; }
+            else filter.$or = aramaFiltresi;
         }
 
         const musteriler = await Musteri.find(filter)
@@ -46,7 +66,8 @@ async function detay(req, res, next) {
 
         const musteri = await Musteri.findOne({
             _id: req.params.id,
-            tenantId
+            tenantId,
+            ...sahiplik(req)
         }).lean();
 
         if (!musteri) {
@@ -119,6 +140,9 @@ async function olustur(req, res, next) {
             grup: body.grup || "Genel",
             fotograf: body.fotograf || "",
             aktif: body.aktif !== false
+            , temsilciId: yonetici(req) && mongoose.Types.ObjectId.isValid(String(body.temsilciId || "")) ? body.temsilciId : aktorId(req)
+            , olusturanKullaniciId: aktorId(req)
+            , konum: konum(body)
         });
 
         return res.status(201).json({
@@ -137,7 +161,8 @@ async function guncelle(req, res, next) {
 
         const musteri = await Musteri.findOne({
             _id: req.params.id,
-            tenantId
+            tenantId,
+            ...sahiplik(req)
         });
 
         if (!musteri) {
@@ -178,6 +203,8 @@ async function guncelle(req, res, next) {
                         : body[alan];
             }
         }
+        if (body.konum !== undefined) musteri.konum = konum(body);
+        if (yonetici(req) && mongoose.Types.ObjectId.isValid(String(body.temsilciId || ""))) musteri.temsilciId = body.temsilciId;
 
         await musteri.save();
 
@@ -197,7 +224,8 @@ async function durumDegistir(req, res, next) {
         const musteri = await Musteri.findOneAndUpdate(
             {
                 _id: req.params.id,
-                tenantId
+                tenantId,
+                ...sahiplik(req)
             },
             {
                 aktif: Boolean(req.body?.aktif)
@@ -226,7 +254,7 @@ async function durumDegistir(req, res, next) {
 async function sil(req, res, next) {
     try {
         const tenantId = tenantObjectId(req);
-        const musteri = await Musteri.findOne({ _id: req.params.id, tenantId });
+        const musteri = await Musteri.findOne({ _id: req.params.id, tenantId, ...sahiplik(req) });
         if (!musteri) return res.status(404).json({ basarili: false, mesaj: "Müşteri bulunamadı." });
 
         const hareketVar = await CariHareket.exists({ tenantId, tarafTipi: "MUSTERI", tarafId: musteri._id });

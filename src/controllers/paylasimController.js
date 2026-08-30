@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const BelgePaylasim = require("../models/BelgePaylasim");
 const Teklif = require("../models/Teklif");
 const Siparis = require("../models/Siparis");
+const Satis = require("../models/Satis");
 const Urun = require("../models/Urun");
 const Tenant = require("../modules/platform/models/Tenant");
 
@@ -16,7 +17,7 @@ const firmaCiktisi = tenant => {
 async function paylasimOlustur(req, res, next) {
     try {
         const tenantId = tId(req), body = req.body || {}, tur = String(body.tur || "").toUpperCase();
-        if (!["KATALOG", "TEKLIF", "SIPARIS"].includes(tur)) return res.status(400).json({ basarili: false, mesaj: "Paylaşım türü geçersiz." });
+        if (!["KATALOG", "TEKLIF", "SIPARIS", "SATIS"].includes(tur)) return res.status(400).json({ basarili: false, mesaj: "Paylaşım türü geçersiz." });
         const tenant = await Tenant.findById(tenantId).lean();
         if (!tenant) return res.status(404).json({ basarili: false, mesaj: "Firma bulunamadı." });
         let belge, baslik;
@@ -31,11 +32,13 @@ async function paylasimOlustur(req, res, next) {
             belge = { kategori, urunler };
         } else {
             if (!mongoose.Types.ObjectId.isValid(body.belgeId)) return res.status(400).json({ basarili: false, mesaj: "Belge seçimi geçersiz." });
-            const Model = tur === "TEKLIF" ? Teklif : Siparis;
-            const noAlan = tur === "TEKLIF" ? "teklifNo" : "siparisNo";
-            const kayit = await Model.findOne({ _id: body.belgeId, tenantId }).populate("musteriId", "kod unvan adSoyad").populate("kalemler.urunId", "kod ad birim paraBirimi").lean();
+            const Model = tur === "TEKLIF" ? Teklif : tur === "SIPARIS" ? Siparis : Satis;
+            const noAlan = tur === "TEKLIF" ? "teklifNo" : tur === "SIPARIS" ? "siparisNo" : "belgeNo";
+            const rol = String(req.currentUser?.rol || req.kullanici?.rol || req.user?.rol || "").toUpperCase();
+            const sahiplik = tur === "SATIS" && !["OWNER", "ADMIN"].includes(rol) ? { kullaniciId: req.currentUser?._id || req.kullanici?._id || req.kullanici?.kullaniciId || req.user?._id } : {};
+            const kayit = await Model.findOne({ _id: body.belgeId, tenantId, ...sahiplik }).populate("musteriId", "kod unvan adSoyad whatsapp telefon").populate("kalemler.urunId", "kod ad birim paraBirimi").lean();
             if (!kayit) return res.status(404).json({ basarili: false, mesaj: "Belge bulunamadı." });
-            baslik = `${tur === "TEKLIF" ? "Teklif" : "Sipariş"} ${kayit[noAlan]}`;
+            baslik = `${tur === "TEKLIF" ? "Teklif" : tur === "SIPARIS" ? "Sipariş" : "Satış"} ${kayit[noAlan]}`;
             belge = kayit;
         }
         const gun = Math.min(90, Math.max(1, Number(body.gecerlilikGun || 30))), token = crypto.randomBytes(32).toString("base64url");

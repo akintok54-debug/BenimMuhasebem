@@ -8,6 +8,7 @@ const SatisIadeSchema = new mongoose.Schema({
     depoId: { type: mongoose.Schema.Types.ObjectId, ref: "Depo", required: true },
     kalemler: [{ urunId: { type: mongoose.Schema.Types.ObjectId, ref: "Urun", required: true }, miktar: Number, birimFiyat: Number, kdv: Number, iskonto: Number, toplam: Number }],
     genelToplam: { type: Number, required: true, min: 0 },
+    odemeTipi: { type: String, enum: ["ACIK_HESAP", "NAKIT", "BANKA", "KART", "CEK", "SENET", "DIGER"], default: "ACIK_HESAP" },
     aciklama: { type: String, trim: true, default: "" },
     kullaniciId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null }
 }, { timestamps: true });

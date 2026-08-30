@@ -12,11 +12,15 @@ const CariHareket = require("../models/CariHareket");
 function tenantId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
 }
+const aktorId = req => req.currentUser?._id || req.kullanici?.kullaniciId || req.user?.kullaniciId;
+const yonetici = req => ["OWNER", "ADMIN"].includes(String(req.currentUser?.rol || req.kullanici?.rol || req.user?.rol || "").toUpperCase());
+const sahiplik = req => yonetici(req) ? {} : { kullaniciId: aktorId(req) };
+const musteriSahiplik = req => yonetici(req) ? {} : { $or: [{ temsilciId: aktorId(req) }, { olusturanKullaniciId: aktorId(req) }] };
 
 async function listele(req, res, next) {
     try {
         const siparisler = await Siparis.find({
-            tenantId: tenantId(req)
+            tenantId: tenantId(req), ...sahiplik(req)
         })
             .populate("musteriId", "kod unvan adSoyad")
             .populate("depoId", "kod ad")
@@ -35,12 +39,12 @@ async function listele(req, res, next) {
 }
 
 async function detay(req, res, next) {
-    try { const siparis = await Siparis.findOne({ _id: req.params.id, tenantId: tenantId(req) }).populate("musteriId").populate("depoId").populate("kalemler.urunId").lean(); if (!siparis) return res.status(404).json({ basarili:false, mesaj:"Sipariş bulunamadı." }); res.json({ basarili:true, siparis }); } catch(error){ next(error); }
+    try { const siparis = await Siparis.findOne({ _id: req.params.id, tenantId: tenantId(req), ...sahiplik(req) }).populate("musteriId").populate("depoId").populate("kalemler.urunId").lean(); if (!siparis) return res.status(404).json({ basarili:false, mesaj:"Sipariş bulunamadı." }); res.json({ basarili:true, siparis }); } catch(error){ next(error); }
 }
 
 async function guncelle(req, res, next) {
     try {
-        const tId=tenantId(req), body=req.body||{}; const siparis=await Siparis.findOne({_id:req.params.id,tenantId:tId});
+        const tId=tenantId(req), body=req.body||{}; const siparis=await Siparis.findOne({_id:req.params.id,tenantId:tId,...sahiplik(req)});
         if(!siparis) return res.status(404).json({basarili:false,mesaj:"Sipariş bulunamadı."});
         if(siparis.satisId || siparis.durum==="TAMAMLANDI") return res.status(409).json({basarili:false,mesaj:"Satışa dönüşmüş sipariş değiştirilemez."});
         if(!Array.isArray(body.kalemler)||!body.kalemler.length) return res.status(400).json({basarili:false,mesaj:"En az bir sipariş kalemi gerekir."});
@@ -63,7 +67,7 @@ async function olustur(req, res, next) {
             return res.status(400).json({ basarili: false, mesaj: "En az bir sipariş kalemi gerekir." });
         }
         const [musteri, depo] = await Promise.all([
-            Musteri.findOne({ _id: body.musteriId, tenantId: tId }),
+            Musteri.findOne({ _id: body.musteriId, tenantId: tId, ...musteriSahiplik(req) }),
             Depo.findOne({ _id: body.depoId, tenantId: tId })
         ]);
         if (!musteri || !depo) return res.status(404).json({ basarili: false, mesaj: "Müşteri veya depo bulunamadı." });
@@ -89,7 +93,7 @@ async function olustur(req, res, next) {
             kalemler, araToplam, toplamKdv, genelToplam, durum: body.durum || "TASLAK",
             paraBirimi: body.paraBirimi || "TRY", teslimTarihi: body.teslimTarihi || null,
             sevkAdresi: body.sevkAdresi || "", odemeKosullari: body.odemeKosullari || "",
-            notlar: body.notlar || "", kullaniciId: req.kullanici?._id || req.user?._id || null
+            notlar: body.notlar || "", kullaniciId: aktorId(req)
         });
         res.status(201).json({ basarili: true, siparis });
     } catch (error) { next(error); }
@@ -101,7 +105,8 @@ async function satisdonustur(req, res, next) {
 
         const siparis = await Siparis.findOne({
             _id: req.params.id,
-            tenantId: tId
+            tenantId: tId,
+            ...sahiplik(req)
         });
 
         if (!siparis) {
@@ -194,7 +199,7 @@ async function satisdonustur(req, res, next) {
             odemeDurumu: "ACIK",
             odemeTipi: "ACIK_HESAP",
             notlar: `Sipariş ${siparis.siparisNo}`,
-            kullaniciId: req.kullanici?._id || null
+            kullaniciId: aktorId(req)
         });
 
         for (const item of stokKontrolleri) {
@@ -212,7 +217,7 @@ async function satisdonustur(req, res, next) {
                 kaynak: "SIPARIS",
                 kaynakId: siparis._id,
                 aciklama: `Sipariş ${siparis.siparisNo}`,
-                kullaniciId: req.kullanici?._id || null
+                kullaniciId: aktorId(req)
             });
         }
 
@@ -223,7 +228,7 @@ async function satisdonustur(req, res, next) {
             tenantId: tId, tarafTipi: "MUSTERI", tarafId: musteri._id,
             tip: "BORC", tutar: siparis.genelToplam, aciklama: `Sipariş satışı ${belgeNo}`,
             kaynak: "SATIS", kaynakId: satis._id, tarih: new Date(),
-            kullaniciId: req.kullanici?._id || req.user?._id || null
+            kullaniciId: aktorId(req)
         });
 
         siparis.satisId = satis._id;

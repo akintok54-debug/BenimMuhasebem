@@ -22,6 +22,9 @@ function cariErisimi(req) {
         tedarikci: izinler.has("supplier.read")
     };
 }
+const aktorId = req => req.currentUser?._id || req.kullanici?.kullaniciId || req.user?.kullaniciId;
+const satisTemsilcisi = req => ["SALES", "SATIS"].includes(String(req.currentUser?.rol || req.kullanici?.rol || req.user?.rol || "").toUpperCase());
+const musteriSahiplik = req => satisTemsilcisi(req) ? { $or: [{ temsilciId: aktorId(req) }, { olusturanKullaniciId: aktorId(req) }] } : {};
 
 async function hesapBul(req, hesapTipi, hesapId) {
     const tId = tenantId(req);
@@ -64,7 +67,7 @@ async function ozet(req, res, next) {
 
         const [musteriler, tedarikciler] = await Promise.all([
             erisim.musteri ? Musteri.find({
-                tenantId: tId
+                tenantId: tId, ...musteriSahiplik(req)
             })
                 .select("kod unvan adSoyad bakiye")
                 .lean() : [],
@@ -120,6 +123,15 @@ async function hareketler(req, res, next) {
 
         if (req.query.tarafId) {
             filter.tarafId = req.query.tarafId;
+        }
+
+        if (satisTemsilcisi(req)) {
+            if (filter.tarafTipi && filter.tarafTipi !== "MUSTERI") return res.status(403).json({ basarili: false, mesaj: "Bu cari kaydına erişim yetkiniz bulunmuyor." });
+            const izinliMusteriler = await Musteri.find({ tenantId: filter.tenantId, ...musteriSahiplik(req) }).select("_id").lean();
+            const izinliIds = izinliMusteriler.map(x => x._id);
+            if (filter.tarafId && !izinliIds.some(x => String(x) === String(filter.tarafId))) return res.status(404).json({ basarili: false, mesaj: "Müşteri cari kaydı bulunamadı." });
+            filter.tarafTipi = "MUSTERI";
+            filter.tarafId = filter.tarafId || { $in: izinliIds };
         }
 
         const hareketler = await CariHareket.find(filter)
@@ -201,7 +213,7 @@ async function ekstrePaylas(req, res, next) {
         if (!mongoose.Types.ObjectId.isValid(String(req.params.musteriId || ""))) {
             return res.status(400).json({ basarili: false, mesaj: "Geçersiz müşteri bilgisi." });
         }
-        const musteri = await Musteri.findOne({ _id: req.params.musteriId, tenantId: tId }).select("_id").lean();
+        const musteri = await Musteri.findOne({ _id: req.params.musteriId, tenantId: tId, ...musteriSahiplik(req) }).select("_id").lean();
         if (!musteri) return res.status(404).json({ basarili: false, mesaj: "Müşteri bulunamadı." });
 
         const token = crypto.randomBytes(32).toString("hex");
@@ -211,7 +223,7 @@ async function ekstrePaylas(req, res, next) {
             musteriId: musteri._id,
             token,
             sonGecerlilik,
-            olusturanKullaniciId: req.kullanici?._id || req.user?._id || null
+            olusturanKullaniciId: aktorId(req)
         });
 
         const protokol = String(req.get("x-forwarded-proto") || req.protocol).split(",")[0].trim();

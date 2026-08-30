@@ -9,6 +9,10 @@ const Ayar = require("../models/Ayar");
 function tenantId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
 }
+const aktorId = req => req.currentUser?._id || req.kullanici?.kullaniciId || req.user?.kullaniciId;
+const yonetici = req => ["OWNER", "ADMIN"].includes(String(req.currentUser?.rol || req.kullanici?.rol || req.user?.rol || "").toUpperCase());
+const sahiplik = req => yonetici(req) ? {} : { kullaniciId: aktorId(req) };
+const musteriSahiplik = req => yonetici(req) ? {} : { $or: [{ temsilciId: aktorId(req) }, { olusturanKullaniciId: aktorId(req) }] };
 
 function hesapla(item) {
     const miktar = Number(item.miktar || 0);
@@ -36,7 +40,7 @@ async function listele(req, res, next) {
     try {
         await Teklif.updateMany({ tenantId: tenantId(req), durum: "GONDERILDI", gecerlilikTarihi: { $lt: new Date() } }, { $set: { durum: "SURESI_DOLDU" } });
         const teklifler = await Teklif.find({
-            tenantId: tenantId(req)
+            tenantId: tenantId(req), ...sahiplik(req)
         })
             .populate("musteriId", "kod unvan adSoyad")
             .populate("kalemler.urunId", "kod ad birim satisFiyati kdv")
@@ -55,7 +59,7 @@ async function listele(req, res, next) {
 
 async function detay(req, res, next) {
     try {
-        const teklif = await Teklif.findOne({ _id: req.params.id, tenantId: tenantId(req) }).populate("musteriId").populate("kalemler.urunId").lean();
+        const teklif = await Teklif.findOne({ _id: req.params.id, tenantId: tenantId(req), ...sahiplik(req) }).populate("musteriId").populate("kalemler.urunId").lean();
         if (!teklif) return res.status(404).json({ basarili: false, mesaj: "Teklif bulunamadı." });
         res.json({ basarili: true, teklif });
     } catch (error) { next(error); }
@@ -64,7 +68,7 @@ async function detay(req, res, next) {
 async function guncelle(req, res, next) {
     try {
         const tId = tenantId(req), body = req.body || {};
-        const teklif = await Teklif.findOne({ _id: req.params.id, tenantId: tId });
+        const teklif = await Teklif.findOne({ _id: req.params.id, tenantId: tId, ...sahiplik(req) });
         if (!teklif) return res.status(404).json({ basarili: false, mesaj: "Teklif bulunamadı." });
         if (await Siparis.exists({ tenantId: tId, teklifId: teklif._id })) return res.status(409).json({ basarili: false, mesaj: "Siparişe dönüşmüş teklif değiştirilemez." });
         if (!Array.isArray(body.kalemler) || !body.kalemler.length) return res.status(400).json({ basarili: false, mesaj: "En az bir teklif kalemi gerekir." });
@@ -105,7 +109,8 @@ async function olustur(req, res, next) {
 
         const musteri = await Musteri.findOne({
             _id: body.musteriId,
-            tenantId: tId
+            tenantId: tId,
+            ...musteriSahiplik(req)
         });
 
         if (!musteri) {
@@ -174,7 +179,7 @@ async function olustur(req, res, next) {
             teslimatKosullari: body.teslimatKosullari || "",
             durum: body.durum || "TASLAK",
             notlar: body.notlar || "",
-            kullaniciId: req.kullanici?._id || null
+            kullaniciId: aktorId(req)
         });
 
         res.status(201).json({
@@ -190,7 +195,8 @@ async function onayla(req, res, next) {
     try {
         const teklif = await Teklif.findOne({
             _id: req.params.id,
-            tenantId: tenantId(req)
+            tenantId: tenantId(req),
+            ...sahiplik(req)
         });
 
         if (!teklif) {
@@ -220,7 +226,8 @@ async function sipariseDonustur(req, res, next) {
 
         const teklif = await Teklif.findOne({
             _id: req.params.id,
-            tenantId: tId
+            tenantId: tId,
+            ...sahiplik(req)
         });
 
         if (!teklif) {
@@ -271,7 +278,7 @@ async function sipariseDonustur(req, res, next) {
             genelToplam: teklif.genelToplam,
             durum: "ONAYLANDI",
             notlar: teklif.notlar,
-            kullaniciId: req.kullanici?._id || null
+            kullaniciId: aktorId(req)
         });
 
         teklif.durum = "SIPARISE_DONUSTU";

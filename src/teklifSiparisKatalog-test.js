@@ -17,7 +17,7 @@ test("Teklif ve sipariş profesyonel durum akışlarını destekler", () => {
 
 test("Paylaşım modeli süre, iptal ve görüntülenme denetimi içerir", () => {
     for (const alan of ["tokenHash", "tur", "firma", "belge", "sonGecerlilikTarihi", "aktif", "goruntulenmeSayisi"]) assert.ok(BelgePaylasim.schema.path(alan));
-    assert.deepEqual(BelgePaylasim.schema.path("tur").enumValues, ["KATALOG", "TEKLIF", "SIPARIS"]);
+    assert.deepEqual(BelgePaylasim.schema.path("tur").enumValues, ["KATALOG", "TEKLIF", "SIPARIS", "SATIS", "TESELLUM"]);
     assert.equal(BelgePaylasim.schema.path("tokenHash").options.select, false);
 });
 
