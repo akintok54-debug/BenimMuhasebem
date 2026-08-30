@@ -4577,6 +4577,109 @@
         } catch (error) { errorBox(error); }
     }
 
+    const personelDurumEtiketi = {
+        AKTIF: "Aktif", IZINLI: "İzinli", ASKIDA: "Askıda", AYRILDI: "Ayrıldı",
+        BEKLIYOR: "Bekliyor", ONAYLANDI: "Onaylandı", REDDEDILDI: "Reddedildi", IPTAL: "İptal",
+        GELDI: "Geldi", GEC: "Geç", GELMEDI: "Gelmedi", RAPORLU: "Raporlu", UZAKTAN: "Uzaktan"
+    };
+
+    let personelMerkeziVeri = { personeller: [], izinler: [], devam: [], panel: {} };
+
+    function personelRozet(durum) {
+        return `<span class="personnel-status status-${escapeHtml(String(durum || "").toLowerCase())}">${escapeHtml(personelDurumEtiketi[durum] || durum || "-")}</span>`;
+    }
+
+    function personelSecenekleri(secili = "") {
+        return personelMerkeziVeri.personeller.filter(x => x.aktif !== false).map(x => `<option value="${x._id}" ${String(x._id) === String(secili) ? "selected" : ""}>${escapeHtml(x.kod)} · ${escapeHtml(x.adSoyad)}</option>`).join("");
+    }
+
+    function personelModalKapat() {
+        document.getElementById("personelModal")?.remove();
+    }
+
+    function personelFormuAc(personel = null) {
+        personelModalKapat();
+        const p = personel || {};
+        const overlay = document.createElement("div");
+        overlay.id = "personelModal";
+        overlay.className = "erp-modal-overlay";
+        const sec = (alan, deger) => p[alan] === deger ? "selected" : "";
+        const iso = value => value ? new Date(value).toISOString().slice(0, 10) : "";
+        overlay.innerHTML = `<div class="erp-modal personnel-modal"><div class="erp-modal-header"><div><h2>${p._id ? "Personel Bilgilerini Düzenle" : "Yeni Personel"}</h2><p>Özlük, görev ve ücret bilgilerini eksiksiz yönetin.</p></div><button type="button" class="erp-modal-close">×</button></div>
+        <form id="personelForm"><div class="personnel-form-section"><h3>Kimlik ve iletişim</h3><div class="erp-form-grid">
+        <label>Personel Kodu<input name="kod" value="${escapeHtml(p.kod || "")}" required></label><label>Ad Soyad<input name="adSoyad" value="${escapeHtml(p.adSoyad || "")}" required></label>
+        <label>E-posta<input name="email" type="email" value="${escapeHtml(p.email || "")}"></label><label>Telefon<input name="telefon" value="${escapeHtml(p.telefon || "")}"></label>
+        <label>Doğum Tarihi<input name="dogumTarihi" type="date" value="${iso(p.dogumTarihi)}"></label><label>Lokasyon<input name="lokasyon" value="${escapeHtml(p.lokasyon || "")}"></label></div></div>
+        <div class="personnel-form-section"><h3>Görev ve çalışma</h3><div class="erp-form-grid"><label>Departman<input name="departman" value="${escapeHtml(p.departman || "")}"></label><label>Görev / Ünvan<input name="gorev" value="${escapeHtml(p.gorev || "")}"></label>
+        <label>Yönetici<input name="yonetici" value="${escapeHtml(p.yonetici || "")}"></label><label>İstihdam Türü<select name="istihdamTuru"><option value="TAM_ZAMANLI" ${sec("istihdamTuru", "TAM_ZAMANLI")}>Tam zamanlı</option><option value="YARI_ZAMANLI" ${sec("istihdamTuru", "YARI_ZAMANLI")}>Yarı zamanlı</option><option value="STAJYER" ${sec("istihdamTuru", "STAJYER")}>Stajyer</option><option value="DONEMSEL" ${sec("istihdamTuru", "DONEMSEL")}>Dönemsel</option></select></label>
+        <label>İşe Giriş<input name="iseGirisTarihi" type="date" value="${iso(p.iseGirisTarihi)}"></label><label>Çalışma Durumu<select name="calismaDurumu"><option value="AKTIF" ${sec("calismaDurumu", "AKTIF")}>Aktif</option><option value="IZINLI" ${sec("calismaDurumu", "IZINLI")}>İzinli</option><option value="ASKIDA" ${sec("calismaDurumu", "ASKIDA")}>Askıda</option><option value="AYRILDI" ${sec("calismaDurumu", "AYRILDI")}>Ayrıldı</option></select></label>
+        <label>Çıkış Tarihi<input name="cikisTarihi" type="date" value="${iso(p.cikisTarihi)}"></label><label>Yıllık İzin Hakkı<input name="yillikIzinHakki" type="number" min="0" value="${Number(p.yillikIzinHakki ?? 14)}"></label></div></div>
+        <div class="personnel-form-section"><h3>Ücret ve yasal bilgiler</h3><div class="erp-form-grid"><label>Aylık Ücret<input name="maas" type="number" min="0" step="0.01" value="${Number(p.maas || 0)}"></label><label>Para Birimi<select name="maasParaBirimi"><option ${sec("maasParaBirimi", "TRY")}>TRY</option><option ${sec("maasParaBirimi", "USD")}>USD</option><option ${sec("maasParaBirimi", "EUR")}>EUR</option></select></label>
+        <label>SGK Meslek Kodu<input name="sgkMeslekKodu" value="${escapeHtml(p.sgkMeslekKodu || "")}"></label><label>IBAN<input name="iban" value="${escapeHtml(p.iban || "")}"></label></div></div>
+        <div class="personnel-form-section"><h3>Adres ve acil durum</h3><div class="erp-form-grid"><label>İl<input name="il" value="${escapeHtml(p.adres?.il || "")}"></label><label>İlçe<input name="ilce" value="${escapeHtml(p.adres?.ilce || "")}"></label><label class="full">Açık Adres<textarea name="acikAdres">${escapeHtml(p.adres?.acikAdres || "")}</textarea></label>
+        <label>Acil Durum Kişisi<input name="acilAdSoyad" value="${escapeHtml(p.acilDurum?.adSoyad || "")}"></label><label>Yakınlık<input name="acilYakinlik" value="${escapeHtml(p.acilDurum?.yakinlik || "")}"></label><label>Acil Telefon<input name="acilTelefon" value="${escapeHtml(p.acilDurum?.telefon || "")}"></label><label class="full">Notlar<textarea name="notlar">${escapeHtml(p.notlar || "")}</textarea></label></div></div>
+        <div id="personelFormMesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button secondary" data-kapat>Vazgeç</button><button class="erp-primary-button" type="submit">${p._id ? "Değişiklikleri Kaydet" : "Personeli Kaydet"}</button></div></form></div>`;
+        document.body.appendChild(overlay);
+        overlay.querySelectorAll(".erp-modal-close,[data-kapat]").forEach(x => x.onclick = personelModalKapat);
+        overlay.querySelector("form").onsubmit = async event => {
+            event.preventDefault();
+            const fd = new FormData(event.currentTarget);
+            const body = Object.fromEntries(fd.entries());
+            body.maas = Number(body.maas || 0); body.yillikIzinHakki = Number(body.yillikIzinHakki || 0);
+            body.adres = { il: body.il, ilce: body.ilce, acikAdres: body.acikAdres };
+            body.acilDurum = { adSoyad: body.acilAdSoyad, yakinlik: body.acilYakinlik, telefon: body.acilTelefon };
+            ["il", "ilce", "acikAdres", "acilAdSoyad", "acilYakinlik", "acilTelefon"].forEach(x => delete body[x]);
+            try {
+                await api(p._id ? `/api/tenant/personeller/${p._id}` : "/api/tenant/personeller", { method: p._id ? "PATCH" : "POST", body: JSON.stringify(body) });
+                personelModalKapat(); await personelMerkeziYukle();
+            } catch (error) { overlay.querySelector("#personelFormMesaj").innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; }
+        };
+    }
+
+    function personelKisaFormAc(tur) {
+        personelModalKapat();
+        const izinMi = tur === "izin";
+        const overlay = document.createElement("div"); overlay.id = "personelModal"; overlay.className = "erp-modal-overlay";
+        overlay.innerHTML = `<div class="erp-modal" style="max-width:680px"><div class="erp-modal-header"><div><h2>${izinMi ? "Yeni İzin Talebi" : "Günlük Devam Kaydı"}</h2><p>${izinMi ? "İzin süresini ve türünü kaydedin; onay sürecinden takip edin." : "Aynı personel ve tarihe ait kayıt otomatik güncellenir."}</p></div><button class="erp-modal-close" type="button">×</button></div><form><div class="erp-form-grid"><label class="full">Personel<select name="personelId" required><option value="">Personel seçin</option>${personelSecenekleri()}</select></label>${izinMi ? `<label>İzin Türü<select name="tur"><option value="YILLIK">Yıllık izin</option><option value="MAZERET">Mazeret</option><option value="HASTALIK">Hastalık</option><option value="UCRETSIZ">Ücretsiz</option><option value="DOGUM">Doğum</option><option value="DIGER">Diğer</option></select></label><label>Başlangıç<input name="baslangicTarihi" type="date" required></label><label>Bitiş<input name="bitisTarihi" type="date" required></label>` : `<label>Tarih<input name="tarih" type="date" value="${new Date().toISOString().slice(0, 10)}" required></label><label>Durum<select name="durum"><option value="GELDI">Geldi</option><option value="GEC">Geç</option><option value="GELMEDI">Gelmedi</option><option value="IZINLI">İzinli</option><option value="RAPORLU">Raporlu</option><option value="UZAKTAN">Uzaktan</option></select></label><label>Giriş<input name="girisSaati" type="time"></label><label>Çıkış<input name="cikisSaati" type="time"></label>`}<label class="full">Açıklama / Not<textarea name="${izinMi ? "aciklama" : "notlar"}"></textarea></label></div><div id="personelFormMesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button secondary" data-kapat>Vazgeç</button><button class="erp-primary-button">Kaydet</button></div></form></div>`;
+        document.body.appendChild(overlay); overlay.querySelectorAll(".erp-modal-close,[data-kapat]").forEach(x => x.onclick = personelModalKapat);
+        overlay.querySelector("form").onsubmit = async event => { event.preventDefault(); const body = Object.fromEntries(new FormData(event.currentTarget).entries()); try { await api(`/api/tenant/personeller/${izinMi ? "izinler" : "devam"}`, { method: "POST", body: JSON.stringify(body) }); personelModalKapat(); await personelMerkeziYukle(izinMi ? "izinler" : "devam"); } catch (error) { overlay.querySelector("#personelFormMesaj").innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; } };
+    }
+
+    function personelTabloSatirlari(personeller) {
+        if (!personeller.length) return `<tr><td colspan="7"><div class="empty-state">Filtreye uygun personel bulunamadı.</div></td></tr>`;
+        return personeller.map(p => `<tr><td><div class="personnel-person"><span>${escapeHtml((p.adSoyad || "?").split(/\s+/).map(x => x[0]).join("").slice(0, 2).toUpperCase())}</span><div><strong>${escapeHtml(p.adSoyad)}</strong><small>${escapeHtml(p.kod)} · ${escapeHtml(p.email || p.telefon || "İletişim yok")}</small></div></div></td><td><strong>${escapeHtml(p.gorev || "-")}</strong><small>${escapeHtml(p.departman || "Departman yok")}</small></td><td>${escapeHtml((p.istihdamTuru || "TAM_ZAMANLI").replaceAll("_", " "))}</td><td>${personelRozet(p.calismaDurumu || (p.aktif ? "AKTIF" : "AYRILDI"))}</td><td>${p.iseGirisTarihi ? tarihKisa(p.iseGirisTarihi) : "-"}</td><td><strong>${finansPara(p.maas || 0, p.maasParaBirimi || "TRY")}</strong></td><td><button class="erp-small-button" data-personel-duzenle="${p._id}">Düzenle</button></td></tr>`).join("");
+    }
+
+    function personelIcerikCiz(aktifTab = "personeller") {
+        const d = personelMerkeziVeri, p = d.panel || {};
+        const tryBordro = (p.bordro || []).find(x => !x._id || x._id === "TRY")?.toplam || 0;
+        const departmanlar = [...new Set(d.personeller.map(x => x.departman).filter(Boolean))].sort();
+        content.innerHTML = `<div class="sales-hero personnel-hero"><div><div class="eyebrow">PERSONEL VE İK YÖNETİMİ</div><h2>Ekibinizi tek merkezden yönetin</h2><p>Özlük bilgileri, izin onayları, devam takibi ve ücret görünümü tenant güvenliğiyle korunur.</p></div><button id="yeniPersonel" class="erp-primary-button">+ Yeni Personel</button></div>
+        <div class="dashboard-grid personnel-kpis">${card("Aktif Personel", Number(p.aktif || 0), `${Number(p.toplam || 0)} toplam kayıt`)}${card("Bugün İzinli", Number(p.izinde || 0), "Onaylı izinler")}${card("Bekleyen İzin", Number(p.bekleyenIzin || 0), "Karar bekliyor")}${card("Aylık Ücret", finansPara(tryBordro, "TRY"), "Aktif personel · TRY")}</div>
+        <section class="dashboard-panel"><div class="personnel-toolbar"><div class="personnel-tabs"><button data-personel-tab="personeller" class="${aktifTab === "personeller" ? "active" : ""}">Personeller</button><button data-personel-tab="izinler" class="${aktifTab === "izinler" ? "active" : ""}">İzin Yönetimi <span>${Number(p.bekleyenIzin || 0)}</span></button><button data-personel-tab="devam" class="${aktifTab === "devam" ? "active" : ""}">Devam / Puantaj</button></div><div class="personnel-actions">${aktifTab === "izinler" ? '<button id="yeniIzin" class="erp-primary-button">+ İzin Kaydı</button>' : aktifTab === "devam" ? '<button id="yeniDevam" class="erp-primary-button">+ Devam Kaydı</button>' : ""}</div></div><div id="personelTabIcerik"></div></section>`;
+        const alan = document.getElementById("personelTabIcerik");
+        if (aktifTab === "personeller") alan.innerHTML = `<div class="personnel-filters"><input id="personelArama" type="search" placeholder="Ad, kod, görev veya e-posta ara"><select id="personelDepartman"><option value="">Tüm departmanlar</option>${departmanlar.map(x => `<option>${escapeHtml(x)}</option>`).join("")}</select></div><div class="table-scroll"><table class="personnel-table"><thead><tr><th>Personel</th><th>Görev</th><th>İstihdam</th><th>Durum</th><th>İşe Giriş</th><th>Aylık Ücret</th><th></th></tr></thead><tbody id="personelSatirlari">${personelTabloSatirlari(d.personeller)}</tbody></table></div>`;
+        if (aktifTab === "izinler") alan.innerHTML = `<div class="table-scroll"><table class="personnel-table"><thead><tr><th>Personel</th><th>İzin Türü</th><th>Tarih Aralığı</th><th>Süre</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>${d.izinler.length ? d.izinler.map(i => `<tr><td><strong>${escapeHtml(i.personelId?.adSoyad || "Silinmiş personel")}</strong><small>${escapeHtml(i.personelId?.departman || "")}</small></td><td>${escapeHtml(i.tur.replaceAll("_", " "))}</td><td>${tarihKisa(i.baslangicTarihi)} – ${tarihKisa(i.bitisTarihi)}</td><td>${Number(i.gun)} gün</td><td>${personelRozet(i.durum)}</td><td>${i.durum === "BEKLIYOR" ? `<button class="erp-small-button" data-izin-onay="${i._id}">Onayla</button> <button class="erp-small-button secondary" data-izin-red="${i._id}">Reddet</button>` : "-"}</td></tr>`).join("") : '<tr><td colspan="6"><div class="empty-state">İzin kaydı bulunmuyor.</div></td></tr>'}</tbody></table></div>`;
+        if (aktifTab === "devam") alan.innerHTML = `<div class="table-scroll"><table class="personnel-table"><thead><tr><th>Tarih</th><th>Personel</th><th>Durum</th><th>Giriş</th><th>Çıkış</th><th>Çalışma</th><th>Not</th></tr></thead><tbody>${d.devam.length ? d.devam.map(k => `<tr><td>${tarihKisa(k.tarih)}</td><td><strong>${escapeHtml(k.personelId?.adSoyad || "Silinmiş personel")}</strong><small>${escapeHtml(k.personelId?.departman || "")}</small></td><td>${personelRozet(k.durum)}</td><td>${escapeHtml(k.girisSaati || "-")}</td><td>${escapeHtml(k.cikisSaati || "-")}</td><td>${Math.floor(Number(k.calismaDakika || 0) / 60)} sa ${Number(k.calismaDakika || 0) % 60} dk</td><td>${escapeHtml(k.notlar || "-")}</td></tr>`).join("") : '<tr><td colspan="7"><div class="empty-state">Devam kaydı bulunmuyor.</div></td></tr>'}</tbody></table></div>`;
+        document.getElementById("yeniPersonel").onclick = () => personelFormuAc();
+        document.getElementById("yeniIzin")?.addEventListener("click", () => personelKisaFormAc("izin"));
+        document.getElementById("yeniDevam")?.addEventListener("click", () => personelKisaFormAc("devam"));
+        document.querySelectorAll("[data-personel-tab]").forEach(x => x.onclick = () => personelIcerikCiz(x.dataset.personelTab));
+        document.querySelectorAll("[data-personel-duzenle]").forEach(x => x.onclick = () => personelFormuAc(d.personeller.find(p => p._id === x.dataset.personelDuzenle)));
+        const filtrele = () => { const arama = String(document.getElementById("personelArama")?.value || "").toLocaleLowerCase("tr-TR"), dep = document.getElementById("personelDepartman")?.value || ""; const sonuc = d.personeller.filter(x => (!dep || x.departman === dep) && (!arama || [x.adSoyad, x.kod, x.gorev, x.email].some(v => String(v || "").toLocaleLowerCase("tr-TR").includes(arama)))); document.getElementById("personelSatirlari").innerHTML = personelTabloSatirlari(sonuc); document.querySelectorAll("[data-personel-duzenle]").forEach(x => x.onclick = () => personelFormuAc(d.personeller.find(p => p._id === x.dataset.personelDuzenle))); };
+        document.getElementById("personelArama")?.addEventListener("input", filtrele); document.getElementById("personelDepartman")?.addEventListener("change", filtrele);
+        document.querySelectorAll("[data-izin-onay],[data-izin-red]").forEach(x => x.onclick = async () => { const id = x.dataset.izinOnay || x.dataset.izinRed; const durum = x.dataset.izinOnay ? "ONAYLANDI" : "REDDEDILDI"; try { await api(`/api/tenant/personeller/izinler/${id}/durum`, { method: "PATCH", body: JSON.stringify({ durum }) }); await personelMerkeziYukle("izinler"); } catch (error) { alert(error.message); } });
+    }
+
+    async function personelMerkeziYukle(aktifTab = "personeller") {
+        setTitle("Personel ve İK"); loading("Personel merkezi hazırlanıyor...");
+        try {
+            const [panel, personeller, izinler, devam] = await Promise.all([api("/api/tenant/personeller/panel"), api("/api/tenant/personeller"), api("/api/tenant/personeller/izinler"), api("/api/tenant/personeller/devam")]);
+            personelMerkeziVeri = { panel: panel.panel || {}, personeller: personeller.personeller || [], izinler: izinler.izinler || [], devam: devam.devam || [] };
+            personelIcerikCiz(aktifTab);
+        } catch (error) { errorBox(error); }
+    }
+
     async function sayfaYukle(page) {
         const buYukleme = ++sayfaYuklemeNo;
         if (page === "dashboard" || page === "anaSayfa" || !page) {
@@ -4647,6 +4750,12 @@
         if (page === "masraflar") {
             if (buYukleme !== sayfaYuklemeNo) return;
             await masraflarYukle();
+            return;
+        }
+
+        if (page === "personeller") {
+            if (buYukleme !== sayfaYuklemeNo) return;
+            await personelMerkeziYukle();
             return;
         }
 

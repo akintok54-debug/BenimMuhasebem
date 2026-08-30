@@ -1,7 +1,7 @@
 const { kaydet } = require("../modules/platform/services/auditServisi");
 const { alarmGonder } = require("../services/guvenlikAlarmServisi");
 
-const kritikParcalar = ["/login", "/users", "/satis", "/alis", "/cari", "/finans", "/stok", "/hesap", "/ayarlar", "/teklif", "/siparis", "/paylasim", "/subscriptions", "/tenant-yetki"];
+const kritikParcalar = ["/login", "/users", "/satis", "/alis", "/cari", "/finans", "/stok", "/hesap", "/ayarlar", "/teklif", "/siparis", "/paylasim", "/subscriptions", "/tenant-yetki", "/personel"];
 function auditMiddleware(req, res, next) {
     const baslangic = Date.now();
     res.on("finish", () => {
