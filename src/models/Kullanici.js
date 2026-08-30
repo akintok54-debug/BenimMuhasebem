@@ -53,6 +53,12 @@ const KullaniciSchema = new mongoose.Schema(
             type: Boolean,
             default: true
         },
+        hesapDurumu: {
+            type: String,
+            enum: ["trial", "active", "expired", "suspended"],
+            default: "active",
+            index: true
+        },
         ozelYetkiler: {
             type: [String],
             enum: ["balance.adjust"],

@@ -5,6 +5,30 @@
     const mesaj = document.getElementById("mesaj");
     const btn = document.getElementById("girisBtn");
     const forgotBtn = document.getElementById("forgotBtn");
+    const registerForm = document.getElementById("registerForm");
+    const loginTab = document.getElementById("loginTab");
+    const registerTab = document.getElementById("registerTab");
+    const formBaslik = document.getElementById("formBaslik");
+    const formAciklama = document.getElementById("formAciklama");
+    const kayitMesaj = document.getElementById("kayitMesaj");
+    const kayitBtn = document.getElementById("kayitBtn");
+
+    function ekranDegistir(kayitAcik) {
+        form.hidden = kayitAcik;
+        registerForm.hidden = !kayitAcik;
+        loginTab.classList.toggle("active", !kayitAcik);
+        registerTab.classList.toggle("active", kayitAcik);
+        loginTab.setAttribute("aria-selected", String(!kayitAcik));
+        registerTab.setAttribute("aria-selected", String(kayitAcik));
+        formBaslik.textContent = kayitAcik ? "Ücretsiz Üye Ol" : "Giriş Yap";
+        formAciklama.textContent = kayitAcik ? "İşletme hesabınızı oluşturun, 30 gün ücretsiz kullanmaya başlayın." : "İşletme hesabınızla güvenli şekilde giriş yapın.";
+        mesaj.textContent = "";
+        kayitMesaj.textContent = "";
+        (kayitAcik ? document.getElementById("firmaAdi") : document.getElementById("email")).focus();
+    }
+
+    loginTab.addEventListener("click", function () { ekranDegistir(false); });
+    registerTab.addEventListener("click", function () { ekranDegistir(true); });
 
     forgotBtn.addEventListener("click", async function () {
         const emailInput = document.getElementById("email");
@@ -82,6 +106,41 @@
             btn.textContent = "Giriş Yap";
         }
 
+    });
+
+    registerForm.addEventListener("submit", async function (event) {
+        event.preventDefault();
+        kayitMesaj.textContent = "";
+        kayitBtn.disabled = true;
+        kayitBtn.textContent = "Hesabınız oluşturuluyor...";
+        try {
+            const response = await fetch("/api/auth/kayit", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Accept": "application/json" },
+                body: JSON.stringify({
+                    firmaAdi: document.getElementById("firmaAdi").value.trim(),
+                    adSoyad: document.getElementById("kayitAdSoyad").value.trim(),
+                    email: document.getElementById("kayitEmail").value.trim(),
+                    telefon: document.getElementById("kayitTelefon").value.trim(),
+                    sifre: document.getElementById("kayitSifre").value,
+                    kosullariKabul: document.getElementById("kosullariKabul").checked
+                })
+            });
+            const data = await response.json().catch(function () { return {}; });
+            if (!response.ok || !data.basarili) throw new Error(data.mesaj || "Hesap oluşturulamadı.");
+            localStorage.removeItem("tenantToken");
+            localStorage.removeItem("token");
+            localStorage.removeItem("accessToken");
+            if (data.csrfToken) sessionStorage.setItem("bmCsrfToken", data.csrfToken);
+            kayitMesaj.classList.add("success");
+            kayitMesaj.textContent = "Hesabınız hazır. Yönetim ekranı açılıyor...";
+            window.location.replace("/erp/");
+        } catch (error) {
+            kayitMesaj.classList.remove("success");
+            kayitMesaj.textContent = error.message || "Hesap oluşturulamadı. Lütfen tekrar deneyin.";
+            kayitBtn.disabled = false;
+            kayitBtn.textContent = "30 Gün Ücretsiz Başla";
+        }
     });
 
 })();

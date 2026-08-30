@@ -7,7 +7,7 @@ function secenek(httpOnly) { return { httpOnly, secure: process.env.NODE_ENV ===
 function oturumCookieYaz(res, token) { const csrfToken = crypto.randomBytes(32).toString("hex"); res.cookie(AUTH_COOKIE, token, secenek(true)); res.cookie(CSRF_COOKIE, csrfToken, secenek(false)); return csrfToken; }
 function oturumCookieSil(res) { res.clearCookie(AUTH_COOKIE, secenek(true)); res.clearCookie(CSRF_COOKIE, secenek(false)); }
 function csrfKontrol(req, res, next) {
-    if (["GET", "HEAD", "OPTIONS"].includes(req.method) || ["/api/auth/login", "/api/auth/2fa-dogrula"].includes(req.path) || req.headers.authorization?.startsWith("Bearer ")) return next();
+    if (["GET", "HEAD", "OPTIONS"].includes(req.method) || ["/api/auth/login", "/api/auth/kayit", "/api/auth/2fa-dogrula"].includes(req.path) || req.headers.authorization?.startsWith("Bearer ")) return next();
     const cookies = cookieOku(req); if (!cookies[AUTH_COOKIE]) return next();
     const header = String(req.get("x-csrf-token") || ""), cookie = String(cookies[CSRF_COOKIE] || "");
     if (header && cookie && header.length === cookie.length && crypto.timingSafeEqual(Buffer.from(header), Buffer.from(cookie))) return next();

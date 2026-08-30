@@ -39,11 +39,15 @@ const TenantSchema = new mongoose.Schema(
             enum: [
                 "trial",
                 "active",
+                "expired",
                 "suspended",
                 "cancelled"
             ],
             default: "trial"
         },
+
+        trialStartAt: { type: Date, default: null },
+        trialEndsAt: { type: Date, default: null, index: true },
 
         modules: {
             type: [String],

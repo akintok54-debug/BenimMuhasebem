@@ -27,6 +27,9 @@ const TenantSubscriptionSchema = new mongoose.Schema({
         default: "trial"
     },
 
+    trialStartAt: { type: Date, default: null },
+    trialEndsAt: { type: Date, default: null },
+
     startedAt: {
         type: Date,
         default: Date.now

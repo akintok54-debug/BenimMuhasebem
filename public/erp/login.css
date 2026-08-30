@@ -25,6 +25,11 @@
     box-shadow: 0 30px 90px rgba(0,0,0,.32);
 }
 
+.auth-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 0 0 24px; padding: 4px; border-radius: 12px; background: #f1f5f9; }
+.auth-tab { padding: 10px; background: transparent; color: #64748b; box-shadow: none; }
+.auth-tab:hover { transform: none; box-shadow: none; }
+.auth-tab.active { background: #fff; color: #1d4ed8; box-shadow: 0 2px 8px rgba(15,23,42,.1); }
+
 .brand {
     display: flex;
     align-items: baseline;
@@ -69,6 +74,13 @@ input {
     font-size: 15px;
 }
 
+input:focus { border-color: #2563eb; outline: 3px solid rgba(37,99,235,.12); }
+label small { display: block; margin-top: 6px; color: #64748b; font-size: 12px; font-weight: 400; }
+.optional { color: #94a3b8; font-size: 12px; font-weight: 400; }
+.terms-row { display: flex; align-items: flex-start; gap: 9px; font-size: 13px; line-height: 1.4; }
+.terms-row input { width: 17px; height: 17px; margin: 1px 0 0; flex: 0 0 auto; }
+.trial-note { margin-top: 10px; color: #64748b; text-align: center; font-size: 12px; }
+
 button {
     width: 100%;
     border: 0;
@@ -91,6 +103,8 @@ button:disabled {
     font-size: 14px;
 }
 #mesaj.success { color: #15803d; }
+#kayitMesaj { margin-bottom: 15px; color: #dc2626; font-size: 14px; }
+#kayitMesaj.success { color: #15803d; }
 .forgot-link { width: auto; padding: 0; margin: -5px 0 16px; background: transparent; color: #2563eb; box-shadow: none; text-align: left; }
 .forgot-link:hover { transform: none; box-shadow: none; text-decoration: underline; }
 
@@ -112,5 +126,10 @@ button:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(37,99,2
     .login-showcase h2 { font-size: 38px; }
     .login-showcase p { margin-left:auto; margin-right:auto; }
     .login-features { display:none; }
-    .login-card { margin: 0 auto; }
+    .login-card { box-sizing: border-box; margin: 0 auto; }
+}
+
+@media (max-width: 480px) {
+    .login-shell { padding: 14px; }
+    .login-card { padding: 26px 22px; border-radius: 18px; }
 }

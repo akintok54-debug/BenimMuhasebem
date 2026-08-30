@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BenimMuhasebe - Güvenli Giriş</title>
-    <link rel="stylesheet" href="/erp/login.css?v=20260827-002">
+    <link rel="stylesheet" href="/erp/login.css?v=20260830-001">
 </head>
 <body>
 
@@ -30,11 +30,13 @@
             <span>İşletme Yönetimi</span>
         </div>
 
-        <h1>Giriş Yap</h1>
+        <div class="auth-tabs" role="tablist" aria-label="Hesap işlemleri">
+            <button class="auth-tab active" id="loginTab" type="button" role="tab" aria-selected="true">Giriş Yap</button>
+            <button class="auth-tab" id="registerTab" type="button" role="tab" aria-selected="false">Üye Ol</button>
+        </div>
 
-        <p>
-            İşletme hesabınızla güvenli şekilde giriş yapın.
-        </p>
+        <h1 id="formBaslik">Giriş Yap</h1>
+        <p id="formAciklama">İşletme hesabınızla güvenli şekilde giriş yapın.</p>
 
         <form id="loginForm">
 
@@ -68,12 +70,49 @@
 
         </form>
 
+        <form id="registerForm" hidden>
+            <label>
+                Firma / işletme adı
+                <input id="firmaAdi" name="firmaAdi" type="text" autocomplete="organization" minlength="2" maxlength="150" required>
+            </label>
+
+            <label>
+                Ad soyad
+                <input id="kayitAdSoyad" name="adSoyad" type="text" autocomplete="name" minlength="2" maxlength="100" required>
+            </label>
+
+            <label>
+                E-posta
+                <input id="kayitEmail" name="email" type="email" autocomplete="email" maxlength="254" required>
+            </label>
+
+            <label>
+                Telefon <span class="optional">(isteğe bağlı)</span>
+                <input id="kayitTelefon" name="telefon" type="tel" autocomplete="tel" maxlength="30">
+            </label>
+
+            <label>
+                Şifre
+                <input id="kayitSifre" name="sifre" type="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+                <small>En az 8 karakter kullanın.</small>
+            </label>
+
+            <label class="terms-row">
+                <input id="kosullariKabul" type="checkbox" required>
+                <span>Kullanım ve gizlilik koşullarını kabul ediyorum.</span>
+            </label>
+
+            <div id="kayitMesaj" aria-live="polite"></div>
+            <button id="kayitBtn" type="submit">30 Gün Ücretsiz Başla</button>
+            <div class="trial-note">Kredi kartı gerekmez · Hesabınız hemen açılır</div>
+        </form>
+
         <div class="login-security">🔒 Güvenli işletme girişi · benimmuhasebe.com</div>
 
     </div>
 
 </div>
 
-<script src="/erp/login.js"></script>
+<script src="/erp/login.js?v=20260830-001"></script>
 </body>
 </html>

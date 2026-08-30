@@ -1,60 +1,30 @@
-﻿const mongoose = require("mongoose");
+const mongoose = require("mongoose");
+const { tenantAboneliginiKontrolEt } = require("../services/abonelikServisi");
 
-function tenantKontrol(req, res, next) {
+async function tenantKontrol(req, res, next) {
     try {
         const kullanici = req.kullanici || req.user;
+        if (!kullanici) return res.status(401).json({ basarili: false, mesaj: "Kimlik doğrulaması gerekli." });
 
-        if (!kullanici) {
-            return res.status(401).json({
-                basarili: false,
-                mesaj: "Kimlik doğrulaması gerekli."
-            });
+        const rol = String(kullanici.rol || kullanici.role || "").toUpperCase();
+        if (["SUPER_ADMIN", "SUPERADMIN", "PLATFORM_ADMIN"].includes(rol)) {
+            return res.status(403).json({ basarili: false, mesaj: "Süper yönetici işletme işlemleri için platform panelini kullanmalıdır." });
         }
 
-        const rol = String(
-            kullanici.rol ||
-            kullanici.role ||
-            ""
-        ).toUpperCase();
-
-        // Platform yöneticileri tenant API'lerine bağlamsız giremez.
-        // Tenant işlemleri platform rotaları üzerinden yürütülür.
-        if (
-            rol === "SUPER_ADMIN" ||
-            rol === "SUPERADMIN" ||
-            rol === "PLATFORM_ADMIN"
-        ) {
-            return res.status(403).json({
-                basarili: false,
-                mesaj: "Süper yönetici tenant işlemleri için platform panelini kullanmalıdır."
-            });
-        }
-
-        if (!kullanici.tenantId) {
-            return res.status(403).json({
-                basarili: false,
-                mesaj: "Tenant kimliği bulunamadı."
-            });
-        }
-
-        const id = String(kullanici.tenantId);
-
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(403).json({
-                basarili: false,
-                mesaj: "Geçersiz tenant kimliği."
-            });
-        }
-
+        const id = String(kullanici.tenantId || "");
+        if (!mongoose.Types.ObjectId.isValid(id)) return res.status(403).json({ basarili: false, mesaj: "İşletme erişimi doğrulanamadı." });
         req.tenantId = id;
 
+        const kontrol = await tenantAboneliginiKontrolEt(id);
+        if (!kontrol.erisim) {
+            res.locals.guvenlikOlayi = { kategori: "ABONELIK_ERISIMI", seviye: "BILGI" };
+            return res.status(kontrol.httpStatus).json({ basarili: false, kod: kontrol.kod, mesaj: kontrol.mesaj, abonelik: kontrol.abonelik || null, yonlendir: "/erp/abonelik.html" });
+        }
+        req.tenant = kontrol.tenant;
+        req.abonelik = kontrol.abonelik;
         return next();
-
-    } catch (error) {
-        return res.status(403).json({
-            basarili: false,
-            mesaj: "Tenant erişimi doğrulanamadı."
-        });
+    } catch (_) {
+        return res.status(403).json({ basarili: false, mesaj: "İşletme erişimi doğrulanamadı." });
     }
 }
 

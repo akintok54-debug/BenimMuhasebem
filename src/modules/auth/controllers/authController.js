@@ -2,12 +2,15 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const Kullanici = require("../../../models/Kullanici");
 const Tenant = require("../../platform/models/Tenant");
+const Plan = require("../../platform/models/Plan");
+const TenantSubscription = require("../../platform/models/TenantSubscription");
 const { tokenOlustur, tokenDogrula, geciciTokenOlustur } = require("../../../services/tokenServisi");
 const { kullaniciVeriPaketi } = require("../../../services/kvkkServisi");
 const { oturumCookieYaz, oturumCookieSil } = require("../../../services/oturumGuvenligi");
 const { sifrele, coz } = require("../../../services/sifrelemeServisi");
 const ikiFaktor = require("../../../services/ikiFaktorServisi");
 const { sifreSifirlamaEpostasiGonder } = require("../../../services/epostaServisi");
+const { trialTarihleri } = require("../../../services/abonelikServisi");
 
 function kullaniciId(req) { return req.kullanici?.kullaniciId || req.user?.kullaniciId; }
 function guvenliKullanici(k) { return { id: k._id, adSoyad: k.adSoyad, email: k.email, telefon: k.telefon || "", unvan: k.unvan || "", rol: k.rol, tenantId: k.tenantId, ozelYetkiler: k.ozelYetkiler || [], ikiFaktorEtkin: !!k.ikiFaktor?.etkin, sonGirisTarihi: k.sonGirisTarihi, createdAt: k.createdAt }; }
@@ -15,6 +18,98 @@ async function oturumAc(req, res, k) { k.sonGirisTarihi = new Date(); await k.sa
 
 async function login(req, res) {
     try { const { email, sifre } = req.body || {}; if (!email || !sifre) return res.status(400).json({ basarili: false, mesaj: "E-posta ve şifre zorunludur." }); const k = await Kullanici.findOne({ email: String(email).trim().toLowerCase() }).select("+ikiFaktor.gizliAnahtar +ikiFaktor.kurtarmaKodlariHash"); if (!k || !k.aktif || !(await bcrypt.compare(String(sifre), String(k.sifre)))) { if (k) req.user = { kullaniciId: k._id, tenantId: k.tenantId, rol: k.rol }; res.locals.guvenlikOlayi = { kategori: "GIRIS", seviye: "UYARI" }; return res.status(401).json({ basarili: false, mesaj: "E-posta veya şifre hatalı." }); } if (k.ikiFaktor?.etkin) return res.json({ basarili: true, ikiFaktorGerekli: true, challengeToken: geciciTokenOlustur({ purpose: "2fa", kullaniciId: k._id.toString() }) }); return oturumAc(req, res, k); } catch (e) { console.error("LOGIN_HATASI", { message: e.message }); return res.status(500).json({ basarili: false, mesaj: "Giriş işlemi sırasında sunucu hatası." }); }
+}
+
+function firmaSlugOlustur(firmaAdi) {
+    const harita = { ç: "c", ğ: "g", ı: "i", ö: "o", ş: "s", ü: "u" };
+    const taban = String(firmaAdi || "isletme")
+        .toLocaleLowerCase("tr-TR")
+        .replace(/[çğıöşü]/g, karakter => harita[karakter])
+        .normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+        .slice(0, 45) || "isletme";
+    return `${taban}-${crypto.randomBytes(3).toString("hex")}`;
+}
+
+async function kayit(req, res) {
+    let tenant = null;
+    let kullanici = null;
+    let subscription = null;
+    try {
+        const body = req.body || {};
+        const firmaAdi = String(body.firmaAdi || "").trim();
+        const adSoyad = String(body.adSoyad || "").trim();
+        const email = String(body.email || "").trim().toLowerCase();
+        const telefon = String(body.telefon || "").trim();
+        const sifre = String(body.sifre || "");
+
+        if (firmaAdi.length < 2 || firmaAdi.length > 150) return res.status(400).json({ basarili: false, mesaj: "Firma adı 2-150 karakter arasında olmalıdır." });
+        if (adSoyad.length < 2 || adSoyad.length > 100) return res.status(400).json({ basarili: false, mesaj: "Ad soyad 2-100 karakter arasında olmalıdır." });
+        if (!/^\S+@\S+\.\S+$/.test(email) || email.length > 254) return res.status(400).json({ basarili: false, mesaj: "Geçerli bir e-posta adresi girin." });
+        if (telefon.length > 30) return res.status(400).json({ basarili: false, mesaj: "Telefon numarası en fazla 30 karakter olabilir." });
+        if (sifre.length < 8 || sifre.length > 128) return res.status(400).json({ basarili: false, mesaj: "Parola 8-128 karakter arasında olmalıdır." });
+        if (body.kosullariKabul !== true) return res.status(400).json({ basarili: false, mesaj: "Kullanım ve gizlilik koşullarını kabul etmelisiniz." });
+        if (await Kullanici.exists({ email })) return res.status(409).json({ basarili: false, mesaj: "Bu e-posta adresiyle kayıtlı bir hesap zaten var." });
+
+        let plan = await Plan.findOne({ code: "STARTER" });
+        if (!plan) {
+            plan = await Plan.findOneAndUpdate(
+                { code: "STARTER" },
+                { $setOnInsert: { name: "Başlangıç", code: "STARTER", description: "30 günlük ücretsiz deneme planı", monthlyPrice: 0, yearlyPrice: 0, aktif: true, limits: { users: 3, products: 1000, storageMb: 1024, aiRequestsMonthly: 100 } } },
+                { new: true, upsert: true, setDefaultsOnInsert: true }
+            );
+        }
+        if (!plan.aktif) return res.status(503).json({ basarili: false, mesaj: "Yeni üyelikler geçici olarak durduruldu. Lütfen daha sonra tekrar deneyin." });
+
+        const { trialStartAt, trialEndsAt } = trialTarihleri();
+        tenant = await Tenant.create({
+            name: firmaAdi,
+            slug: firmaSlugOlustur(firmaAdi),
+            plan: "starter",
+            status: "trial",
+            trialStartAt,
+            trialEndsAt,
+            modules: plan.modules || [],
+            limits: plan.limits || undefined,
+            firmaBilgileri: { unvan: firmaAdi, yetkili: adSoyad, telefon, email }
+        });
+        kullanici = await Kullanici.create({
+            adSoyad,
+            email,
+            telefon,
+            unvan: firmaAdi,
+            sifre: await bcrypt.hash(sifre, 12),
+            rol: "OWNER",
+            tenantId: tenant._id,
+            aktif: true,
+            hesapDurumu: "trial"
+        });
+        subscription = await TenantSubscription.create({
+            tenantId: tenant._id,
+            planId: plan._id,
+            status: "trial",
+            trialStartAt,
+            trialEndsAt,
+            startedAt: trialStartAt,
+            expiresAt: trialEndsAt,
+            autoRenew: false,
+            usage: { users: 1, products: 0, storageMb: 0, aiRequests: 0 }
+        });
+        tenant.createdBy = kullanici._id;
+        tenant.usage.users = 1;
+        await tenant.save();
+        res.locals.guvenlikOlayi = { kategori: "KAYIT", seviye: "BILGI" };
+        return oturumAc(req, res, kullanici);
+    } catch (e) {
+        await Promise.allSettled([
+            subscription?._id ? TenantSubscription.deleteOne({ _id: subscription._id }) : Promise.resolve(),
+            kullanici?._id ? Kullanici.deleteOne({ _id: kullanici._id }) : Promise.resolve(),
+            tenant?._id ? Tenant.deleteOne({ _id: tenant._id }) : Promise.resolve()
+        ]);
+        if (e?.code === 11000) return res.status(409).json({ basarili: false, mesaj: "Bu e-posta veya işletme kaydı zaten kullanılıyor." });
+        console.error("KAYIT_HATASI", { message: e.message });
+        return res.status(500).json({ basarili: false, mesaj: "Hesap oluşturulamadı. Lütfen tekrar deneyin." });
+    }
 }
 async function sifremiUnuttum(req, res) {
     const genelMesaj = "Hesap bulunuyorsa parola yenileme bağlantısı e-posta adresinize gönderildi.";
@@ -66,4 +161,4 @@ async function hesapSil(req, res, next) { try { const { sifre, onay } = req.body
 async function verilerimiDisariAktar(req, res, next) { try { const paket = await kullaniciVeriPaketi(kullaniciId(req), req.tenantId); if (!paket) return res.status(404).json({ basarili: false, mesaj: "Kullanıcı hesabı bulunamadı." }); res.set("Cache-Control", "no-store"); res.set("Content-Disposition", `attachment; filename=benimmuhasebe-verilerim-${new Date().toISOString().slice(0, 10)}.json`); return res.json({ basarili: true, veriPaketi: paket }); } catch (e) { next(e); } }
 function logout(req, res) { oturumCookieSil(res); return res.json({ basarili: true, mesaj: "Oturum kapatıldı." }); }
 
-module.exports = { login, sifremiUnuttum, sifreYenile, ikiFaktorDogrula, ikiFaktorBaslat, ikiFaktorOnayla, ikiFaktorKapat, profil, profilGuncelle, sifreDegistir, hesapSil, verilerimiDisariAktar, logout };
+module.exports = { login, kayit, firmaSlugOlustur, sifremiUnuttum, sifreYenile, ikiFaktorDogrula, ikiFaktorBaslat, ikiFaktorOnayla, ikiFaktorKapat, profil, profilGuncelle, sifreDegistir, hesapSil, verilerimiDisariAktar, logout };
