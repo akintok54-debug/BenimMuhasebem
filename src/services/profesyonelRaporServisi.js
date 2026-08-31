@@ -59,7 +59,13 @@ function tarihAraligi(query = {}, simdi = new Date()) {
     return { kod, baslangic, bitis, baslangicYazi: tarihYaz(baslangic), bitisYazi: tarihYaz(bitis) };
 }
 function oncekiAralik(aralik) { const sure = aralik.bitis.getTime() - aralik.baslangic.getTime() + 1; const bitis = new Date(aralik.baslangic.getTime() - 1), baslangic = new Date(bitis.getTime() - sure + 1); return { kod: "ONCEKI_DONEM", baslangic, bitis, baslangicYazi: tarihYaz(baslangic), bitisYazi: tarihYaz(bitis) }; }
-function karsilastirmaAraligi(query, aralik) { const kod = String(query.donem || "BU_AY").toUpperCase(); if (kod === "BUGUN") return tarihAraligi({ donem: "DUN" }); if (kod === "BU_AY") return tarihAraligi({ donem: "GECEN_AY" }); if (kod === "BU_YIL") return tarihAraligi({ donem: "GECEN_YIL" }); return oncekiAralik(aralik); }
+function karsilastirmaAraligi(query, aralik) {
+    const kod = String(query.donem || "BU_AY").toUpperCase();
+    if (kod === "BUGUN") return oncekiAralik(aralik);
+    if (kod === "BU_AY") return tarihAraligi({ donem: "GECEN_AY" }, aralik.bitis);
+    if (kod === "BU_YIL") return tarihAraligi({ donem: "GECEN_YIL" }, aralik.bitis);
+    return oncekiAralik(aralik);
+}
 function kalemNet(k) { return yuvarla(Number(k.miktar || 0) * Number(k.birimFiyat || 0) * (1 - Number(k.iskonto || 0) / 100)); }
 function stokYon(tip) { return ["GIRIS", "SAYIM_ARTI", "IADE_GIRIS", "TRANSFER_GIRIS", "DEVIR_GIRIS"].includes(tip) ? 1 : -1; }
 function ad(nesne) { return nesne?.unvan || nesne?.adSoyad || nesne?.ad || nesne?.bankaAdi || "-"; }

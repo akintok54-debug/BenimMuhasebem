@@ -124,6 +124,13 @@ test("Rapor ekranı filtre, karşılaştırma, grafik ve üç dışa aktarma iş
     for (const metin of ["ERP RAPORLARI", "Özel Tarih", "Satış Temsilcisi", ">Excel<", ">PDF<", ">Yazdır<", "Dönem Kâr ve Stok Raporu", "raporGrafikleri"]) assert.ok(js.includes(metin), metin);
 });
 
+test("Rapor modalı teknik alan ve işlem kodlarını kullanıcı dostu Türkçe metne çevirir", () => {
+    const js = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
+    for (const metin of ["RAPOR_ALAN_ETIKETLERI", "RAPOR_KOD_ETIKETLERI", "Belge İçeriği", "Kredi Kartı", "İade Girişi", "raporDegeriHazirla"]) assert.ok(js.includes(metin), metin);
+    assert.match(js, /key === "tenantId"/);
+    assert.match(js, /Array\.isArray\(value\).*kalem/);
+});
+
 test("Rapor ana ekranı sade dönem düğmeleri, yönetici kartları ve dört rapor kategorisi sunar", () => {
     const js = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
     for (const metin of ["Bugün", "Bu Hafta", "Bu Ay", "Bu Yıl", "Özel Tarih", "SATIŞ RAPORLARI", "STOK RAPORLARI", "FİNANS RAPORLARI", "DÖNEM RAPORLARI", "Gelişmiş Filtreler", "Hesaplanamadı"]) assert.ok(js.includes(metin), metin);
