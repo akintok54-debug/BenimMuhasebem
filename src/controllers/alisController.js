@@ -277,6 +277,7 @@ async function olustur(req, res, next) {
          * ALIŞ -> STOK GRŞ
          */
         for (const kalem of kalemler) {
+            const stokBirimMaliyeti = kalem.birimFiyat * (1 - Number(kalem.iskonto || 0) / 100);
             const stok = await Stok.findOneAndUpdate(
                 {
                     tenantId,
@@ -288,7 +289,7 @@ async function olustur(req, res, next) {
                         miktar: kalem.miktar
                     },
                     $set: {
-                        maliyet: kalem.birimFiyat,
+                        maliyet: stokBirimMaliyeti,
                         sonHareketTarihi: new Date()
                     }
                 },
@@ -305,7 +306,10 @@ async function olustur(req, res, next) {
                 depoId: depo._id,
                 tip: "GIRIS",
                 miktar: kalem.miktar,
-                birimMaliyet: kalem.birimFiyat,
+                tarih: alis.tarih,
+                birimMaliyet: stokBirimMaliyeti,
+                maliyetDogrulandi: stokBirimMaliyeti > 0,
+                maliyetKaynagi: "ALIS_BELGESI",
                 kaynak: "ALIS",
                 kaynakId: alis._id,
                 aciklama: `Alış ${belgeNo}`,
@@ -373,7 +377,8 @@ async function iadeOlustur(req, res, next) {
         const iade = await AlisIade.create({ tenantId, belgeNo, tarih: body.tarih || new Date(), tedarikciId: tedarikci._id, depoId: depo._id, kalemler, genelToplam, aciklama: body.aciklama || "Alış iadesi", kullaniciId: req.kullanici?._id || req.user?._id || null });
         for (const kalem of kalemler) {
             await Stok.updateOne({ tenantId, urunId: kalem.urunId, depoId: depo._id }, { $inc: { miktar: -kalem.miktar }, $set: { sonHareketTarihi: new Date() } });
-            await StokHareket.create({ tenantId, urunId: kalem.urunId, depoId: depo._id, tip: "IADE_CIKIS", miktar: kalem.miktar, birimMaliyet: kalem.birimFiyat, kaynak: "ALIS_IADE", kaynakId: iade._id, aciklama: `Alış iadesi ${belgeNo}`, kullaniciId: req.kullanici?._id || req.user?._id || null });
+            const iadeBirimMaliyeti = kalem.birimFiyat * (1 - Number(kalem.iskonto || 0) / 100);
+            await StokHareket.create({ tenantId, urunId: kalem.urunId, depoId: depo._id, tip: "IADE_CIKIS", miktar: kalem.miktar, tarih: iade.tarih, birimMaliyet: iadeBirimMaliyeti, maliyetDogrulandi: iadeBirimMaliyeti > 0, maliyetKaynagi: "ALIS_IADE_BELGESI", kaynak: "ALIS_IADE", kaynakId: iade._id, aciklama: `Alış iadesi ${belgeNo}`, kullaniciId: req.kullanici?._id || req.user?._id || null });
         }
         tedarikci.bakiye -= genelToplam; await tedarikci.save();
         const cariHareket = await CariHareket.create({ tenantId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id, tip: "IADE", tutar: genelToplam, belgeNo, aciklama: `Alış iadesi ${belgeNo}`, kaynak: "ALIS_IADE", kaynakId: iade._id, tarih: body.tarih || new Date(), kullaniciId: req.kullanici?._id || req.user?._id || null });

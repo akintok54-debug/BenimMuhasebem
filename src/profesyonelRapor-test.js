@@ -3,7 +3,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { RAPORLAR, hesaplamalariTamamla, tarihAraligi, oncekiAralik, karsilastirmaAraligi, depoKosuluOlustur } = require("./services/profesyonelRaporServisi");
+const { RAPORLAR, hesaplamalariTamamla, stokMaliyetAnalizi, tarihAraligi, oncekiAralik, karsilastirmaAraligi, depoKosuluOlustur } = require("./services/profesyonelRaporServisi");
 
 async function istek(url, options) {
     const uygulama = require("./uygulama"), server = uygulama.listen(0, "127.0.0.1");
@@ -34,6 +34,37 @@ test("Dönem, net alış, SMM, brüt kâr ve net sonuç formülleri doğru çal�
     assert.equal(sonuc.brutKar, 800);
     assert.equal(sonuc.faaliyetKari, 600);
     assert.equal(sonuc.netKarZarar, 600);
+});
+
+test("Net satış sıfırken dönem içi stok artışı negatif SMM ve sahte pozitif kâr üretmez", () => {
+    const baslangic = new Date("2026-08-01T00:00:00Z"), bitis = new Date("2026-08-31T23:59:59Z");
+    const analiz = stokMaliyetAnalizi([{ urunId: "u1", depoId: "d1", miktar: 10 }], [{ urunId: "u1", depoId: "d1", tip: "SAYIM_ARTI", kaynak: "URUN_EXCEL", miktar: 10, birimMaliyet: 100, createdAt: new Date("2026-08-10T10:00:00Z") }], [], baslangic, bitis);
+    assert.equal(analiz.satilanMalinMaliyeti, 0);
+    assert.equal(analiz.digerStokEtkisi, 1000);
+    const sonuc = hesaplamalariTamamla({ donemBasiMalMevcudu: analiz.donemBasiMalMevcudu, donemSonuMalMevcudu: analiz.donemSonuMalMevcudu, toplamAlis: 0, alisIadeleri: 0, toplamSatisGeliri: 0, satisIadeleri: 0, digerGelirler: 0, toplamGiderler: 0, satilanMalinMaliyeti: analiz.satilanMalinMaliyeti, maliyetGuvenilir: analiz.guvenilir });
+    assert.equal(sonuc.satilanMalinMaliyeti, 0);
+    assert.equal(sonuc.brutKar, 0);
+    assert.equal(sonuc.netKarZarar, 0);
+});
+
+test("Satış çıkış maliyeti eksikse SMM, brüt kâr ve net kâr hesaplanamaz", () => {
+    const baslangic = new Date("2026-08-01T00:00:00Z"), bitis = new Date("2026-08-31T23:59:59Z");
+    const hareketler = [{ urunId: "u1", depoId: "d1", tip: "GIRIS", kaynak: "DEVIR", miktar: 10, birimMaliyet: 100, createdAt: new Date("2026-07-01T10:00:00Z") }, { urunId: "u1", depoId: "d1", tip: "CIKIS", kaynak: "SATIS", kaynakId: "s1", miktar: 1, birimMaliyet: 0, createdAt: new Date("2026-08-10T10:00:00Z") }];
+    const analiz = stokMaliyetAnalizi([{ urunId: "u1", depoId: "d1", miktar: 9 }], hareketler, [], baslangic, bitis);
+    assert.equal(analiz.guvenilir, false);
+    assert.equal(analiz.satilanMalinMaliyeti, null);
+    const sonuc = hesaplamalariTamamla({ donemBasiMalMevcudu: null, donemSonuMalMevcudu: null, toplamAlis: 0, alisIadeleri: 0, toplamSatisGeliri: 500, satisIadeleri: 0, digerGelirler: 0, toplamGiderler: 0, satilanMalinMaliyeti: null, maliyetGuvenilir: false });
+    assert.equal(sonuc.brutKar, null);
+    assert.equal(sonuc.netKarZarar, null);
+});
+
+test("Negatif satış maliyeti kâr olarak gösterilmez", () => {
+    const baslangic = new Date("2026-08-01T00:00:00Z"), bitis = new Date("2026-08-31T23:59:59Z");
+    const hareketler = [{ urunId: "u1", depoId: "d1", tip: "GIRIS", kaynak: "ALIS", miktar: 2, birimMaliyet: 100, createdAt: new Date("2026-07-01T10:00:00Z") }, { urunId: "u1", depoId: "d1", tip: "CIKIS", kaynak: "SATIS", kaynakId: "s1", miktar: 1, birimMaliyet: 100, createdAt: new Date("2026-07-10T10:00:00Z") }, { urunId: "u1", depoId: "d1", tip: "IADE_GIRIS", kaynak: "SATIS_IADE", kaynakId: "i1", miktar: 1, birimMaliyet: 999, createdAt: new Date("2026-08-10T10:00:00Z") }];
+    const analiz = stokMaliyetAnalizi([{ urunId: "u1", depoId: "d1", miktar: 2 }], hareketler, [{ _id: "i1", orijinalSatisId: "s1" }], baslangic, bitis);
+    assert.equal(analiz.guvenilir, false);
+    assert.equal(analiz.satilanMalinMaliyeti, null);
+    assert.ok(analiz.nedenler.some(x => x.includes("negatif")));
 });
 
 test("Özel dönem ve önceki eş uzunluktaki dönem güvenli hesaplanır", () => {
@@ -79,7 +110,22 @@ test("Depo şube alanı ve rapor şube-depo bağlantısı tenant kapsamında tan
     assert.match(servis, /depoKosuluOlustur\(depoId, sube, subeDepoIds\)/);
 });
 
+test("Stok hareketleri işlem tarihi ve doğrulanmış maliyet kaynağını saklar", () => {
+    const model = fs.readFileSync(path.join(__dirname, "models", "StokHareket.js"), "utf8");
+    const satis = fs.readFileSync(path.join(__dirname, "controllers", "satisController.js"), "utf8");
+    const alis = fs.readFileSync(path.join(__dirname, "controllers", "alisController.js"), "utf8");
+    for (const metin of ["tarih:", "maliyetDogrulandi", "maliyetKaynagi", "DEVIR_GIRIS", "DEVIR_CIKIS"]) assert.ok(model.includes(metin), metin);
+    assert.match(satis, /maliyetKaynagi:[^\n]*"ORIJINAL_SATIS"/);
+    assert.match(alis, /maliyetKaynagi:\s*"ALIS_BELGESI"/);
+});
+
 test("Rapor ekranı filtre, karşılaştırma, grafik ve üç dışa aktarma işlemini sunar", () => {
     const js = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
-    for (const metin of ["PROFESYONEL ERP RAPOR MERKEZİ", "Özel tarih aralığı", "Satış Temsilcisi", "Excel İndir", "PDF İndir", "Yazdır", "Dönem Kâr ve Stok Raporu", "raporGrafikleri"]) assert.ok(js.includes(metin), metin);
+    for (const metin of ["ERP RAPORLARI", "Özel Tarih", "Satış Temsilcisi", ">Excel<", ">PDF<", ">Yazdır<", "Dönem Kâr ve Stok Raporu", "raporGrafikleri"]) assert.ok(js.includes(metin), metin);
+});
+
+test("Rapor ana ekranı sade dönem düğmeleri, yönetici kartları ve dört rapor kategorisi sunar", () => {
+    const js = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
+    for (const metin of ["Bugün", "Bu Hafta", "Bu Ay", "Bu Yıl", "Özel Tarih", "SATIŞ RAPORLARI", "STOK RAPORLARI", "FİNANS RAPORLARI", "DÖNEM RAPORLARI", "Gelişmiş Filtreler", "Hesaplanamadı"]) assert.ok(js.includes(metin), metin);
+    assert.match(js, /id="raporDetayKabuk"[^>]*hidden/);
 });

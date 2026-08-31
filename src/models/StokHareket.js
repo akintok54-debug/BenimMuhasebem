@@ -33,7 +33,9 @@ const StokHareketSchema = new mongoose.Schema(
                 "IADE_GIRIS",
                 "IADE_CIKIS",
                 "TRANSFER_GIRIS",
-                "TRANSFER_CIKIS"
+                "TRANSFER_CIKIS",
+                "DEVIR_GIRIS",
+                "DEVIR_CIKIS"
             ],
             required: true
         },
@@ -44,10 +46,27 @@ const StokHareketSchema = new mongoose.Schema(
             min: 0
         },
 
+        tarih: {
+            type: Date,
+            default: Date.now,
+            index: true
+        },
+
         birimMaliyet: {
             type: Number,
             default: 0,
             min: 0
+        },
+
+        maliyetDogrulandi: {
+            type: Boolean,
+            default: false
+        },
+
+        maliyetKaynagi: {
+            type: String,
+            trim: true,
+            default: ""
         },
 
         kaynak: {
@@ -86,5 +105,6 @@ StokHareketSchema.index({
 });
 
 StokHareketSchema.index({ tenantId: 1, islemAnahtari: 1 }, { unique: true, sparse: true });
+StokHareketSchema.index({ tenantId: 1, tarih: -1, depoId: 1 });
 
 module.exports = mongoose.model("StokHareket", StokHareketSchema);

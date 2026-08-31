@@ -186,7 +186,10 @@ async function transfer(req, res, next) {
                 depoId: kaynakDepo._id,
                 tip: "TRANSFER_CIKIS",
                 miktar,
+                tarih: transferBelgesi.tarih,
                 birimMaliyet: maliyet,
+                maliyetDogrulandi: maliyet > 0,
+                maliyetKaynagi: "TRANSFER",
                 kaynak,
                 kaynakId: transferBelgesi._id,
                 aciklama,
@@ -198,7 +201,10 @@ async function transfer(req, res, next) {
                 depoId: hedefDepo._id,
                 tip: "TRANSFER_GIRIS",
                 miktar,
+                tarih: transferBelgesi.tarih,
                 birimMaliyet: maliyet,
+                maliyetDogrulandi: maliyet > 0,
+                maliyetKaynagi: "TRANSFER",
                 kaynak,
                 kaynakId: transferBelgesi._id,
                 aciklama,
@@ -264,7 +270,7 @@ async function sayim(req, res, next) {
             stok.miktar = kalem.sayilanMiktar;
             stok.sonHareketTarihi = new Date();
             await stok.save();
-            if (kalem.fark) await StokHareket.create({ tenantId: tId, urunId: kalem.urunId, depoId: depo._id, tip: kalem.fark > 0 ? "SAYIM_ARTI" : "SAYIM_EKSI", miktar: Math.abs(kalem.fark), birimMaliyet: kalem.birimMaliyet, kaynak: "SAYIM", kaynakId: belge._id, aciklama: `${belgeNo} sayım farkı`, kullaniciId: req.kullanici?._id || req.user?._id || null });
+            if (kalem.fark) await StokHareket.create({ tenantId: tId, urunId: kalem.urunId, depoId: depo._id, tip: kalem.fark > 0 ? "SAYIM_ARTI" : "SAYIM_EKSI", miktar: Math.abs(kalem.fark), tarih: belge.tarih, birimMaliyet: kalem.birimMaliyet, maliyetDogrulandi: kalem.birimMaliyet > 0, maliyetKaynagi: "SAYIM", kaynak: "SAYIM", kaynakId: belge._id, aciklama: `${belgeNo} sayım farkı`, kullaniciId: req.kullanici?._id || req.user?._id || null });
         }
         res.status(201).json({ basarili: true, sayim: belge });
     } catch (error) { next(error); }
@@ -329,8 +335,8 @@ async function hareket(req, res, next) {
         const birimMaliyet = body.birimMaliyet === undefined || body.birimMaliyet === ""
             ? null
             : Number(body.birimMaliyet);
-        const girisTipleri = ["GIRIS", "SAYIM_ARTI", "IADE_GIRIS"];
-        const cikisTipleri = ["CIKIS", "SAYIM_EKSI", "IADE_CIKIS"];
+        const girisTipleri = ["GIRIS", "SAYIM_ARTI", "IADE_GIRIS", "DEVIR_GIRIS"];
+        const cikisTipleri = ["CIKIS", "SAYIM_EKSI", "IADE_CIKIS", "DEVIR_CIKIS"];
 
         if (!Number.isFinite(miktar) || miktar <= 0) {
             return res.status(400).json({
@@ -428,7 +434,10 @@ async function hareket(req, res, next) {
             depoId: depo._id,
             tip,
             miktar,
+            tarih: body.tarih || new Date(),
             birimMaliyet: birimMaliyet ?? stok.maliyet ?? 0,
+            maliyetDogrulandi: Number(birimMaliyet ?? stok.maliyet ?? 0) > 0,
+            maliyetKaynagi: birimMaliyet !== null ? "MANUEL_GIRIS" : "STOK_KARTI",
             kaynak: body.kaynak || "MANUEL",
             kaynakId: body.kaynakId || null,
             aciklama: body.aciklama || "",

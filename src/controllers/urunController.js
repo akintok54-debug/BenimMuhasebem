@@ -440,7 +440,7 @@ async function topluAktar(req, res, next) {
                     if (fark) await StokHareket.create({
                         tenantId: tId, urunId: urun._id, depoId: depo._id,
                         tip: fark > 0 ? "SAYIM_ARTI" : "SAYIM_EKSI", miktar: Math.abs(fark),
-                        birimMaliyet: Number(urun.alisFiyati || 0), kaynak: "URUN_EXCEL",
+                        tarih: new Date(), birimMaliyet: Number(urun.alisFiyati || 0), maliyetDogrulandi: Number(urun.alisFiyati || 0) > 0, maliyetKaynagi: "URUN_EXCEL", kaynak: "URUN_EXCEL",
                         aciklama: "Excel ürün aktarımı stok güncellemesi",
                         kullaniciId: req.kullanici?._id || req.user?._id || null
                     });
