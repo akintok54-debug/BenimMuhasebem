@@ -56,6 +56,8 @@ const CariHareketSchema = new mongoose.Schema(
             default: null
         },
 
+        islemAnahtari: { type: String, default: undefined, select: false },
+
         belgeNo: { type: String, trim: true, default: "" },
 
         odemeYontemi: {
@@ -95,5 +97,7 @@ CariHareketSchema.index({
     tarafId: 1,
     tarih: -1
 });
+
+CariHareketSchema.index({ tenantId: 1, islemAnahtari: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model("CariHareket", CariHareketSchema);

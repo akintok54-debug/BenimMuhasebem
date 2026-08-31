@@ -26,7 +26,7 @@ async function listele(req, res, next) {
     try {
         const kullanicilar = await Kullanici.find({ tenantId: tenantId(req), silinmeTarihi: null }).select("adSoyad email telefon unvan rol aktif ozelYetkiler yetkiModu sonGirisTarihi createdAt").sort({ aktif: -1, adSoyad: 1 });
         const atanabilirRoller = ROLLER.filter(rol => yonetilebilirRol(req, rol));
-        return res.json({ basarili: true, aktifKullaniciId: req.currentUser?._id, kullanicilar: kullanicilar.map(guvenliKullanici), yetkiKatalogu: YETKI_KATALOGU, roller: atanabilirRoller.map(kod => ({ kod, ad: ROL_ETIKETLERI[kod], varsayilanYetkiler: varsayilanYetkiler(kod) })) });
+        return res.json({ basarili: true, aktifKullaniciId: req.currentUser?._id, aktifKullaniciRol: req.currentUser?.rol, kullanicilar: kullanicilar.map(guvenliKullanici), yetkiKatalogu: YETKI_KATALOGU, roller: atanabilirRoller.map(kod => ({ kod, ad: ROL_ETIKETLERI[kod], varsayilanYetkiler: varsayilanYetkiler(kod) })) });
     } catch (error) { next(error); }
 }
 

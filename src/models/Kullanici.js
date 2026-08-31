@@ -70,7 +70,7 @@ const KullaniciSchema = new mongoose.Schema(
                 "customer.read", "customer.write", "supplier.read", "supplier.write",
                 "cash.read", "cash.write", "accounting.read", "accounting.write",
                 "reports.read", "tenant.users", "tenant.settings", "balance.adjust",
-                "field.read", "field.write"
+                "field.read", "field.write", "field.settle"
             ],
             default: []
         },

@@ -12,7 +12,7 @@ async function kaydet({
 }) {
     if (mongoose.connection.readyState !== 1) return null;
     return PlatformAuditLog.create({
-        actorUserId: req?.user?._id || req?.user?.id || req?.user?.kullaniciId || req?.kullanici?.kullaniciId || null,
+        actorUserId: req?.currentUser?._id || req?.user?._id || req?.user?.id || req?.user?.kullaniciId || req?.kullanici?.kullaniciId || null,
         tenantId: tenantId || req?.tenantId || req?.user?.tenantId || null,
         action,
         resource,

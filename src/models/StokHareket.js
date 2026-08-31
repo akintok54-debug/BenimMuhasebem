@@ -60,6 +60,8 @@ const StokHareketSchema = new mongoose.Schema(
             default: null
         },
 
+        islemAnahtari: { type: String, default: undefined, select: false },
+
         aciklama: {
             type: String,
             trim: true,
@@ -82,5 +84,7 @@ StokHareketSchema.index({
     urunId: 1,
     createdAt: -1
 });
+
+StokHareketSchema.index({ tenantId: 1, islemAnahtari: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model("StokHareket", StokHareketSchema);

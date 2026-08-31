@@ -1,7 +1,7 @@
 const ROL_ESLEME = { SATIS: "SALES", MUHASEBE: "ACCOUNTING", ETICARET: "ECOMMERCE", DEPO: "WAREHOUSE" };
 const Kullanici = require("../models/Kullanici");
 const YETKI_KATALOGU = [
-    { kod: "field.read", grup: "Saha", ad: "Saha operasyonunu görüntüle" }, { kod: "field.write", grup: "Saha", ad: "Saha günü, ziyaret, rota ve teslim yönet" },
+    { kod: "field.read", grup: "Saha", ad: "Saha operasyonunu görüntüle" }, { kod: "field.write", grup: "Saha", ad: "Saha günü, ziyaret ve rota yönet" }, { kod: "field.settle", grup: "Saha", ad: "Saha personeli gün sonu teslim al" },
     { kod: "sales.read", grup: "Satış", ad: "Satışları görüntüle" }, { kod: "sales.write", grup: "Satış", ad: "Satış, teklif ve sipariş oluştur / değiştir" },
     { kod: "customer.read", grup: "Müşteri", ad: "Müşterileri görüntüle" }, { kod: "customer.write", grup: "Müşteri", ad: "Müşteri yönet" },
     { kod: "supplier.read", grup: "Tedarikçi", ad: "Tedarikçileri görüntüle" }, { kod: "supplier.write", grup: "Tedarikçi", ad: "Tedarikçi yönet" },
@@ -14,8 +14,8 @@ const YETKI_KATALOGU = [
 ];
 const YETKILER = {
     SUPER_ADMIN: ["*"], OWNER: ["*"], ADMIN: ["*"],
-    MANAGER: ["sales.*", "purchase.*", "stock.*", "customer.*", "supplier.*", "reports.read"],
-    SALES: ["sales.*", "field.*", "customer.read", "customer.write", "stock.read"],
+    MANAGER: ["sales.*", "purchase.*", "stock.*", "customer.*", "supplier.*", "field.*", "cash.read", "reports.read"],
+    SALES: ["sales.*", "field.read", "field.write", "customer.read", "customer.write", "stock.read"],
     CASHIER: ["cash.*", "customer.read", "sales.read"],
     ACCOUNTING: ["cash.*", "accounting.*", "customer.*", "supplier.*", "reports.read", "sales.read", "purchase.read"],
     WAREHOUSE: ["stock.*", "sales.read", "purchase.read", "supplier.read"],

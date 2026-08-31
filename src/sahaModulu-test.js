@@ -54,6 +54,7 @@ test("saha müşteri kartı cari bakiye, bağımsız tahsilat, sipariş ve birle
     assert.match(controller, /async function musteriFinans/);
     assert.match(controller, /CariHareket\.find\(\{ tenantId, tarafTipi: "MUSTERI", tarafId: musteri\._id \}\)/);
     assert.match(controller, /Siparis\.find\(\{ tenantId, musteriId: musteri\._id \}\)/);
+    assert.match(controller, /paraBirimi: \{ \$in: \["TRY", null\] \}/);
     assert.match(rota, /musteriler\/:id\/finans/);
     assert.match(cariRota, /"field\.write"/);
 });

@@ -13,6 +13,8 @@ const CariHareket = require("../models/CariHareket");
 const SatisIade = require("../models/SatisIade");
 const Siparis = require("../models/Siparis");
 const Teklif = require("../models/Teklif");
+const SahaGun = require("../models/SahaGun");
+const CekSenetPortfoy = require("../models/CekSenetPortfoy");
 
 function tenantObjectId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
@@ -160,10 +162,19 @@ async function detay(req, res, next) {
 }
 
 async function olustur(req, res, next) {
+    const rollback = { tenantId: null, satisId: null, stoklar: [], musteriId: null, musteriBakiyeArtisi: 0, finansModeli: null, finansHesapId: null, finansArtisi: 0 };
     try {
         const tenantId = tenantObjectId(req);
+        rollback.tenantId = tenantId;
         const body = req.body || {};
         const perakende = body.perakende === true || String(body.satisKanali || "").toUpperCase() === "PERAKENDE";
+        const sahaSatisi = String(body.satisKanali || "").toUpperCase() === "SAHA";
+        let sahaGun = null;
+        if (sahaSatisi) {
+            const gun = /^\d{4}-\d{2}-\d{2}$/.test(String(body.sahaGun || "")) ? String(body.sahaGun) : new Date().toISOString().slice(0, 10);
+            sahaGun = await SahaGun.findOne({ tenantId, kullaniciId: islemKullaniciId(req), gun, durum: "AKTIF" });
+            if (!sahaGun) return res.status(409).json({ basarili: false, mesaj: "Saha satışı için personele ait aktif saha günü bulunmalıdır." });
+        }
 
         if (!body.belgeNo) {
             return res.status(400).json({
@@ -362,6 +373,10 @@ async function olustur(req, res, next) {
             });
         }
 
+        if (sahaSatisi && odemeTipi === "NAKIT" && String(hesapId || "") !== String(sahaGun.sahaKasaId || "")) {
+            return res.status(403).json({ basarili: false, mesaj: "Saha nakit satışı yalnızca personelin saha kasasına işlenebilir." });
+        }
+
         if (
             ["KART", "BANKA"].includes(odemeTipi) &&
             hesapTipi !== "BANKA"
@@ -385,7 +400,8 @@ async function olustur(req, res, next) {
                 finansHesabi =
                     await Kasa.findOne({
                         _id: hesapId,
-                        tenantId
+                        tenantId,
+                        aktif: { $ne: false }
                     });
 
             } else {
@@ -393,7 +409,8 @@ async function olustur(req, res, next) {
                 finansHesabi =
                     await Banka.findOne({
                         _id: hesapId,
-                        tenantId
+                        tenantId,
+                        aktif: { $ne: false }
                     });
             }
 
@@ -421,10 +438,11 @@ async function olustur(req, res, next) {
             kalanTutar,
             hesapTipi,
             hesapId,
-            satisKanali: perakende ? "PERAKENDE" : String(body.satisKanali || "NORMAL").toUpperCase(),
+            satisKanali: perakende ? "PERAKENDE" : (sahaSatisi ? "SAHA" : "NORMAL"),
             notlar: body.notlar || "",
             kullaniciId: islemKullaniciId(req)
         });
+        rollback.satisId = satis._id;
 
         // SATIŞ -> STOK ÇIKIŞI
         for (const item of stokKontrolleri) {
@@ -433,6 +451,7 @@ async function olustur(req, res, next) {
             item.stok.sonHareketTarihi = new Date();
 
             await item.stok.save();
+            rollback.stoklar.push({ stokId: item.stok._id, miktar: item.miktar });
 
             const kalem =
                 kalemler.find(
@@ -448,6 +467,7 @@ async function olustur(req, res, next) {
                 birimMaliyet: item.stok.maliyet || 0,
                 kaynak: "SATIS",
                 kaynakId: satis._id,
+                islemAnahtari: `SATIS:${satis._id}:STOK:${item.stok.urunId}:${depo._id}`,
                 aciklama: `Satış ${belgeNo}`,
                 kullaniciId: islemKullaniciId(req)
             });
@@ -457,25 +477,37 @@ async function olustur(req, res, next) {
         // SATIŞ ÖDEME BALANTISI
         // ==================================================
 
-        if (kalanTutar > 0) {
+        const oncekiBakiye = Number(musteri.bakiye || 0);
+        musteri.bakiye += kalanTutar;
+        await musteri.save();
+        rollback.musteriId = musteri._id;
+        rollback.musteriBakiyeArtisi = kalanTutar;
 
-            musteri.bakiye += kalanTutar;
-
-            await musteri.save();
-
-            await CariHareket.create({
+        await CariHareket.create({
                 tenantId,
                 tarafTipi: "MUSTERI",
                 tarafId: musteri._id,
                 tip: "BORC",
-                tutar: kalanTutar,
+                tutar: genelToplam,
                 aciklama: `Satış ${belgeNo}`,
                 kaynak: "SATIS",
                 kaynakId: satis._id,
+                islemAnahtari: `SATIS:${satis._id}:BORC`,
+                bakiyeDegisimi: genelToplam,
+                oncekiBakiye,
+                sonrakiBakiye: oncekiBakiye + genelToplam,
                 tarih: body.tarih || new Date(),
                 kullaniciId: islemKullaniciId(req)
             });
-        }
+
+        if (odenenTutar > 0) await CariHareket.create({
+            tenantId, tarafTipi: "MUSTERI", tarafId: musteri._id, tip: "TAHSILAT", tutar: odenenTutar,
+            aciklama: `Satış tahsilatı ${belgeNo}`, kaynak: "SATIS_TAHSILAT", kaynakId: satis._id,
+            islemAnahtari: `SATIS:${satis._id}:TAHSILAT`,
+            odemeYontemi: odemeTipi === "KART" ? "KREDI_KARTI" : odemeTipi === "BANKA" ? "IBAN" : odemeTipi,
+            bakiyeDegisimi: -odenenTutar, oncekiBakiye: oncekiBakiye + genelToplam, sonrakiBakiye: oncekiBakiye + kalanTutar,
+            tarih: body.tarih || new Date(), belgeNo, kullaniciId: islemKullaniciId(req)
+        });
 
         if (
             odenenTutar > 0 &&
@@ -486,6 +518,9 @@ async function olustur(req, res, next) {
                 odenenTutar;
 
             await finansHesabi.save();
+            rollback.finansModeli = hesapTipi === "KASA" ? Kasa : Banka;
+            rollback.finansHesapId = finansHesabi._id;
+            rollback.finansArtisi = odenenTutar;
 
             await ParaHareket.create({
 
@@ -521,6 +556,13 @@ async function olustur(req, res, next) {
             });
         }
 
+        if (["CEK", "SENET"].includes(odemeTipi)) await CekSenetPortfoy.create({
+            tenantId, tur: odemeTipi, hareketTipi: "GIRIS", musteriId: musteri._id, tutar: odenenTutar,
+            belgeNo: String(body.evrakNo || belgeNo).trim(), vadeTarihi: body.vadeTarihi || null,
+            banka: String(body.banka || "").trim(), kesideci: String(body.kesideci || "").trim(),
+            kaynak: "SATIS", kaynakId: satis._id, aciklama: `Saha/satış tahsilatı ${belgeNo}`, kullaniciId: islemKullaniciId(req)
+        });
+
         res.status(201).json({
             basarili: true,
             mesaj: "Satış kaydedildi. Stok güncellendi.",
@@ -528,18 +570,34 @@ async function olustur(req, res, next) {
             musteriBakiye: musteri.bakiye
         });
     } catch (error) {
+        if (rollback.satisId && rollback.tenantId) {
+            await CekSenetPortfoy.deleteMany({ tenantId: rollback.tenantId, kaynak: "SATIS", kaynakId: rollback.satisId }).catch(() => {});
+            await ParaHareket.deleteMany({ tenantId: rollback.tenantId, kaynak: "SATIS", kaynakId: rollback.satisId }).catch(() => {});
+            await CariHareket.deleteMany({ tenantId: rollback.tenantId, kaynakId: rollback.satisId, kaynak: { $in: ["SATIS", "SATIS_TAHSILAT"] } }).catch(() => {});
+            await StokHareket.deleteMany({ tenantId: rollback.tenantId, kaynak: "SATIS", kaynakId: rollback.satisId }).catch(() => {});
+            if (rollback.finansModeli && rollback.finansHesapId && rollback.finansArtisi) await rollback.finansModeli.updateOne({ _id: rollback.finansHesapId, tenantId: rollback.tenantId }, { $inc: { bakiye: -rollback.finansArtisi } }).catch(() => {});
+            if (rollback.musteriId && rollback.musteriBakiyeArtisi) await Musteri.updateOne({ _id: rollback.musteriId, tenantId: rollback.tenantId }, { $inc: { bakiye: -rollback.musteriBakiyeArtisi } }).catch(() => {});
+            for (const stok of rollback.stoklar) await Stok.updateOne({ _id: stok.stokId, tenantId: rollback.tenantId }, { $inc: { miktar: stok.miktar } }).catch(() => {});
+            await Satis.deleteOne({ _id: rollback.satisId, tenantId: rollback.tenantId }).catch(() => {});
+        }
         next(error);
     }
 }
 
 async function iadeAl(req, res, next) {
+    const rollback = { tenantId: null, iadeId: null, stoklar: [], musteriId: null, musteriDegisimi: 0, finansModeli: null, finansHesapId: null, finansAzalisi: 0 };
     try {
         const tenantId = tenantObjectId(req);
+        rollback.tenantId = tenantId;
         const body = req.body || {};
         if (!body.belgeNo || !body.musteriId || !body.depoId) return res.status(400).json({ basarili: false, mesaj: "İade belge no, müşteri ve depo zorunludur." });
         if (!Array.isArray(body.kalemler) || !body.kalemler.length) return res.status(400).json({ basarili: false, mesaj: "En az bir iade kalemi gerekir." });
         const [musteri, depo] = await Promise.all([Musteri.findOne({ _id: body.musteriId, tenantId, ...(yonetici(req) ? {} : { $or: [{ temsilciId: islemKullaniciId(req) }, { olusturanKullaniciId: islemKullaniciId(req) }] }) }), Depo.findOne({ _id: body.depoId, tenantId })]);
         if (!musteri || !depo) return res.status(404).json({ basarili: false, mesaj: "Müşteri veya depo bulunamadı." });
+        const orijinalSatis = mongoose.Types.ObjectId.isValid(String(body.orijinalSatisId || ""))
+            ? await Satis.findOne({ _id: body.orijinalSatisId, tenantId, musteriId: musteri._id, depoId: depo._id, ...sahiplik(req) })
+            : null;
+        if (body.orijinalSatisId && !orijinalSatis) return res.status(404).json({ basarili: false, mesaj: "İade edilecek satış bulunamadı veya bu satışa erişiminiz yok." });
         const kalemler = []; let genelToplam = 0;
         for (const item of body.kalemler) {
             const urun = await Urun.findOne({ _id: item.urunId, tenantId });
@@ -548,19 +606,61 @@ async function iadeAl(req, res, next) {
             const ara = miktar * birimFiyat * (1 - iskonto / 100); const toplam = ara * (1 + kdv / 100);
             kalemler.push({ urunId: urun._id, miktar, birimFiyat, kdv, iskonto, toplam }); genelToplam += toplam;
         }
-        const odemeTipi = String(body.odemeTipi || "ACIK_HESAP").toUpperCase();
+        if (orijinalSatis) {
+            const oncekiIadeler = await SatisIade.find({ tenantId, orijinalSatisId: orijinalSatis._id }).select("kalemler").lean();
+            for (const kalem of kalemler) {
+                const satilan = orijinalSatis.kalemler.filter(x => String(x.urunId) === String(kalem.urunId)).reduce((n, x) => n + Number(x.miktar || 0), 0);
+                const iadeEdilen = oncekiIadeler.flatMap(x => x.kalemler || []).filter(x => String(x.urunId) === String(kalem.urunId)).reduce((n, x) => n + Number(x.miktar || 0), 0);
+                if (iadeEdilen + kalem.miktar > satilan) return res.status(409).json({ basarili: false, mesaj: "İade miktarı satıştaki kalan miktarı aşamaz." });
+            }
+        }
+        const odemeTipi = String(orijinalSatis?.odemeTipi || body.odemeTipi || "ACIK_HESAP").toUpperCase();
         if (!["ACIK_HESAP", "NAKIT", "KART", "BANKA", "CEK", "SENET", "DIGER"].includes(odemeTipi)) return res.status(400).json({ basarili: false, mesaj: "İade ödeme yöntemi geçersiz." });
-        const iade = await SatisIade.create({ tenantId, belgeNo: String(body.belgeNo).trim().toUpperCase(), tarih: body.tarih || new Date(), musteriId: musteri._id, depoId: depo._id, kalemler, genelToplam, odemeTipi, aciklama: body.notlar || "Müşteri satış iadesi", kullaniciId: islemKullaniciId(req) });
+        const hesapTipi = orijinalSatis?.hesapTipi || body.hesapTipi || null;
+        const hesapId = orijinalSatis?.hesapId || body.hesapId || null;
+        let finansHesabi = null;
+        if (["NAKIT", "KART", "BANKA"].includes(odemeTipi)) {
+            const Model = hesapTipi === "KASA" ? Kasa : hesapTipi === "BANKA" ? Banka : null;
+            finansHesabi = Model && await Model.findOne({ _id: hesapId, tenantId, aktif: { $ne: false }, bakiye: { $gte: genelToplam } });
+            if (!finansHesabi) return res.status(409).json({ basarili: false, mesaj: "İade ödemesi için satış hesabı bulunamadı veya bakiyesi yetersiz." });
+        }
+        const satisKanali = orijinalSatis?.satisKanali === "SAHA" || String(body.satisKanali || "").toUpperCase() === "SAHA" ? "SAHA" : "NORMAL";
+        const iade = await SatisIade.create({ tenantId, belgeNo: String(body.belgeNo).trim().toUpperCase(), tarih: body.tarih || new Date(), musteriId: musteri._id, depoId: depo._id, orijinalSatisId: orijinalSatis?._id || null, kalemler, genelToplam, odemeTipi, hesapTipi, hesapId, satisKanali, aciklama: body.notlar || "Müşteri satış iadesi", kullaniciId: islemKullaniciId(req) });
+        rollback.iadeId = iade._id;
         for (const kalem of kalemler) {
             let stok = await Stok.findOne({ tenantId, urunId: kalem.urunId, depoId: depo._id });
             if (!stok) stok = new Stok({ tenantId, urunId: kalem.urunId, depoId: depo._id, miktar: 0, maliyet: 0 });
             stok.miktar += kalem.miktar; stok.sonHareketTarihi = new Date(); await stok.save();
-            await StokHareket.create({ tenantId, urunId: kalem.urunId, depoId: depo._id, tip: "IADE_GIRIS", miktar: kalem.miktar, birimMaliyet: kalem.birimFiyat, kaynak: "SATIS_IADE", kaynakId: iade._id, aciklama: `Satış iadesi ${iade.belgeNo}`, kullaniciId: req.kullanici?._id || req.user?._id || null });
+            rollback.stoklar.push({ stokId: stok._id, miktar: kalem.miktar });
+            await StokHareket.create({ tenantId, urunId: kalem.urunId, depoId: depo._id, tip: "IADE_GIRIS", miktar: kalem.miktar, birimMaliyet: kalem.birimFiyat, kaynak: "SATIS_IADE", kaynakId: iade._id, islemAnahtari: `SATIS_IADE:${iade._id}:STOK:${kalem.urunId}:${depo._id}`, aciklama: `Satış iadesi ${iade.belgeNo}`, kullaniciId: islemKullaniciId(req) });
         }
-        musteri.bakiye -= genelToplam; await musteri.save();
-        const cariHareket = await CariHareket.create({ tenantId, tarafTipi: "MUSTERI", tarafId: musteri._id, tip: "IADE", tutar: genelToplam, aciklama: `Satış iadesi ${iade.belgeNo}`, kaynak: "SATIS_IADE", kaynakId: iade._id, tarih: body.tarih || new Date(), kullaniciId: req.kullanici?._id || req.user?._id || null });
-        res.status(201).json({ basarili: true, iade, cariHareket, musteriBakiye: musteri.bakiye });
-    } catch (error) { next(error); }
+        const oncekiBakiye = Number(musteri.bakiye || 0);
+        const nakdenIade = odemeTipi !== "ACIK_HESAP" && odemeTipi !== "DIGER";
+        musteri.bakiye += nakdenIade ? 0 : -genelToplam; await musteri.save();
+        rollback.musteriId = musteri._id; rollback.musteriDegisimi = nakdenIade ? 0 : -genelToplam;
+        const cariHareket = await CariHareket.create({ tenantId, tarafTipi: "MUSTERI", tarafId: musteri._id, tip: "IADE", tutar: genelToplam, bakiyeDegisimi: -genelToplam, oncekiBakiye, sonrakiBakiye: oncekiBakiye - genelToplam, aciklama: `Satış iadesi ${iade.belgeNo}`, kaynak: "SATIS_IADE", kaynakId: iade._id, islemAnahtari: `SATIS_IADE:${iade._id}:CARI:IADE`, tarih: body.tarih || new Date(), kullaniciId: islemKullaniciId(req) });
+        if (nakdenIade) await CariHareket.create({ tenantId, tarafTipi: "MUSTERI", tarafId: musteri._id, tip: "ODEME", tutar: genelToplam, bakiyeDegisimi: genelToplam, oncekiBakiye: oncekiBakiye - genelToplam, sonrakiBakiye: oncekiBakiye, odemeYontemi: odemeTipi === "KART" ? "KREDI_KARTI" : odemeTipi === "BANKA" ? "IBAN" : odemeTipi, aciklama: `Satış iade ödemesi ${iade.belgeNo}`, kaynak: "SATIS_IADE_ODEME", kaynakId: iade._id, islemAnahtari: `SATIS_IADE:${iade._id}:CARI:ODEME`, tarih: body.tarih || new Date(), kullaniciId: islemKullaniciId(req) });
+        let paraHareket = null;
+        if (finansHesabi) {
+            finansHesabi.bakiye -= genelToplam; await finansHesabi.save();
+            rollback.finansModeli = hesapTipi === "KASA" ? Kasa : Banka; rollback.finansHesapId = finansHesabi._id; rollback.finansAzalisi = genelToplam;
+            paraHareket = await ParaHareket.create({ tenantId, hesapTipi, hesapId: finansHesabi._id, tip: "CIKIS", tutar: genelToplam, paraBirimi: finansHesabi.paraBirimi || "TRY", aciklama: `Satış iadesi ${iade.belgeNo}`, kaynak: "SATIS_IADE", kaynakId: iade._id, belgeNo: iade.belgeNo, tarih: body.tarih || new Date(), kullaniciId: islemKullaniciId(req) });
+        }
+        if (["CEK", "SENET"].includes(odemeTipi)) await CekSenetPortfoy.create({ tenantId, tur: odemeTipi, hareketTipi: "IADE", musteriId: musteri._id, tutar: genelToplam, belgeNo: iade.belgeNo, durum: "IADE", kaynak: "SATIS_IADE", kaynakId: iade._id, aciklama: `İade edilen ${odemeTipi.toLowerCase()} evrakı`, kullaniciId: islemKullaniciId(req) });
+        res.status(201).json({ basarili: true, iade, cariHareket, paraHareket, musteriBakiye: musteri.bakiye });
+    } catch (error) {
+        if (rollback.iadeId && rollback.tenantId) {
+            await CekSenetPortfoy.deleteMany({ tenantId: rollback.tenantId, kaynak: "SATIS_IADE", kaynakId: rollback.iadeId }).catch(() => {});
+            await ParaHareket.deleteMany({ tenantId: rollback.tenantId, kaynak: "SATIS_IADE", kaynakId: rollback.iadeId }).catch(() => {});
+            await CariHareket.deleteMany({ tenantId: rollback.tenantId, kaynakId: rollback.iadeId, kaynak: { $in: ["SATIS_IADE", "SATIS_IADE_ODEME"] } }).catch(() => {});
+            await StokHareket.deleteMany({ tenantId: rollback.tenantId, kaynak: "SATIS_IADE", kaynakId: rollback.iadeId }).catch(() => {});
+            if (rollback.finansModeli && rollback.finansHesapId && rollback.finansAzalisi) await rollback.finansModeli.updateOne({ _id: rollback.finansHesapId, tenantId: rollback.tenantId }, { $inc: { bakiye: rollback.finansAzalisi } }).catch(() => {});
+            if (rollback.musteriId && rollback.musteriDegisimi) await Musteri.updateOne({ _id: rollback.musteriId, tenantId: rollback.tenantId }, { $inc: { bakiye: -rollback.musteriDegisimi } }).catch(() => {});
+            for (const stok of rollback.stoklar) await Stok.updateOne({ _id: stok.stokId, tenantId: rollback.tenantId }, { $inc: { miktar: -stok.miktar } }).catch(() => {});
+            await SatisIade.deleteOne({ _id: rollback.iadeId, tenantId: rollback.tenantId }).catch(() => {});
+        }
+        next(error);
+    }
 }
 
 async function guncelle(req, res, next) {

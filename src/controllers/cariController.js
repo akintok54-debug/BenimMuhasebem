@@ -6,6 +6,8 @@ const CariHareket = require("../models/CariHareket");
 const Kasa = require("../models/Kasa");
 const Banka = require("../models/Banka");
 const ParaHareket = require("../models/ParaHareket");
+const SahaGun = require("../models/SahaGun");
+const CekSenetPortfoy = require("../models/CekSenetPortfoy");
 const CariEkstrePaylasim = require("../models/CariEkstrePaylasim");
 const Tenant = require("../modules/platform/models/Tenant");
 const crypto = require("crypto");
@@ -41,14 +43,14 @@ async function hesapBul(req, hesapTipi, hesapId) {
         return Kasa.findOne({
             _id: hesapId,
             tenantId: tId,
-            aktif: true
+            aktif: { $ne: false }
         });
     }
 
     return Banka.findOne({
         _id: hesapId,
         tenantId: tId,
-        aktif: true
+        aktif: { $ne: false }
     });
 }
 
@@ -262,6 +264,9 @@ async function musteriTahsilat(req, res, next) {
         const tId = tenantId(req);
         const body = req.body || {};
         const tutar = Number(body.tutar || 0);
+        const sahaIslemi = String(body.kaynakKanal || "").toUpperCase() === "SAHA";
+        const istemciAnahtari = String(body.islemAnahtari || req.get?.("Idempotency-Key") || "").trim().slice(0, 160);
+        const islemAnahtari = istemciAnahtari ? `${sahaIslemi ? "SAHA" : "CARI"}:TAHSILAT:${istemciAnahtari}` : undefined;
 
         if (!mongoose.Types.ObjectId.isValid(String(body.musteriId || "")) || !Number.isFinite(tutar) || tutar <= 0) {
             return res.status(400).json({
@@ -291,6 +296,18 @@ async function musteriTahsilat(req, res, next) {
             });
         }
 
+        if (islemAnahtari) {
+            const mevcut = await CariHareket.findOne({ tenantId: tId, islemAnahtari }).select("+islemAnahtari");
+            if (mevcut) return res.status(200).json({ basarili: true, tekrar: true, mesaj: "Bu tahsilat daha önce finans sistemine işlendi.", cariHareket: mevcut, musteriBakiye: musteri.bakiye });
+        }
+
+        let sahaGun = null;
+        if (sahaIslemi) {
+            const gun = /^\d{4}-\d{2}-\d{2}$/.test(String(body.sahaGun || "")) ? String(body.sahaGun) : new Date().toISOString().slice(0, 10);
+            sahaGun = await SahaGun.findOne({ tenantId: tId, kullaniciId: aktorId(req), gun, durum: "AKTIF" });
+            if (!sahaGun) return res.status(409).json({ basarili: false, mesaj: "Saha tahsilatı için aktif saha günü bulunmalıdır." });
+        }
+
         const hesap = odeme.hesapTipi ? await hesapBul(req, odeme.hesapTipi, body.hesapId) : null;
 
         if (odeme.hesapTipi && !hesap) {
@@ -300,17 +317,22 @@ async function musteriTahsilat(req, res, next) {
             });
         }
 
+        if (sahaIslemi && odeme.yontem === "NAKIT" && String(hesap?._id || "") !== String(sahaGun.sahaKasaId || "")) {
+            return res.status(403).json({ basarili: false, mesaj: "Nakit saha tahsilatı yalnızca personelin saha kasasına işlenebilir." });
+        }
+
         musteri.bakiye -= tutar;
         if (hesap) hesap.bakiye += tutar;
 
         await musteri.save();
         if (hesap) await hesap.save();
 
-        let cariHareket = null, paraHareket = null;
+        let cariHareket = null, paraHareket = null, portfoy = null;
         try {
             cariHareket = await CariHareket.create({
                 tenantId: tId, tarafTipi: "MUSTERI", tarafId: musteri._id, tip: "TAHSILAT", tutar,
                 aciklama: body.aciklama || "Müşteri tahsilatı", kaynak: "TAHSILAT",
+                islemAnahtari,
                 belgeNo: String(body.belgeNo || "").trim(), odemeYontemi: odeme.yontem,
                 oncekiBakiye: Number(musteri.bakiye) + tutar, sonrakiBakiye: Number(musteri.bakiye), bakiyeDegisimi: -tutar,
                 tarih: body.tarih || new Date(), kullaniciId: aktorId(req)
@@ -321,9 +343,11 @@ async function musteriTahsilat(req, res, next) {
                 kaynak: "TAHSILAT", kaynakId: cariHareket._id, tarih: body.tarih || new Date(),
                 belgeNo: String(body.belgeNo || "").trim(), kullaniciId: aktorId(req)
             }) : null;
-            return res.status(201).json({ basarili: true, mesaj: "Tahsilat kaydedildi.", musteriBakiye: musteri.bakiye, hesap, cariHareket, paraHareket });
+            if (["CEK", "SENET"].includes(odeme.yontem)) portfoy = await CekSenetPortfoy.create({ tenantId: tId, tur: odeme.yontem, hareketTipi: "GIRIS", musteriId: musteri._id, tutar, belgeNo: String(body.belgeNo || "").trim(), vadeTarihi: body.vadeTarihi || null, banka: String(body.banka || "").trim(), kesideci: String(body.kesideci || "").trim(), kaynak: "TAHSILAT", kaynakId: cariHareket._id, aciklama: body.aciklama || "Müşteri tahsilatı", kullaniciId: aktorId(req) });
+            return res.status(201).json({ basarili: true, mesaj: "Tahsilat cari, finans ve evrak portföyüne kaydedildi.", musteriBakiye: musteri.bakiye, hesap, cariHareket, paraHareket, portfoy });
         } catch (error) {
-            if (paraHareket?._id) await ParaHareket.deleteOne({ _id: paraHareket._id, tenantId: tId }).catch(() => {});
+            if (portfoy?._id) await CekSenetPortfoy.deleteOne({ _id: portfoy._id, tenantId: tId }).catch(() => {});
+            if (paraHareket?._id) await ParaHareket.deleteMany({ _id: { $in: [paraHareket._id] }, tenantId: tId }).catch(() => {});
             if (cariHareket?._id) await CariHareket.deleteOne({ _id: cariHareket._id, tenantId: tId }).catch(() => {});
             musteri.bakiye += tutar; await musteri.save().catch(() => {});
             if (hesap) { hesap.bakiye -= tutar; await hesap.save().catch(() => {}); }

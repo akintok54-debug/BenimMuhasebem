@@ -4,6 +4,7 @@ const Kasa = require("../models/Kasa");
 const Banka = require("../models/Banka");
 const ParaHareket = require("../models/ParaHareket");
 const CariHareket = require("../models/CariHareket");
+const CekSenetPortfoy = require("../models/CekSenetPortfoy");
 const Musteri = require("../models/Musteri");
 const Tedarikci = require("../models/Tedarikci");
 const Satis = require("../models/Satis");
@@ -340,4 +341,15 @@ async function ozet(req, res, next) {
     } catch (error) { next(error); }
 }
 
-module.exports = { kasaListele, kasaOlustur, kasaEkstresi, kasaRaporu, bankaListele, bankaOlustur, hesapGuncelle, paraHareketleri, hesapHareketi, transfer, ozet, ekstreOzetle, hareketTuruBelirle, donemSinirlari };
+async function cekSenetPortfoyu(req, res, next) {
+    try {
+        const tId = tenantId(req), filter = { tenantId: tId };
+        if (["CEK", "SENET"].includes(String(req.query.tur || "").toUpperCase())) filter.tur = String(req.query.tur).toUpperCase();
+        if (req.query.durum) filter.durum = String(req.query.durum).toUpperCase();
+        const evraklar = await CekSenetPortfoy.find(filter).populate("musteriId", "kod unvan adSoyad").populate("kullaniciId", "adSoyad email").sort({ vadeTarihi: 1, createdAt: -1 }).lean();
+        const toplamlar = evraklar.reduce((o, x) => { const isaret = x.hareketTipi === "IADE" ? -1 : 1; o[x.tur] = (o[x.tur] || 0) + isaret * Number(x.tutar || 0); return o; }, { CEK: 0, SENET: 0 });
+        res.json({ basarili: true, toplam: evraklar.length, toplamlar, evraklar });
+    } catch (error) { next(error); }
+}
+
+module.exports = { kasaListele, kasaOlustur, kasaEkstresi, kasaRaporu, bankaListele, bankaOlustur, hesapGuncelle, paraHareketleri, hesapHareketi, transfer, ozet, cekSenetPortfoyu, ekstreOzetle, hareketTuruBelirle, donemSinirlari };

@@ -60,6 +60,19 @@ const KasaSchema = new mongoose.Schema(
             default: ""
         },
 
+        sorumluKullaniciId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Kullanici",
+            default: null,
+            index: true
+        },
+
+        sahaKasasi: {
+            type: Boolean,
+            default: false,
+            index: true
+        },
+
         sube: {
             type: String,
             trim: true,
@@ -80,6 +93,11 @@ const KasaSchema = new mongoose.Schema(
 KasaSchema.index(
     { tenantId: 1, kod: 1 },
     { unique: true }
+);
+
+KasaSchema.index(
+    { tenantId: 1, sorumluKullaniciId: 1 },
+    { unique: true, partialFilterExpression: { sahaKasasi: true } }
 );
 
 module.exports = mongoose.model("Kasa", KasaSchema);

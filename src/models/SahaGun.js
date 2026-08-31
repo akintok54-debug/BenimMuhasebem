@@ -53,15 +53,18 @@ const SahaGunSchema = new mongoose.Schema({
     satisBasiPrim: { type: Number, min: 0, default: 0 },
     ciroHedefi: { type: Number, min: 0, default: 0 },
     hesaplananPrim: { type: Number, min: 0, default: 0 },
+    sahaKasaId: { type: mongoose.Schema.Types.ObjectId, ref: "Kasa", default: null, index: true },
     kasaTeslimi: {
         kaynakKasaId: { type: mongoose.Schema.Types.ObjectId, ref: "Kasa", default: null },
         hedefKasaId: { type: mongoose.Schema.Types.ObjectId, ref: "Kasa", default: null },
         teslimEdilmesiGereken: { type: Number, min: 0, default: 0 },
         teslimEdilen: { type: Number, min: 0, default: 0 },
         fark: { type: Number, default: 0 },
-        durum: { type: String, enum: ["BEKLIYOR", "TAM", "EKSIK", "FAZLA"], default: "BEKLIYOR" },
+        durum: { type: String, enum: ["BEKLIYOR", "ISLENIYOR", "TAM", "EKSIK", "FAZLA"], default: "BEKLIYOR" },
         teslimTarihi: { type: Date, default: null },
-        transferGrupId: { type: mongoose.Schema.Types.ObjectId, default: null }
+        transferGrupId: { type: mongoose.Schema.Types.ObjectId, default: null },
+        teslimEdenKullaniciId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null },
+        teslimAlanKullaniciId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null }
     }
 }, { timestamps: true });
 

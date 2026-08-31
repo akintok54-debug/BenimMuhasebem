@@ -25,7 +25,7 @@ test("Telefon kimliği normalize edilir ve kullanıcı modeli kapsamlı özel ye
     assert.equal(telefonNormalize("0532 111 22 33"), "905321112233");
     assert.ok(Kullanici.schema.path("telefonNormalize"));
     assert.ok(Kullanici.schema.path("yetkiModu"));
-    for (const kod of ["sales.read", "sales.write", "stock.read", "cash.write", "tenant.users", "balance.adjust"]) assert.ok(Kullanici.schema.path("ozelYetkiler").options.enum.includes(kod), kod);
+    for (const kod of ["sales.read", "sales.write", "stock.read", "cash.write", "tenant.users", "balance.adjust", "field.settle"]) assert.ok(Kullanici.schema.path("ozelYetkiler").options.enum.includes(kod), kod);
 });
 
 test("Rol varsayılanı ve kutucukla belirlenen özel yetkiler birbirinden ayrıdır", () => {
@@ -49,4 +49,19 @@ test("Giriş ve mobil kullanıcı ekranı e-posta veya telefon ile kutucuklu yet
     assert.match(auth, /telefonNormalize/); assert.match(auth, /body\.kimlik/);
     assert.match(login, /E-posta veya cep telefonu/);
     for (const metin of ["Yeni Saha Kullanıcısı", "Modül ve İşlem Yetkileri", "Rol Önerisini Uygula", "Pasif — girişi engelle", "mobilYetkiMenusunuUygula"]) assert.ok(js.includes(metin), metin);
+});
+
+test("Eski tenant kurucusu OWNER rolüne güvenli ve auditli biçimde yükseltilir", () => {
+    const middleware = fs.readFileSync(path.join(__dirname, "middleware", "tenantKontrol.js"), "utf8");
+    const auth = fs.readFileSync(path.join(__dirname, "modules", "auth", "controllers", "authController.js"), "utf8");
+    const controller = fs.readFileSync(path.join(__dirname, "controllers", "kullaniciYonetimController.js"), "utf8");
+    const ui = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
+    assert.match(auth, /rol: "OWNER"/);
+    assert.match(auth, /tenant\.createdBy = kullanici\._id/);
+    assert.match(middleware, /Kullanici\.exists\(\{ tenantId, rol: "OWNER"/);
+    assert.match(middleware, /tenant\.createdBy[\s\S]+ilkKullanici/);
+    assert.match(middleware, /rol: "ADMIN"[\s\S]+\$set: \{ rol: "OWNER" \}/);
+    assert.match(middleware, /LEGACY_TENANT_OWNER_REPAIR/);
+    assert.match(controller, /aktifKullaniciRol: req\.currentUser\?\.rol/);
+    assert.match(ui, /aktifRol === "ADMIN" && mevcut\.rol === "ADMIN"/);
 });
