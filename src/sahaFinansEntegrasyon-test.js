@@ -52,3 +52,15 @@ test("gün sonu teslim alma yalnızca yönetici yetkisiyle, atomik sahiplenme ve
     assert.match(arayuz, /Saha Personeli Takip \/ Gün Sonu Tesellüm/);
     assert.match(arayuz, /TESLİM ETMESİ GEREKEN NET TUTAR/);
 });
+
+test("saha satış kullanıcısı günü bitirdikten sonra kendi kasasını ana kasaya aktarır", () => {
+    const rota = oku("routes/sahaRotasi.js"), controller = oku("controllers/sahaController.js"), arayuz = oku("../public/erp/erp.js");
+    assert.match(rota, /kasa-teslim[^\n]+field\.write[^\n]+GUN_SONU_TESELLUM/);
+    assert.match(controller, /req\.sahaKasaKendiTeslimi\s*=\s*true/);
+    assert.match(controller, /sahaGun\.durum\s*!==\s*"TAMAMLANDI"/);
+    assert.match(controller, /tip:\s*"CIKIS"[\s\S]+kaynak:\s*"SAHA_KASA_TESLIM"[\s\S]+tip:\s*"GIRIS"/);
+    assert.match(controller, /"kasaTeslimi\.teslimTarihi": null/);
+    assert.match(arayuz, /Saha Kasasını Ana Kasaya Teslim Et/);
+    assert.match(arayuz, /d\.anaKasalar/);
+    assert.match(arayuz, /\/api\/tenant\/saha\/kasa-teslim/);
+});

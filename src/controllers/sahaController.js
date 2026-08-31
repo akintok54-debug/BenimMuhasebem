@@ -105,11 +105,12 @@ async function tesellumHesapla(req, kullaniciId, gun) {
 async function panel(req, res, next) {
     try {
         const tenantId = tId(req), kullaniciId = hedefKullaniciId(req), gun = gunMetni(req.query.gun);
-        const [sahaGun, temsilciler, musteriler, kasalar, bankalar] = await Promise.all([
+        const [sahaGun, temsilciler, musteriler, kasalar, anaKasalar, bankalar] = await Promise.all([
             SahaGun.findOne({ tenantId, kullaniciId, gun }).populate("kullaniciId", "adSoyad email telefon").populate("rota.musteriId", "kod unvan adSoyad adres konum").populate("ziyaretler.musteriId", "kod unvan adSoyad whatsapp telefon").lean(),
             yonetici(req) ? Kullanici.find({ tenantId, rol: { $in: ["SALES", "SATIS"] }, aktif: true, silinmeTarihi: null }).select("adSoyad email telefon").sort({ adSoyad: 1 }).lean() : [],
             Musteri.find({ tenantId, aktif: { $ne: false }, ...(yonetici(req) ? {} : { $or: [{ temsilciId: kullaniciId }, { olusturanKullaniciId: kullaniciId }] }) }).select("kod unvan adSoyad telefon whatsapp email adres il ilce konum temsilciId bakiye notlar").sort({ unvan: 1, adSoyad: 1 }).lean(),
             Kasa.find({ tenantId, aktif: { $ne: false }, paraBirimi: { $in: ["TRY", null] }, ...(yonetici(req) ? {} : { sorumluKullaniciId: kullaniciId, sahaKasasi: true }) }).select("kod ad kasaTuru paraBirimi sahaKasasi sorumluKullaniciId").sort({ ad: 1 }).lean(),
+            Kasa.find({ tenantId, aktif: { $ne: false }, paraBirimi: { $in: ["TRY", null] }, sahaKasasi: { $ne: true } }).select("kod ad kasaTuru paraBirimi").sort({ ad: 1 }).lean(),
             Banka.find({ tenantId, aktif: { $ne: false }, paraBirimi: { $in: ["TRY", null] } }).select("kod bankaAdi iban paraBirimi").sort({ bankaAdi: 1 }).lean()
         ]);
         if (sahaGun && !sahaGun.sahaKasaId) {
@@ -120,7 +121,7 @@ async function panel(req, res, next) {
         }
         const tesellum = await tesellumHesapla(req, kullaniciId, gun);
         res.set("Cache-Control", "private, no-store");
-        res.json({ basarili: true, gun, sahaGun, tesellum, temsilciler, musteriler, kasalar, bankalar, seciliKullaniciId: kullaniciId, yonetici: yonetici(req) });
+        res.json({ basarili: true, gun, sahaGun, tesellum, temsilciler, musteriler, kasalar, anaKasalar, bankalar, seciliKullaniciId: kullaniciId, yonetici: yonetici(req) });
     } catch (error) { next(error); }
 }
 
@@ -271,11 +272,14 @@ async function teslimAl(req, res, next) {
     const tenantId = tId(req), body = req.body || {}, sahaGunId = String(req.params.id || ""), grupId = new mongoose.Types.ObjectId();
     let kaynak = null, hedef = null, teslimEdilen = 0, kaynakAzaldi = false, hedefArtti = false, sahiplenildi = false;
     try {
-        if (!yonetici(req)) return res.status(403).json({ basarili: false, mesaj: "Teslim alma işlemi yönetici yetkisi gerektirir." });
+        const kendiTeslimi = req.sahaKasaKendiTeslimi === true;
+        if (!kendiTeslimi && !yonetici(req)) return res.status(403).json({ basarili: false, mesaj: "Teslim alma işlemi yönetici yetkisi gerektirir." });
         if (!mongoose.Types.ObjectId.isValid(sahaGunId) || !mongoose.Types.ObjectId.isValid(String(body.hedefKasaId || ""))) return res.status(400).json({ basarili: false, mesaj: "Saha günü ve ana kasa geçerli olmalıdır." });
         teslimEdilen = pozitif(body.teslimEdilen, "Teslim edilen tutar", true);
         const sahaGun = await SahaGun.findOne({ _id: sahaGunId, tenantId });
         if (!sahaGun) return res.status(404).json({ basarili: false, mesaj: "Saha günü bulunamadı." });
+        if (kendiTeslimi && String(sahaGun.kullaniciId) !== String(aktorId(req))) return res.status(403).json({ basarili: false, mesaj: "Yalnızca kendi saha kasanızı teslim edebilirsiniz." });
+        if (kendiTeslimi && sahaGun.durum !== "TAMAMLANDI") return res.status(409).json({ basarili: false, mesaj: "Kasa tesliminden önce saha gününü bitirin." });
         if (sahaGun.kasaTeslimi?.teslimTarihi) return res.status(409).json({ basarili: false, mesaj: "Bu saha günü için kasa teslimi zaten yapılmış." });
         const kaynakKasaId = sahaGun.sahaKasaId || (await sahaKasasiBulVeyaOlustur(tenantId, sahaGun.kullaniciId))._id;
         [kaynak, hedef] = await Promise.all([
@@ -316,6 +320,7 @@ async function kasaTeslim(req, res, next) {
         const sahaGun = await gunBul(req);
         if (!sahaGun) return res.status(404).json({ basarili: false, mesaj: "Saha günü bulunamadı." });
         req.params.id = String(sahaGun._id);
+        req.sahaKasaKendiTeslimi = true;
         return teslimAl(req, res, next);
     } catch (error) { next(error); }
 }
