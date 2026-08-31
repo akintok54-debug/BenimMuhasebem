@@ -99,8 +99,10 @@ async function detay(req, res, next) {
 }
 
 async function olustur(req, res, next) {
+    const rollback = { tenantId: null, alisId: null, stoklar: [] };
     try {
         const tenantId = tenantObjectId(req);
+        rollback.tenantId = tenantId;
         const body = req.body || {};
 
         if (!body.belgeNo) {
@@ -271,6 +273,7 @@ async function olustur(req, res, next) {
                 req.user?._id ||
                 null
         });
+        rollback.alisId = alis._id;
 
         /*
          * ALIŞ -> STOK GRŞ
@@ -298,6 +301,8 @@ async function olustur(req, res, next) {
                     setDefaultsOnInsert: true
                 }
             );
+            if (!stok) throw new Error("Stok güncellenemedi.");
+            rollback.stoklar.push({ stokId: stok._id, miktar: kalem.miktar });
 
             await StokHareket.create({
                 tenantId,
@@ -318,9 +323,6 @@ async function olustur(req, res, next) {
                     null
             });
 
-            if (!stok) {
-                throw new Error("Stok güncellenemedi.");
-            }
         }
 
         /*
@@ -345,6 +347,11 @@ async function olustur(req, res, next) {
             tedarikciBakiye: muhasebe.taraf.bakiye
         });
     } catch (error) {
+        if (rollback.alisId && rollback.tenantId) {
+            await StokHareket.deleteMany({ tenantId: rollback.tenantId, kaynak: "ALIS", kaynakId: rollback.alisId }).catch(() => {});
+            for (const stok of rollback.stoklar) await Stok.updateOne({ _id: stok.stokId, tenantId: rollback.tenantId }, { $inc: { miktar: -stok.miktar } }).catch(() => {});
+            await Alis.deleteOne({ _id: rollback.alisId, tenantId: rollback.tenantId }).catch(() => {});
+        }
         next(error);
     }
 }
@@ -359,8 +366,10 @@ async function iadeleriListele(req, res, next) {
 }
 
 async function iadeOlustur(req, res, next) {
+    const rollback = { tenantId: null, iadeId: null, stoklar: [] };
     try {
         const tenantId = tenantObjectId(req), body = req.body || {};
+        rollback.tenantId = tenantId;
         if (!body.belgeNo || !body.tedarikciId || !body.depoId || !Array.isArray(body.kalemler) || !body.kalemler.length) return res.status(400).json({ basarili: false, mesaj: "İade belge no, tedarikçi, depo ve kalem zorunludur." });
         const [tedarikci, depo] = await Promise.all([Tedarikci.findOne({ _id: body.tedarikciId, tenantId }), Depo.findOne({ _id: body.depoId, tenantId, aktif: true })]);
         if (!tedarikci || !depo) return res.status(404).json({ basarili: false, mesaj: "Tedarikçi veya depo bulunamadı." });
@@ -374,14 +383,24 @@ async function iadeOlustur(req, res, next) {
         }
         const belgeNo = String(body.belgeNo).trim().toUpperCase();
         const iade = await AlisIade.create({ tenantId, belgeNo, tarih: body.tarih || new Date(), tedarikciId: tedarikci._id, depoId: depo._id, kalemler, genelToplam, aciklama: body.aciklama || "Alış iadesi", kullaniciId: req.kullanici?._id || req.user?._id || null });
+        rollback.iadeId = iade._id;
         for (const kalem of kalemler) {
-            await Stok.updateOne({ tenantId, urunId: kalem.urunId, depoId: depo._id }, { $inc: { miktar: -kalem.miktar }, $set: { sonHareketTarihi: new Date() } });
+            const stokSonucu = await Stok.updateOne({ tenantId, urunId: kalem.urunId, depoId: depo._id, miktar: { $gte: kalem.miktar } }, { $inc: { miktar: -kalem.miktar }, $set: { sonHareketTarihi: new Date() } });
+            if (!stokSonucu.modifiedCount) throw Object.assign(new Error("İade sırasında stok başka bir işlem tarafından değiştirildi."), { status: 409 });
+            rollback.stoklar.push({ urunId: kalem.urunId, depoId: depo._id, miktar: kalem.miktar });
             const iadeBirimMaliyeti = kalem.birimFiyat * (1 - Number(kalem.iskonto || 0) / 100);
             await StokHareket.create({ tenantId, urunId: kalem.urunId, depoId: depo._id, tip: "IADE_CIKIS", miktar: kalem.miktar, tarih: iade.tarih, birimMaliyet: iadeBirimMaliyeti, maliyetDogrulandi: iadeBirimMaliyeti > 0, maliyetKaynagi: "ALIS_IADE_BELGESI", kaynak: "ALIS_IADE", kaynakId: iade._id, aciklama: `Alış iadesi ${belgeNo}`, kullaniciId: req.kullanici?._id || req.user?._id || null });
         }
         const muhasebe = await hareketKaydet({ tenantId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id, tip: "IADE", tutar: genelToplam, bakiyeDegisimi: -genelToplam, belgeNo, aciklama: `Alış iadesi ${belgeNo}`, kaynak: "ALIS_IADE", kaynakId: iade._id, tarih: body.tarih || new Date(), kullaniciId: req.kullanici?._id || req.user?._id || null });
         res.status(201).json({ basarili: true, iade, cariHareket: muhasebe.cariHareket, tedarikciBakiye: muhasebe.taraf.bakiye });
-    } catch (error) { next(error); }
+    } catch (error) {
+        if (rollback.iadeId && rollback.tenantId) {
+            await StokHareket.deleteMany({ tenantId: rollback.tenantId, kaynak: "ALIS_IADE", kaynakId: rollback.iadeId }).catch(() => {});
+            for (const stok of rollback.stoklar) await Stok.updateOne({ tenantId: rollback.tenantId, urunId: stok.urunId, depoId: stok.depoId }, { $inc: { miktar: stok.miktar } }).catch(() => {});
+            await AlisIade.deleteOne({ _id: rollback.iadeId, tenantId: rollback.tenantId }).catch(() => {});
+        }
+        next(error);
+    }
 }
 
 async function siparisleriListele(req, res, next) {
@@ -414,4 +433,7 @@ module.exports = {
     siparisleriListele,
     siparisOlustur
 };
+
+module.exports.hesaplaKalem = hesaplaKalem;
+module.exports.kalemGecerliMi = kalemGecerliMi;
 

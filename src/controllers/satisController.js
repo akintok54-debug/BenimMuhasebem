@@ -17,6 +17,7 @@ const SahaGun = require("../models/SahaGun");
 const CekSenetPortfoy = require("../models/CekSenetPortfoy");
 const Tedarikci = require("../models/Tedarikci");
 const { etkinYetkiler } = require("../middleware/yetkiKontrol");
+const { tarihAraligi } = require("../services/profesyonelRaporServisi");
 
 function tenantObjectId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
@@ -56,6 +57,13 @@ function hesaplaKalem(kalem) {
         kdvTutari,
         toplam
     };
+}
+
+function kalemGecerliMi(kalem) {
+    return Number.isFinite(kalem.miktar) && kalem.miktar > 0 &&
+        Number.isFinite(kalem.birimFiyat) && kalem.birimFiyat >= 0 &&
+        Number.isFinite(kalem.kdv) && kalem.kdv >= 0 && kalem.kdv <= 100 &&
+        Number.isFinite(kalem.iskonto) && kalem.iskonto >= 0 && kalem.iskonto <= 100;
 }
 
 function istanbulDonemSinirlari(simdi = new Date()) {
@@ -100,30 +108,35 @@ async function listele(req, res, next) {
 async function panel(req, res, next) {
     try {
         const tenantId = tenantObjectId(req);
-        const { bugun, yarin, ayBasi, sonrakiAyBasi } = istanbulDonemSinirlari();
+        const { bugun, yarin } = istanbulDonemSinirlari();
+        const seciliDonem = tarihAraligi(req.query || {});
+        const sorguBaslangic = new Date(Math.min(seciliDonem.baslangic.getTime(), bugun.getTime()));
+        const sorguBitis = new Date(Math.max(seciliDonem.bitis.getTime(), yarin.getTime() - 1));
         const izinler = new Set(etkinYetkiler(req.currentUser || {}));
         const tedarikciOdemesiGorur = izinler.has("supplier.read");
         const finansKosullari = [{ tarafTipi: "MUSTERI", tip: "TAHSILAT" }];
         if (tedarikciOdemesiGorur) finansKosullari.push({ tarafTipi: "TEDARIKCI", tip: "ODEME" });
-        const [satislar, acikSiparis, aktifTeklif, iadeler, finansHareketleri] = await Promise.all([
-            Satis.find({ tenantId, tarih: { $gte: ayBasi, $lt: sonrakiAyBasi }, ...sahiplik(req) })
+        const [tumSatislar, acikSiparis, aktifTeklif, iadeler, tumFinansHareketleri] = await Promise.all([
+            Satis.find({ tenantId, tarih: { $gte: sorguBaslangic, $lte: sorguBitis }, ...sahiplik(req) })
                 .populate("musteriId", "kod unvan adSoyad bakiye")
                 .populate("kalemler.urunId", "kod ad birim alisFiyati")
                 .populate("kullaniciId", "adSoyad email")
                 .sort({ tarih: -1, createdAt: -1 }).lean(),
             Siparis.countDocuments({ tenantId, durum: { $nin: ["TAMAMLANDI", "IPTAL"] }, ...sahiplik(req) }),
             Teklif.countDocuments({ tenantId, durum: { $nin: ["ONAYLANDI", "REDDEDILDI", "IPTAL", "SURESI_DOLDU", "SIPARISE_DONUSTU"] }, ...sahiplik(req) }),
-            SatisIade.find({ tenantId, tarih: { $gte: ayBasi, $lt: sonrakiAyBasi }, ...sahiplik(req) }).select("genelToplam tarih").lean(),
-            CariHareket.find({ tenantId, tarih: { $gte: ayBasi, $lt: sonrakiAyBasi }, durum: { $ne: "IPTAL" }, $or: finansKosullari, ...sahiplik(req) })
+            SatisIade.find({ tenantId, tarih: { $gte: seciliDonem.baslangic, $lte: seciliDonem.bitis }, ...sahiplik(req) }).select("genelToplam tarih").lean(),
+            CariHareket.find({ tenantId, tarih: { $gte: sorguBaslangic, $lte: sorguBitis }, durum: { $ne: "IPTAL" }, $or: finansKosullari, ...sahiplik(req) })
                 .select("tarafTipi tarafId tip tutar odemeYontemi aciklama belgeNo kaynak tarih kullaniciId")
                 .populate("kullaniciId", "adSoyad email").sort({ tarih: -1, createdAt: -1 }).lean()
         ]);
-        const bugunSatis = satislar.filter(x => new Date(x.tarih) >= bugun && new Date(x.tarih) < yarin);
+        const satislar = tumSatislar.filter(x => new Date(x.tarih) >= seciliDonem.baslangic && new Date(x.tarih) <= seciliDonem.bitis);
+        const bugunSatis = tumSatislar.filter(x => new Date(x.tarih) >= bugun && new Date(x.tarih) < yarin);
         const toplam = liste => liste.reduce((n, x) => n + Number(x.genelToplam || 0), 0);
         const hareketToplami = liste => liste.reduce((n, x) => n + Number(x.tutar || 0), 0);
-        const ayTahsilatlar = finansHareketleri.filter(x => x.tarafTipi === "MUSTERI" && x.tip === "TAHSILAT");
-        const ayOdemeler = finansHareketleri.filter(x => x.tarafTipi === "TEDARIKCI" && x.tip === "ODEME");
-        const bugunFinans = finansHareketleri.filter(x => new Date(x.tarih) >= bugun && new Date(x.tarih) < yarin);
+        const seciliFinans = tumFinansHareketleri.filter(x => new Date(x.tarih) >= seciliDonem.baslangic && new Date(x.tarih) <= seciliDonem.bitis);
+        const ayTahsilatlar = seciliFinans.filter(x => x.tarafTipi === "MUSTERI" && x.tip === "TAHSILAT");
+        const ayOdemeler = seciliFinans.filter(x => x.tarafTipi === "TEDARIKCI" && x.tip === "ODEME");
+        const bugunFinans = tumFinansHareketleri.filter(x => new Date(x.tarih) >= bugun && new Date(x.tarih) < yarin);
         const acikBakiye = satislar.reduce((n, x) => n + Number(x.kalanTutar || 0), 0);
         const iadeToplam = toplam(iadeler);
         const urunMap = new Map(), temsilciMap = new Map();
@@ -144,21 +157,24 @@ async function panel(req, res, next) {
             const t = temsilciMap.get(temsilci) || { temsilci, belge: 0, ciro: 0, tahsilat: 0 };
             t.tahsilat += Number(hareket.tutar || 0); temsilciMap.set(temsilci, t);
         }
-        const musteriIds = [...new Set(bugunFinans.filter(x => x.tarafTipi === "MUSTERI").map(x => String(x.tarafId)))];
-        const tedarikciIds = [...new Set(bugunFinans.filter(x => x.tarafTipi === "TEDARIKCI").map(x => String(x.tarafId)))];
+        const musteriIds = [...new Set(tumFinansHareketleri.filter(x => x.tarafTipi === "MUSTERI").map(x => String(x.tarafId)))];
+        const tedarikciIds = [...new Set(tumFinansHareketleri.filter(x => x.tarafTipi === "TEDARIKCI").map(x => String(x.tarafId)))];
         const [musteriler, tedarikciler] = await Promise.all([
             musteriIds.length ? Musteri.find({ _id: { $in: musteriIds }, tenantId }).select("kod unvan adSoyad").lean() : [],
             tedarikciIds.length ? Tedarikci.find({ _id: { $in: tedarikciIds }, tenantId }).select("kod unvan adSoyad").lean() : []
         ]);
         const tarafMap = new Map([...musteriler, ...tedarikciler].map(x => [String(x._id), x]));
-        const bugunFinansSatirlari = bugunFinans.map(x => ({
+        const finansSatirinaCevir = x => ({
             _id: x._id, tur: x.tip, tarafTipi: x.tarafTipi, taraf: tarafMap.get(String(x.tarafId)) || null,
             tutar: Number(x.tutar || 0), odemeYontemi: x.odemeYontemi, aciklama: x.aciklama,
             belgeNo: x.belgeNo, kaynak: x.kaynak, tarih: x.tarih, kullanici: x.kullaniciId || null
-        }));
+        });
+        const bugunFinansSatirlari = bugunFinans.map(finansSatirinaCevir);
+        const seciliFinansSatirlari = seciliFinans.map(finansSatirinaCevir);
+        const seciliOzet = { donem: { kod: seciliDonem.kod, baslangic: seciliDonem.baslangicYazi, bitis: seciliDonem.bitisYazi }, ciro: toplam(satislar), tahsilat: hareketToplami(ayTahsilatlar), odeme: hareketToplami(ayOdemeler), belge: satislar.length, iade: iadeToplam, netCiro: toplam(satislar) - iadeToplam, finansHareketleri: seciliFinansSatirlari };
         res.json({ basarili: true, panel: {
             bugun: { ciro: toplam(bugunSatis), tahsilat: hareketToplami(bugunFinans.filter(x => x.tarafTipi === "MUSTERI")), odeme: hareketToplami(bugunFinans.filter(x => x.tarafTipi === "TEDARIKCI")), belge: bugunSatis.length, finansHareketleri: bugunFinansSatirlari },
-            ay: { ciro: toplam(satislar), tahsilat: hareketToplami(ayTahsilatlar), odeme: hareketToplami(ayOdemeler), belge: satislar.length, iade: iadeToplam, netCiro: toplam(satislar) - iadeToplam },
+            secili: seciliOzet, ay: seciliOzet,
             acikBakiye, acikSiparis, aktifTeklif,
             sonSatislar: satislar.slice(0, 12),
             enCokSatanlar: [...urunMap.values()].sort((a, b) => b.ciro - a.ciro).slice(0, 8),
@@ -301,7 +317,7 @@ async function olustur(req, res, next) {
         let genelToplam = 0;
 
         // Önce bütün stokları doğrula.
-        const stokKontrolleri = [];
+        const stokKontrolleri = new Map();
 
         for (const item of body.kalemler) {
 
@@ -317,21 +333,7 @@ async function olustur(req, res, next) {
                 });
             }
 
-            const stok = await Stok.findOne({
-                tenantId,
-                urunId: urun._id,
-                depoId: depo._id
-            });
-
             const miktar = Number(item.miktar || 0);
-
-            if (!stok || stok.miktar < miktar) {
-                return res.status(409).json({
-                    basarili: false,
-                    mesaj: `Yetersiz stok: ${urun.kod}`
-                });
-            }
-
             const kalem = hesaplaKalem({
                 urunId: urun._id,
                 miktar,
@@ -343,11 +345,20 @@ async function olustur(req, res, next) {
                 iskonto: item.iskonto ?? urun.iskonto ?? 0
             });
 
+            if (!kalemGecerliMi(kalem)) {
+                return res.status(400).json({ basarili: false, mesaj: `Geçersiz satış kalemi: ${urun.kod}` });
+            }
+
+            const stokAnahtari = String(urun._id);
+            const mevcutKontrol = stokKontrolleri.get(stokAnahtari);
+            const stok = mevcutKontrol?.stok || await Stok.findOne({ tenantId, urunId: urun._id, depoId: depo._id });
+            const toplamIhtiyac = Number(mevcutKontrol?.miktar || 0) + miktar;
+            if (!stok || Number(stok.miktar || 0) < toplamIhtiyac) {
+                return res.status(409).json({ basarili: false, mesaj: `Yetersiz stok: ${urun.kod}` });
+            }
+
             kalemler.push(kalem);
-            stokKontrolleri.push({
-                stok,
-                miktar
-            });
+            stokKontrolleri.set(stokAnahtari, { stok, miktar: toplamIhtiyac });
 
             araToplam += kalem.araToplam;
             toplamKdv += kalem.kdvTutari;
@@ -489,32 +500,28 @@ async function olustur(req, res, next) {
         rollback.satisId = satis._id;
 
         // SATIŞ -> STOK ÇIKIŞI
-        for (const item of stokKontrolleri) {
-
-            item.stok.miktar -= item.miktar;
-            item.stok.sonHareketTarihi = new Date();
-
-            await item.stok.save();
-            rollback.stoklar.push({ stokId: item.stok._id, miktar: item.miktar });
-
-            const kalem =
-                kalemler.find(
-                    x => String(x.urunId) === String(item.stok.urunId)
-                );
+        for (const item of stokKontrolleri.values()) {
+            const stok = await Stok.findOneAndUpdate(
+                { _id: item.stok._id, tenantId, miktar: { $gte: item.miktar } },
+                { $inc: { miktar: -item.miktar }, $set: { sonHareketTarihi: new Date() } },
+                { new: true }
+            );
+            if (!stok) throw Object.assign(new Error("Satış sırasında stok başka bir işlem tarafından kullanıldı."), { status: 409 });
+            rollback.stoklar.push({ stokId: stok._id, miktar: item.miktar });
 
             await StokHareket.create({
                 tenantId,
-                urunId: item.stok.urunId,
+                urunId: stok.urunId,
                 depoId: depo._id,
                 tip: "CIKIS",
                 miktar: item.miktar,
                 tarih: satis.tarih,
-                birimMaliyet: item.stok.maliyet || 0,
-                maliyetDogrulandi: Number(item.stok.maliyet || 0) > 0,
+                birimMaliyet: stok.maliyet || 0,
+                maliyetDogrulandi: Number(stok.maliyet || 0) > 0,
                 maliyetKaynagi: "STOK_KARTI",
                 kaynak: "SATIS",
                 kaynakId: satis._id,
-                islemAnahtari: `SATIS:${satis._id}:STOK:${item.stok.urunId}:${depo._id}`,
+                islemAnahtari: `SATIS:${satis._id}:STOK:${stok.urunId}:${depo._id}`,
                 aciklama: `Satış ${belgeNo}`,
                 kullaniciId: islemKullaniciId(req)
             });
@@ -645,11 +652,15 @@ async function iadeAl(req, res, next) {
             ? await Satis.findOne({ _id: body.orijinalSatisId, tenantId, musteriId: musteri._id, depoId: depo._id, ...sahiplik(req) })
             : null;
         if (body.orijinalSatisId && !orijinalSatis) return res.status(404).json({ basarili: false, mesaj: "İade edilecek satış bulunamadı veya bu satışa erişiminiz yok." });
-        const kalemler = []; let genelToplam = 0;
+        const kalemler = []; let genelToplam = 0; const iadeUrunleri = new Set();
         for (const item of body.kalemler) {
             const urun = await Urun.findOne({ _id: item.urunId, tenantId });
             const miktar = Number(item.miktar || 0), birimFiyat = Number(item.birimFiyat ?? urun?.satisFiyati ?? 0), kdv = Number(item.kdv ?? urun?.kdv ?? 20), iskonto = Number(item.iskonto ?? urun?.iskonto ?? 0);
-            if (!urun || miktar <= 0 || birimFiyat < 0) return res.status(400).json({ basarili: false, mesaj: "İade kalemi geçersiz." });
+            const kontrolKalemi = { miktar, birimFiyat, kdv, iskonto };
+            if (!urun || !kalemGecerliMi(kontrolKalemi)) return res.status(400).json({ basarili: false, mesaj: "İade kalemi geçersiz." });
+            const urunAnahtari = String(urun._id);
+            if (iadeUrunleri.has(urunAnahtari)) return res.status(400).json({ basarili: false, mesaj: "Aynı ürün iade belgesinde yalnızca bir satırda yer almalıdır." });
+            iadeUrunleri.add(urunAnahtari);
             const ara = miktar * birimFiyat * (1 - iskonto / 100); const toplam = ara * (1 + kdv / 100);
             kalemler.push({ urunId: urun._id, miktar, birimFiyat, kdv, iskonto, toplam }); genelToplam += toplam;
         }
@@ -722,7 +733,7 @@ async function guncelle(req, res, next) {
         if(!Array.isArray(body.kalemler)||!body.kalemler.length)return res.status(400).json({basarili:false,mesaj:"En az bir satış kalemi gerekir."});
         const depoId=body.depoId||satis.depoId; if(String(depoId)!==String(satis.depoId))return res.status(409).json({basarili:false,mesaj:"Kayıtlı satışın deposu değiştirilemez."});
         const yeniKalemler=[];let araToplam=0,toplamKdv=0,genelToplam=0;const ihtiyac=new Map();
-        for(const item of body.kalemler){const urun=await Urun.findOne({_id:item.urunId,tenantId});if(!urun)return res.status(404).json({basarili:false,mesaj:"Ürün bulunamadı."});const k=hesaplaKalem({urunId:urun._id,miktar:item.miktar,birimFiyat:item.birimFiyat??urun.satisFiyati,kdv:item.kdv??urun.kdv,iskonto:item.iskonto??urun.iskonto??0});if(k.miktar<=0)return res.status(400).json({basarili:false,mesaj:"Miktar geçersiz."});yeniKalemler.push(k);araToplam+=k.araToplam;toplamKdv+=k.kdvTutari;genelToplam+=k.toplam;ihtiyac.set(String(urun._id),(ihtiyac.get(String(urun._id))||0)+k.miktar);}
+        for(const item of body.kalemler){const urun=await Urun.findOne({_id:item.urunId,tenantId});if(!urun)return res.status(404).json({basarili:false,mesaj:"Ürün bulunamadı."});const k=hesaplaKalem({urunId:urun._id,miktar:item.miktar,birimFiyat:item.birimFiyat??urun.satisFiyati,kdv:item.kdv??urun.kdv,iskonto:item.iskonto??urun.iskonto??0});if(!kalemGecerliMi(k))return res.status(400).json({basarili:false,mesaj:"Satış kalemi geçersiz."});yeniKalemler.push(k);araToplam+=k.araToplam;toplamKdv+=k.kdvTutari;genelToplam+=k.toplam;ihtiyac.set(String(urun._id),(ihtiyac.get(String(urun._id))||0)+k.miktar);}
         const eski=new Map();for(const k of satis.kalemler)eski.set(String(k.urunId),(eski.get(String(k.urunId))||0)+Number(k.miktar||0));
         for(const [urunId,miktar] of ihtiyac){const stok=await Stok.findOne({tenantId,urunId,depoId});const kullanilabilir=Number(stok?.miktar||0)+Number(eski.get(urunId)||0);if(kullanilabilir<miktar)return res.status(409).json({basarili:false,mesaj:`Düzeltme için yetersiz stok: ${urunId}`});}
         for(const [urunId,miktar] of eski){let stok=await Stok.findOne({tenantId,urunId,depoId});if(!stok)stok=new Stok({tenantId,urunId,depoId,miktar:0,maliyet:0});stok.miktar+=miktar;await stok.save();}
@@ -777,6 +788,8 @@ module.exports = {
     iadeleriListele,
     guncelle,
     sil,
-    istanbulDonemSinirlari
+    istanbulDonemSinirlari,
+    hesaplaKalem,
+    kalemGecerliMi
 };
 

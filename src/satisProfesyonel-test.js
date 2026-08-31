@@ -77,6 +77,16 @@ test("Satış merkezi tahsilatı ortak cari hareketlerinden ve İstanbul gün s�
     assert.equal(sinir.bugun.toISOString(), "2026-08-31T21:00:00.000Z");
 });
 
+test("Satış merkezi günlük, haftalık, aylık, yıllık ve özel tarih raporu sunar", () => {
+    const controller = fs.readFileSync(path.join(__dirname, "controllers", "satisController.js"), "utf8");
+    const arayuz = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
+    assert.match(controller, /tarihAraligi\(req\.query/);
+    assert.match(controller, /secili:\s*seciliOzet/);
+    for (const kod of ["BUGUN", "BU_HAFTA", "BU_AY", "BU_YIL", "OZEL"]) assert.ok(arayuz.includes(kod), kod);
+    for (const metin of ["Bugünkü Ciro", "Bugünkü Tahsilat", "Seçili Dönem Net Ciro", "Seçili Dönem Tahsilat ve Ödemeleri"]) assert.ok(arayuz.includes(metin), metin);
+    assert.match(arayuz, /\/api\/tenant\/satis\/panel\?\$\{satisFiltre\}/);
+});
+
 test("Satış, perakende ve saha ekranları hızlı ürün kartı açıp stoğuyla satışa ekler", () => {
     const js = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
     const controller = fs.readFileSync(path.join(__dirname, "controllers", "urunController.js"), "utf8");
