@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const CariHareket = require("./models/CariHareket");
+const { tedarikciOdemeSonrasiBakiye } = require("./controllers/cariController");
 
 async function istek(path, options = {}) {
     const uygulama = require("./uygulama");
@@ -56,4 +57,14 @@ test("Cari arayüzü aktif tarafa göre yeni kayıt açar ve müşteri güncelle
     assert.match(js, /await api\(`\/api\/tenant\/musteriler\/\$\{encodeURIComponent\(id\)\}`/);
     assert.match(js, /musteriTahsilatDuzenleFormu/);
     assert.match(js, /Tutarı Değiştir/);
+});
+
+test("Borcu sıfır olan tedarikçiye ödeme avans/alacak bakiyesi oluşturur", () => {
+    assert.equal(tedarikciOdemeSonrasiBakiye(0, 8000), -8000);
+    assert.equal(tedarikciOdemeSonrasiBakiye(3000, 8000), -5000);
+
+    const controller = fs.readFileSync(path.join(__dirname, "controllers", "cariController.js"), "utf8");
+    assert.doesNotMatch(controller, /Ödeme tedarikçi bakiyesini aşamaz/);
+    assert.match(controller, /bakiyeDegisimi: -tutar/);
+    assert.match(controller, /tenantId: tId/);
 });

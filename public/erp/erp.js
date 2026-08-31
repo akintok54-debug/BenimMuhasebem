@@ -3562,7 +3562,7 @@
                 <form><div class="erp-form-grid">
                     <label>Ödeme Yöntemi<select name="odemeYontemi" required><option value="NAKIT">Nakit</option><option value="KREDI_KARTI">Kredi Kartı</option><option value="SENET">Senet</option><option value="CEK">Çek</option></select></label>
                     <label data-hesap-label>Hesap<select name="hesapId"></select></label>
-                    <label>Tutar<input name="tutar" type="number" min="0.01" step="0.01" ${tahsilat && Number(musteri.bakiye) > 0 ? `max="${Number(musteri.bakiye)}"` : ""} required></label>
+                    <label>Tutar<input name="tutar" type="number" min="0.01" step="0.01" ${tahsilat && Number(musteri.bakiye) > 0 ? `max="${Number(musteri.bakiye)}"` : ""} required>${!musteriMi && !tahsilat ? "<small>Mevcut borcu aşan ödeme tedarikçi avansı/alacağı olarak negatif bakiyede izlenir.</small>" : ""}</label>
                     <label>Tarih<input name="tarih" type="date" value="${new Date().toISOString().slice(0, 10)}" required></label>
                     <label>Belge No<input name="belgeNo" placeholder="Makbuz / senet / çek no"></label>
                     <label class="full">Açıklama<input name="aciklama" value="${tahsilat ? `${tarafAdi} tahsilatı` : `${tarafAdi} ödemesi`}"></label>
