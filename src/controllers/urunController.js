@@ -151,6 +151,32 @@ function fiyatDogrula(value) {
     return fiyat;
 }
 
+function urunOlusturmaVerisi(tId, body) {
+    return {
+        tenantId: tId,
+        kod: metin(body.kod).toUpperCase(),
+        barkod: metin(body.barkod),
+        ad: metin(body.ad),
+        kategori: metin(body.kategori),
+        marka: metin(body.marka),
+        model: metin(body.model),
+        uyumluluk: Array.isArray(body.uyumluluk) ? body.uyumluluk.map(metin).filter(Boolean) : [],
+        birim: metin(body.birim || "ADET").toUpperCase(),
+        kdv: Number(body.kdv ?? 20),
+        alisFiyati: Number(body.alisFiyati || 0),
+        satisFiyati: Number(body.satisFiyati || 0),
+        bayiFiyati: Number(body.bayiFiyati || 0),
+        perakendeFiyati: Number(body.perakendeFiyati ?? body.satisFiyati ?? 0),
+        iskonto: Number(body.iskonto || 0),
+        paraBirimi: paraBirimiDogrula(body.paraBirimi),
+        gorsel: gorselDogrula(body.gorsel),
+        minimumStok: Number(body.minimumStok || 0),
+        kritikStok: Number(body.kritikStok || 0),
+        aktif: body.aktif !== false,
+        notlar: metin(body.notlar)
+    };
+}
+
 async function ozelFiyatlariListele(req, res, next) {
     try {
         const fiyatlar = await OzelFiyat.find({ tenantId: tenantId(req) })
@@ -269,37 +295,50 @@ async function olustur(req, res, next) {
         sayilariDogrula(body);
         await benzersizAlanlariDogrula(tId, body);
 
-        const urun = await Urun.create({
-            tenantId: tId,
-            kod: String(body.kod).trim().toUpperCase(),
-            barkod: body.barkod || "",
-            ad: String(body.ad).trim(),
-            kategori: body.kategori || "",
-            marka: body.marka || "",
-            model: body.model || "",
-            uyumluluk: Array.isArray(body.uyumluluk)
-                ? body.uyumluluk
-                : [],
-            birim: body.birim || "ADET",
-            kdv: Number(body.kdv ?? 20),
-            alisFiyati: Number(body.alisFiyati || 0),
-            satisFiyati: Number(body.satisFiyati || 0),
-            bayiFiyati: Number(body.bayiFiyati || 0),
-            perakendeFiyati: Number(body.perakendeFiyati ?? body.satisFiyati ?? 0),
-            iskonto: Number(body.iskonto || 0),
-            paraBirimi: paraBirimiDogrula(body.paraBirimi),
-            gorsel: gorselDogrula(body.gorsel),
-            minimumStok: Number(body.minimumStok || 0),
-            kritikStok: Number(body.kritikStok || 0),
-            aktif: body.aktif !== false,
-            notlar: body.notlar || ""
-        });
+        const urun = await Urun.create(urunOlusturmaVerisi(tId, body));
 
         res.status(201).json({
             basarili: true,
             urun
         });
     } catch (error) {
+        next(error);
+    }
+}
+
+async function hizliSatisUrunuOlustur(req, res, next) {
+    let urun = null, stok = null;
+    try {
+        const body = req.body || {}, tId = tenantId(req);
+        const stokMiktari = Number(body.stokMiktari || 0), alisFiyati = Number(body.alisFiyati || 0);
+        if (!metin(body.kod) || !metin(body.ad) || !mongoose.Types.ObjectId.isValid(metin(body.depoId))) {
+            return res.status(400).json({ basarili: false, mesaj: "Ürün kodu, ürün adı ve depo zorunludur." });
+        }
+        if (!Number.isFinite(stokMiktari) || stokMiktari <= 0) {
+            return res.status(400).json({ basarili: false, mesaj: "Ürünü hemen satabilmek için başlangıç stoğu sıfırdan büyük olmalıdır." });
+        }
+        if (!Number.isFinite(alisFiyati) || alisFiyati <= 0) {
+            return res.status(400).json({ basarili: false, mesaj: "Gerçek stok maliyeti için alış maliyeti sıfırdan büyük olmalıdır." });
+        }
+        sayilariDogrula(body);
+        await benzersizAlanlariDogrula(tId, body);
+        const depo = await Depo.findOne({ _id: body.depoId, tenantId: tId, aktif: { $ne: false } });
+        if (!depo) return res.status(404).json({ basarili: false, mesaj: "Aktif depo bulunamadı." });
+
+        urun = await Urun.create(urunOlusturmaVerisi(tId, { ...body, aktif: true }));
+        stok = await Stok.create({ tenantId: tId, urunId: urun._id, depoId: depo._id, miktar: stokMiktari, maliyet: alisFiyati, sonHareketTarihi: new Date() });
+        const hareket = await StokHareket.create({
+            tenantId: tId, urunId: urun._id, depoId: depo._id, tip: "DEVIR_GIRIS", miktar: stokMiktari,
+            tarih: body.tarih || new Date(), birimMaliyet: alisFiyati, maliyetDogrulandi: true,
+            maliyetKaynagi: "HIZLI_SATIS_URUNU", kaynak: "HIZLI_SATIS_URUNU",
+            islemAnahtari: `HIZLI_SATIS_URUNU:${urun._id}:${depo._id}`,
+            aciklama: metin(body.aciklama || "Satış ekranından hızlı ürün ve açılış stoğu"),
+            kullaniciId: req.currentUser?._id || req.kullanici?.kullaniciId || req.user?.kullaniciId || null
+        });
+        return res.status(201).json({ basarili: true, mesaj: "Ürün kartı ve başlangıç stoğu oluşturuldu; satışa hazır.", urun, stok, hareket, depo: { _id: depo._id, kod: depo.kod, ad: depo.ad } });
+    } catch (error) {
+        if (stok?._id) await Stok.deleteOne({ _id: stok._id, tenantId: tenantId(req) }).catch(() => {});
+        if (urun?._id) await Urun.deleteOne({ _id: urun._id, tenantId: tenantId(req) }).catch(() => {});
         next(error);
     }
 }
@@ -466,6 +505,7 @@ module.exports = {
     listele,
     detay,
     olustur,
+    hizliSatisUrunuOlustur,
     guncelle,
     topluAktar,
     ozelFiyatlariListele,

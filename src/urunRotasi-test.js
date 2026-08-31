@@ -11,6 +11,21 @@ async function testSunucusuAc() {
     });
 }
 
+test("Hızlı satış ürünü API kimliksiz erişimi reddeder ve dinamik ürün rotasından önce tanımlıdır", async () => {
+    const server = await testSunucusuAc();
+    try {
+        const response = await fetch(`http://127.0.0.1:${server.address().port}/api/tenant/urunler/hizli-satis`, {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
+        });
+        assert.equal(response.status, 401);
+    } finally { await new Promise(resolve => server.close(resolve)); }
+
+    const router = require("./routes/urunRotasi");
+    const yollar = router.stack.filter(x => x.route).map(x => x.route.path);
+    assert.ok(yollar.indexOf("/hizli-satis") >= 0);
+    assert.ok(yollar.indexOf("/hizli-satis") < yollar.indexOf("/:id"));
+});
+
 test("Ürün API kimliksiz erişimi reddeder", async () => {
     const server = await testSunucusuAc();
 

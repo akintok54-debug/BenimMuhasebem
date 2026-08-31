@@ -15,6 +15,8 @@ const Siparis = require("../models/Siparis");
 const Teklif = require("../models/Teklif");
 const SahaGun = require("../models/SahaGun");
 const CekSenetPortfoy = require("../models/CekSenetPortfoy");
+const Tedarikci = require("../models/Tedarikci");
+const { etkinYetkiler } = require("../middleware/yetkiKontrol");
 
 function tenantObjectId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
@@ -56,6 +58,23 @@ function hesaplaKalem(kalem) {
     };
 }
 
+function istanbulDonemSinirlari(simdi = new Date()) {
+    const parcalar = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+        timeZone: "Europe/Istanbul", year: "numeric", month: "2-digit", day: "2-digit"
+    }).formatToParts(simdi).filter(x => x.type !== "literal").map(x => [x.type, x.value]));
+    const gun = `${parcalar.year}-${parcalar.month}-${parcalar.day}`;
+    const bugun = new Date(`${gun}T00:00:00+03:00`);
+    const ay = Number(parcalar.month), yil = Number(parcalar.year);
+    const sonrakiAy = ay === 12 ? `${yil + 1}-01` : `${yil}-${String(ay + 1).padStart(2, "0")}`;
+    return {
+        gun,
+        bugun,
+        yarin: new Date(bugun.getTime() + 86400000),
+        ayBasi: new Date(`${parcalar.year}-${parcalar.month}-01T00:00:00+03:00`),
+        sonrakiAyBasi: new Date(`${sonrakiAy}-01T00:00:00+03:00`)
+    };
+}
+
 async function listele(req, res, next) {
     try {
         const satislar = await Satis.find({
@@ -81,29 +100,37 @@ async function listele(req, res, next) {
 async function panel(req, res, next) {
     try {
         const tenantId = tenantObjectId(req);
-        const simdi = new Date();
-        const bugun = new Date(simdi.getFullYear(), simdi.getMonth(), simdi.getDate());
-        const ayBasi = new Date(simdi.getFullYear(), simdi.getMonth(), 1);
-        const [satislar, acikSiparis, aktifTeklif, iadeler] = await Promise.all([
-            Satis.find({ tenantId, tarih: { $gte: ayBasi }, ...sahiplik(req) })
+        const { bugun, yarin, ayBasi, sonrakiAyBasi } = istanbulDonemSinirlari();
+        const izinler = new Set(etkinYetkiler(req.currentUser || {}));
+        const tedarikciOdemesiGorur = izinler.has("supplier.read");
+        const finansKosullari = [{ tarafTipi: "MUSTERI", tip: "TAHSILAT" }];
+        if (tedarikciOdemesiGorur) finansKosullari.push({ tarafTipi: "TEDARIKCI", tip: "ODEME" });
+        const [satislar, acikSiparis, aktifTeklif, iadeler, finansHareketleri] = await Promise.all([
+            Satis.find({ tenantId, tarih: { $gte: ayBasi, $lt: sonrakiAyBasi }, ...sahiplik(req) })
                 .populate("musteriId", "kod unvan adSoyad bakiye")
                 .populate("kalemler.urunId", "kod ad birim alisFiyati")
                 .populate("kullaniciId", "adSoyad email")
                 .sort({ tarih: -1, createdAt: -1 }).lean(),
             Siparis.countDocuments({ tenantId, durum: { $nin: ["TAMAMLANDI", "IPTAL"] }, ...sahiplik(req) }),
             Teklif.countDocuments({ tenantId, durum: { $nin: ["ONAYLANDI", "REDDEDILDI", "IPTAL", "SURESI_DOLDU", "SIPARISE_DONUSTU"] }, ...sahiplik(req) }),
-            SatisIade.find({ tenantId, tarih: { $gte: ayBasi }, ...sahiplik(req) }).select("genelToplam tarih").lean()
+            SatisIade.find({ tenantId, tarih: { $gte: ayBasi, $lt: sonrakiAyBasi }, ...sahiplik(req) }).select("genelToplam tarih").lean(),
+            CariHareket.find({ tenantId, tarih: { $gte: ayBasi, $lt: sonrakiAyBasi }, durum: { $ne: "IPTAL" }, $or: finansKosullari, ...sahiplik(req) })
+                .select("tarafTipi tarafId tip tutar odemeYontemi aciklama belgeNo kaynak tarih kullaniciId")
+                .populate("kullaniciId", "adSoyad email").sort({ tarih: -1, createdAt: -1 }).lean()
         ]);
-        const bugunSatis = satislar.filter(x => new Date(x.tarih) >= bugun);
+        const bugunSatis = satislar.filter(x => new Date(x.tarih) >= bugun && new Date(x.tarih) < yarin);
         const toplam = liste => liste.reduce((n, x) => n + Number(x.genelToplam || 0), 0);
-        const tahsilat = liste => liste.reduce((n, x) => n + Number(x.odenenTutar || 0), 0);
+        const hareketToplami = liste => liste.reduce((n, x) => n + Number(x.tutar || 0), 0);
+        const ayTahsilatlar = finansHareketleri.filter(x => x.tarafTipi === "MUSTERI" && x.tip === "TAHSILAT");
+        const ayOdemeler = finansHareketleri.filter(x => x.tarafTipi === "TEDARIKCI" && x.tip === "ODEME");
+        const bugunFinans = finansHareketleri.filter(x => new Date(x.tarih) >= bugun && new Date(x.tarih) < yarin);
         const acikBakiye = satislar.reduce((n, x) => n + Number(x.kalanTutar || 0), 0);
         const iadeToplam = toplam(iadeler);
         const urunMap = new Map(), temsilciMap = new Map();
         for (const satis of satislar) {
             const temsilci = satis.kullaniciId?.adSoyad || satis.kullaniciId?.email || "Atanmamış";
             const t = temsilciMap.get(temsilci) || { temsilci, belge: 0, ciro: 0, tahsilat: 0 };
-            t.belge++; t.ciro += Number(satis.genelToplam || 0); t.tahsilat += Number(satis.odenenTutar || 0); temsilciMap.set(temsilci, t);
+            t.belge++; t.ciro += Number(satis.genelToplam || 0); temsilciMap.set(temsilci, t);
             for (const k of satis.kalemler || []) {
                 const id = String(k.urunId?._id || k.urunId || "");
                 const u = urunMap.get(id) || { urunId: id, kod: k.urunId?.kod || "-", ad: k.urunId?.ad || "Ürün", miktar: 0, ciro: 0, kar: 0 };
@@ -112,9 +139,26 @@ async function panel(req, res, next) {
                 urunMap.set(id, u);
             }
         }
+        for (const hareket of ayTahsilatlar) {
+            const temsilci = hareket.kullaniciId?.adSoyad || hareket.kullaniciId?.email || "Atanmamış";
+            const t = temsilciMap.get(temsilci) || { temsilci, belge: 0, ciro: 0, tahsilat: 0 };
+            t.tahsilat += Number(hareket.tutar || 0); temsilciMap.set(temsilci, t);
+        }
+        const musteriIds = [...new Set(bugunFinans.filter(x => x.tarafTipi === "MUSTERI").map(x => String(x.tarafId)))];
+        const tedarikciIds = [...new Set(bugunFinans.filter(x => x.tarafTipi === "TEDARIKCI").map(x => String(x.tarafId)))];
+        const [musteriler, tedarikciler] = await Promise.all([
+            musteriIds.length ? Musteri.find({ _id: { $in: musteriIds }, tenantId }).select("kod unvan adSoyad").lean() : [],
+            tedarikciIds.length ? Tedarikci.find({ _id: { $in: tedarikciIds }, tenantId }).select("kod unvan adSoyad").lean() : []
+        ]);
+        const tarafMap = new Map([...musteriler, ...tedarikciler].map(x => [String(x._id), x]));
+        const bugunFinansSatirlari = bugunFinans.map(x => ({
+            _id: x._id, tur: x.tip, tarafTipi: x.tarafTipi, taraf: tarafMap.get(String(x.tarafId)) || null,
+            tutar: Number(x.tutar || 0), odemeYontemi: x.odemeYontemi, aciklama: x.aciklama,
+            belgeNo: x.belgeNo, kaynak: x.kaynak, tarih: x.tarih, kullanici: x.kullaniciId || null
+        }));
         res.json({ basarili: true, panel: {
-            bugun: { ciro: toplam(bugunSatis), tahsilat: tahsilat(bugunSatis), belge: bugunSatis.length },
-            ay: { ciro: toplam(satislar), tahsilat: tahsilat(satislar), belge: satislar.length, iade: iadeToplam, netCiro: toplam(satislar) - iadeToplam },
+            bugun: { ciro: toplam(bugunSatis), tahsilat: hareketToplami(bugunFinans.filter(x => x.tarafTipi === "MUSTERI")), odeme: hareketToplami(bugunFinans.filter(x => x.tarafTipi === "TEDARIKCI")), belge: bugunSatis.length, finansHareketleri: bugunFinansSatirlari },
+            ay: { ciro: toplam(satislar), tahsilat: hareketToplami(ayTahsilatlar), odeme: hareketToplami(ayOdemeler), belge: satislar.length, iade: iadeToplam, netCiro: toplam(satislar) - iadeToplam },
             acikBakiye, acikSiparis, aktifTeklif,
             sonSatislar: satislar.slice(0, 12),
             enCokSatanlar: [...urunMap.values()].sort((a, b) => b.ciro - a.ciro).slice(0, 8),
@@ -732,6 +776,7 @@ module.exports = {
     iadeAl,
     iadeleriListele,
     guncelle,
-    sil
+    sil,
+    istanbulDonemSinirlari
 };
 

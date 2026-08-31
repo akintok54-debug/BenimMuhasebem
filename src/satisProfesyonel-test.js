@@ -6,6 +6,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const uygulama = require("./uygulama");
 const Satis = require("./models/Satis");
+const { istanbulDonemSinirlari } = require("./controllers/satisController");
 
 test("Satış panel endpointi kimliksiz erişimi reddeder", async () => {
     const server = await new Promise((resolve, reject) => {
@@ -63,4 +64,26 @@ test("Perakende satış müşteri seçmeden peşin tahsilat ve ayrı satış kan
     assert.match(controller, /unvan:\s*"Perakende Müşteri"/);
     assert.match(controller, /\["NAKIT",\s*"KART",\s*"BANKA"\]/);
     assert.match(controller, /satisKanali:\s*perakende\s*\?\s*"PERAKENDE"/);
+});
+
+test("Satış merkezi tahsilatı ortak cari hareketlerinden ve İstanbul gün sınırından hesaplar", () => {
+    const controller = fs.readFileSync(path.join(__dirname, "controllers", "satisController.js"), "utf8");
+    assert.match(controller, /CariHareket\.find\(/);
+    assert.match(controller, /tarafTipi:\s*"MUSTERI",\s*tip:\s*"TAHSILAT"/);
+    assert.match(controller, /durum:\s*\{\s*\$ne:\s*"IPTAL"\s*\}/);
+    assert.match(controller, /finansHareketleri:\s*bugunFinansSatirlari/);
+    const sinir = istanbulDonemSinirlari(new Date("2026-08-31T22:30:00.000Z"));
+    assert.equal(sinir.gun, "2026-09-01");
+    assert.equal(sinir.bugun.toISOString(), "2026-08-31T21:00:00.000Z");
+});
+
+test("Satış, perakende ve saha ekranları hızlı ürün kartı açıp stoğuyla satışa ekler", () => {
+    const js = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
+    const controller = fs.readFileSync(path.join(__dirname, "controllers", "urunController.js"), "utf8");
+    const rota = fs.readFileSync(path.join(__dirname, "routes", "urunRotasi.js"), "utf8");
+    for (const ifade of ["hizliSatisUrunuAc", "salesQuickProduct", "hizliSatisUrunEkle", "/api/tenant/urunler/hizli-satis", "Ürünü Oluştur ve Satışa Ekle"]) assert.match(js, new RegExp(ifade));
+    assert.match(rota, /hizli-satis[\s\S]+sales\.write/);
+    assert.match(controller, /tip:\s*"DEVIR_GIRIS"/);
+    assert.match(controller, /maliyetDogrulandi:\s*true/);
+    assert.match(controller, /tenantId:\s*tId/);
 });
