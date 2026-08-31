@@ -22,6 +22,12 @@ const DepoSchema = new mongoose.Schema(
             trim: true
         },
 
+        sube: {
+            type: String,
+            trim: true,
+            default: ""
+        },
+
         adres: {
             type: String,
             trim: true,
@@ -42,5 +48,7 @@ DepoSchema.index(
     { tenantId: 1, kod: 1 },
     { unique: true }
 );
+
+DepoSchema.index({ tenantId: 1, sube: 1, aktif: 1 });
 
 module.exports = mongoose.model("Depo", DepoSchema);

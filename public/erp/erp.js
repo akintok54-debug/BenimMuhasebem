@@ -4151,12 +4151,22 @@
     }
 
     function stokDepoPaneli(panel) {
-        panel.innerHTML = `<div class="stock-two-column"><div class="dashboard-panel stock-panel"><div class="panel-heading"><div><h2>Depolar</h2><p>Aktif depo listesi ve stok satırı sayıları.</p></div></div><div class="stock-depot-list">${stokMerkezi.depolar.length ? stokMerkezi.depolar.map(d => { const satir = stokMerkezi.stoklar.filter(x => String(x.depoId?._id) === String(d._id)); const miktar = satir.reduce((n, x) => n + Number(x.miktar || 0), 0); return `<div class="stock-depot"><b>${escapeHtml(d.kod)} · ${escapeHtml(d.ad)}</b><span>${miktar} adet · ${satir.length} ürün satırı</span><small>${escapeHtml(d.adres || "Adres yok")}</small></div>`; }).join("") : "<p>Henüz depo yok.</p>"}</div></div><div class="dashboard-panel stock-panel"><div class="panel-heading"><div><h2>Yeni Depo</h2><p>Stok işlemleri için depo kartı açın.</p></div></div><form id="stokDepoForm" class="erp-form-grid"><label>Depo Kodu<input name="kod" required maxlength="30"></label><label>Depo Adı<input name="ad" required maxlength="120"></label><label class="full">Adres<textarea name="adres"></textarea></label><div id="stokDepoMesaj" class="full"></div><div class="full"><button class="erp-primary-button" type="submit">Depoyu Kaydet</button></div></form></div></div>`;
-        panel.querySelector("#stokDepoForm").onsubmit = async event => {
+        panel.innerHTML = `<div class="stock-two-column"><div class="dashboard-panel stock-panel"><div class="panel-heading"><div><h2>Depolar</h2><p>Aktif depo listesi, bağlı şube ve stok satırı sayıları.</p></div></div><div class="stock-depot-list">${stokMerkezi.depolar.length ? stokMerkezi.depolar.map(d => { const satir = stokMerkezi.stoklar.filter(x => String(x.depoId?._id) === String(d._id)); const miktar = satir.reduce((n, x) => n + Number(x.miktar || 0), 0); return `<div class="stock-depot"><b>${escapeHtml(d.kod)} · ${escapeHtml(d.ad)}</b><span>${miktar} adet · ${satir.length} ürün satırı</span><small>Şube: ${escapeHtml(d.sube || "Atanmamış")} · ${escapeHtml(d.adres || "Adres yok")}</small><button type="button" class="erp-small-button" data-depo-duzenle="${escapeHtml(d._id)}">Düzenle</button></div>`; }).join("") : "<p>Henüz depo yok.</p>"}</div></div><div class="dashboard-panel stock-panel"><div class="panel-heading"><div><h2 id="stokDepoFormBaslik">Yeni Depo</h2><p>Şube bağlantısı raporların satış, alış, iade ve stok verilerini doğru süzmesini sağlar.</p></div></div><form id="stokDepoForm" class="erp-form-grid"><input type="hidden" name="depoId"><label>Depo Kodu<input name="kod" required maxlength="30"></label><label>Depo Adı<input name="ad" required maxlength="120"></label><label class="full">Şube<input name="sube" maxlength="120" placeholder="Örn. Merkez"></label><label class="full">Adres<textarea name="adres"></textarea></label><div id="stokDepoMesaj" class="full"></div><div class="full"><button class="erp-primary-button" type="submit">Depoyu Kaydet</button><button class="erp-secondary-button" id="stokDepoVazgec" type="button" hidden>Vazgeç</button></div></form></div></div>`;
+        const form = panel.querySelector("#stokDepoForm");
+        const formuSifirla = () => { form.reset(); form.elements.depoId.value = ""; panel.querySelector("#stokDepoFormBaslik").textContent = "Yeni Depo"; form.querySelector('[type="submit"]').textContent = "Depoyu Kaydet"; panel.querySelector("#stokDepoVazgec").hidden = true; };
+        panel.querySelectorAll("[data-depo-duzenle]").forEach(button => button.onclick = () => {
+            const depo = stokMerkezi.depolar.find(x => String(x._id) === button.dataset.depoDuzenle);
+            if (!depo) return;
+            form.elements.depoId.value = depo._id; form.elements.kod.value = depo.kod || ""; form.elements.ad.value = depo.ad || ""; form.elements.sube.value = depo.sube || ""; form.elements.adres.value = depo.adres || "";
+            panel.querySelector("#stokDepoFormBaslik").textContent = "Depoyu Düzenle"; form.querySelector('[type="submit"]').textContent = "Değişiklikleri Kaydet"; panel.querySelector("#stokDepoVazgec").hidden = false; form.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+        panel.querySelector("#stokDepoVazgec").onclick = formuSifirla;
+        form.onsubmit = async event => {
             event.preventDefault();
             const mesaj = panel.querySelector("#stokDepoMesaj");
             try {
-                await api("/api/tenant/stok/depolar", { method: "POST", body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget).entries())) });
+                const veri = Object.fromEntries(new FormData(event.currentTarget).entries()), depoId = veri.depoId; delete veri.depoId;
+                await api(depoId ? `/api/tenant/stok/depolar/${depoId}` : "/api/tenant/stok/depolar", { method: depoId ? "PATCH" : "POST", body: JSON.stringify(veri) });
                 await stokMerkeziYukle("depolar");
             } catch (error) { mesaj.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; }
         };

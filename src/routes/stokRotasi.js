@@ -13,6 +13,7 @@ router.use(yetkiKontrol("stock.read"));
 
 router.get("/depolar", controller.depolar);
 router.post("/depolar", yetkiKontrol("stock.write"), controller.depoOlustur);
+router.patch("/depolar/:id", yetkiKontrol("stock.write"), controller.depoGuncelle);
 
 router.get("/", controller.listele);
 router.post("/hareket", yetkiKontrol("stock.write"), controller.hareket);

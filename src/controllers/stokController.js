@@ -44,6 +44,7 @@ async function depoOlustur(req, res, next) {
             tenantId: tenantId(req),
             kod: String(body.kod).trim().toUpperCase(),
             ad: String(body.ad).trim(),
+            sube: String(body.sube || "").trim(),
             adres: body.adres || "",
             aktif: body.aktif !== false
         });
@@ -52,6 +53,27 @@ async function depoOlustur(req, res, next) {
             basarili: true,
             depo
         });
+    } catch (error) {
+        next(error);
+    }
+}
+
+async function depoGuncelle(req, res, next) {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(String(req.params.id || ""))) {
+            return res.status(400).json({ basarili: false, mesaj: "Geçersiz depo kimliği." });
+        }
+        const body = req.body || {};
+        if (!body.kod || !body.ad) {
+            return res.status(400).json({ basarili: false, mesaj: "Depo kodu ve depo adı zorunludur." });
+        }
+        const depo = await Depo.findOneAndUpdate(
+            { _id: req.params.id, tenantId: tenantId(req) },
+            { $set: { kod: String(body.kod).trim().toUpperCase(), ad: String(body.ad).trim(), sube: String(body.sube || "").trim(), adres: String(body.adres || "").trim() } },
+            { new: true, runValidators: true }
+        ).lean();
+        if (!depo) return res.status(404).json({ basarili: false, mesaj: "Depo bulunamadı." });
+        res.json({ basarili: true, mesaj: "Depo güncellendi.", depo });
     } catch (error) {
         next(error);
     }
@@ -456,6 +478,7 @@ async function hareketler(req, res, next) {
 module.exports = {
     depolar,
     depoOlustur,
+    depoGuncelle,
     listele,
     hareket,
     transfer,

@@ -85,17 +85,22 @@ function stokDegeriKesim(stoklar, hareketler, kesim) {
     return yuvarla(deger);
 }
 function degisim(yeni, eski) { return { yeni: yuvarla(yeni), eski: yuvarla(eski), fark: yuvarla(yeni - eski), yuzde: eski ? yuvarla((yeni - eski) / Math.abs(eski) * 100) : null }; }
+function depoKosuluOlustur(depoId, sube, subeDepoIds = []) {
+    if (!sube) return depoId || null;
+    if (!depoId) return { $in: subeDepoIds };
+    return subeDepoIds.some(x => String(x) === String(depoId)) ? depoId : { $in: [] };
+}
 
 async function filtreSecenekleri(tenantId) {
     const [depolar, musteriler, tedarikciler, urunler, temsilciler, kasalar, bankalar] = await Promise.all([
-        Depo.find({ tenantId, aktif: { $ne: false } }).select("kod ad").sort({ ad: 1 }).lean(),
+        Depo.find({ tenantId, aktif: { $ne: false } }).select("kod ad sube").sort({ ad: 1 }).lean(),
         Musteri.find({ tenantId, aktif: { $ne: false } }).select("kod unvan adSoyad").sort({ unvan: 1, adSoyad: 1 }).lean(),
         Tedarikci.find({ tenantId, aktif: { $ne: false } }).select("kod unvan adSoyad").sort({ unvan: 1, adSoyad: 1 }).lean(),
         Urun.find({ tenantId, aktif: { $ne: false } }).select("kod ad marka kategori").sort({ ad: 1 }).lean(),
         Kullanici.find({ tenantId, aktif: true, silinmeTarihi: null }).select("adSoyad rol").sort({ adSoyad: 1 }).lean(),
         Kasa.find({ tenantId, aktif: true }).select("sube").lean(), Banka.find({ tenantId, aktif: true }).select("sube").lean()
     ]);
-    return { depolar, musteriler, tedarikciler, urunler, temsilciler, markalar: [...new Set(urunler.map(x => x.marka).filter(Boolean))].sort(), kategoriler: [...new Set(urunler.map(x => x.kategori).filter(Boolean))].sort(), subeler: [...new Set([...kasalar, ...bankalar].map(x => x.sube).filter(Boolean))].sort(), odemeTipleri: ["ACIK_HESAP", "NAKIT", "KART", "BANKA", "CEK", "SENET", "KREDI_KARTI", "IBAN"] };
+    return { depolar, musteriler, tedarikciler, urunler, temsilciler, markalar: [...new Set(urunler.map(x => x.marka).filter(Boolean))].sort(), kategoriler: [...new Set(urunler.map(x => x.kategori).filter(Boolean))].sort(), subeler: [...new Set([...depolar, ...kasalar, ...bankalar].map(x => x.sube).filter(Boolean))].sort(), odemeTipleri: ["ACIK_HESAP", "NAKIT", "KART", "BANKA", "CEK", "SENET", "KREDI_KARTI", "IBAN"] };
 }
 
 async function raporuHesapla(tenantId, query = {}, sabitAralik = null) {
@@ -110,16 +115,18 @@ async function raporuHesapla(tenantId, query = {}, sabitAralik = null) {
     const urunKosulu = urunKisitli ? { $in: urunIds } : null;
     const odemeTipi = String(query.odemeTipi || "").toUpperCase(), satisOdemeTipi = odemeTipi === "KREDI_KARTI" ? "KART" : odemeTipi === "IBAN" ? "BANKA" : odemeTipi, alisOdemeTipi = satisOdemeTipi === "BANKA" ? "HAVALE_EFT" : satisOdemeTipi, cariOdemeTipi = odemeTipi === "KART" ? "KREDI_KARTI" : odemeTipi === "BANKA" || odemeTipi === "HAVALE_EFT" ? "IBAN" : odemeTipi, sube = String(query.sube || "").trim();
     const hesapFiltre = { tenantId, aktif: true, ...(sube ? { sube } : {}) };
-    const [kasalar, bankalar] = await Promise.all([Kasa.find(hesapFiltre).select("kod ad bakiye paraBirimi sube").lean(), Banka.find(hesapFiltre).select("kod bankaAdi bakiye paraBirimi sube").lean()]);
+    const [kasalar, bankalar, subeDepolari] = await Promise.all([Kasa.find(hesapFiltre).select("kod ad bakiye paraBirimi sube").lean(), Banka.find(hesapFiltre).select("kod bankaAdi bakiye paraBirimi sube").lean(), sube ? Depo.find({ tenantId, sube, aktif: { $ne: false } }).select("_id").lean() : []]);
     const hesapIds = [...kasalar, ...bankalar].map(x => x._id);
-    const satisFiltre = { tenantId, tarih, ...(depoId ? { depoId } : {}), ...(musteriId ? { musteriId } : {}), ...(temsilciId ? { kullaniciId: temsilciId } : {}), ...(satisOdemeTipi ? { odemeTipi: satisOdemeTipi } : {}), ...(urunKosulu ? { "kalemler.urunId": urunKosulu } : {}) };
-    const alisFiltre = { tenantId, tarih, ...(depoId ? { depoId } : {}), ...(tedarikciId ? { tedarikciId } : {}), ...(alisOdemeTipi ? { odemeTipi: alisOdemeTipi } : {}), ...(urunKosulu ? { "kalemler.urunId": urunKosulu } : {}) };
-    const satisIadeFiltre = { tenantId, tarih, ...(depoId ? { depoId } : {}), ...(musteriId ? { musteriId } : {}), ...(temsilciId ? { kullaniciId: temsilciId } : {}), ...(satisOdemeTipi ? { odemeTipi: satisOdemeTipi } : {}), ...(urunKosulu ? { "kalemler.urunId": urunKosulu } : {}) };
-    const alisIadeFiltre = { tenantId, tarih, ...(depoId ? { depoId } : {}), ...(tedarikciId ? { tedarikciId } : {}), ...(urunKosulu ? { "kalemler.urunId": urunKosulu } : {}) };
-    const stokFiltre = { tenantId, ...(depoId ? { depoId } : {}), ...(urunKosulu ? { urunId: urunKosulu } : {}) };
+    const subeDepoIds = subeDepolari.map(x => x._id);
+    const depoKosulu = depoKosuluOlustur(depoId, sube, subeDepoIds);
+    const satisFiltre = { tenantId, tarih, ...(depoKosulu ? { depoId: depoKosulu } : {}), ...(musteriId ? { musteriId } : {}), ...(temsilciId ? { kullaniciId: temsilciId } : {}), ...(satisOdemeTipi ? { odemeTipi: satisOdemeTipi } : {}), ...(urunKosulu ? { "kalemler.urunId": urunKosulu } : {}) };
+    const alisFiltre = { tenantId, tarih, ...(depoKosulu ? { depoId: depoKosulu } : {}), ...(tedarikciId ? { tedarikciId } : {}), ...(alisOdemeTipi ? { odemeTipi: alisOdemeTipi } : {}), ...(urunKosulu ? { "kalemler.urunId": urunKosulu } : {}) };
+    const satisIadeFiltre = { tenantId, tarih, ...(depoKosulu ? { depoId: depoKosulu } : {}), ...(musteriId ? { musteriId } : {}), ...(temsilciId ? { kullaniciId: temsilciId } : {}), ...(satisOdemeTipi ? { odemeTipi: satisOdemeTipi } : {}), ...(urunKosulu ? { "kalemler.urunId": urunKosulu } : {}) };
+    const alisIadeFiltre = { tenantId, tarih, ...(depoKosulu ? { depoId: depoKosulu } : {}), ...(tedarikciId ? { tedarikciId } : {}), ...(urunKosulu ? { "kalemler.urunId": urunKosulu } : {}) };
+    const stokFiltre = { tenantId, ...(depoKosulu ? { depoId: depoKosulu } : {}), ...(urunKosulu ? { urunId: urunKosulu } : {}) };
     const cariFiltre = { tenantId, tarih: { $lte: aralik.bitis }, durum: { $ne: "IPTAL" } };
     const masrafFiltre = { tenantId, tarih, durum: { $ne: "IPTAL" }, ...(sube ? { hesapId: { $in: hesapIds } } : {}) };
-    const hareketFiltre = { tenantId, createdAt: { $gte: aralik.baslangic }, ...(depoId ? { depoId } : {}), ...(urunKosulu ? { urunId: urunKosulu } : {}) };
+    const hareketFiltre = { tenantId, createdAt: { $gte: aralik.baslangic }, ...(depoKosulu ? { depoId: depoKosulu } : {}), ...(urunKosulu ? { urunId: urunKosulu } : {}) };
     const [satislar, satisIadeleri, alislar, alisIadeleri, stoklar, stokHareketleri, cariHam, donemCariHam, paraSonrasi, digerGelirler, masraflar, portfoy, tenant, cariMusteriler, cariTedarikciler] = await Promise.all([
         Satis.find(satisFiltre).select("belgeNo tarih musteriId depoId kalemler araToplam genelToplam odemeTipi odenenTutar kullaniciId").populate("musteriId", "kod unvan adSoyad").populate("kullaniciId", "adSoyad").lean(),
         SatisIade.find(satisIadeFiltre).select("belgeNo tarih musteriId kalemler genelToplam orijinalSatisId kullaniciId").populate("musteriId", "kod unvan adSoyad").populate("kullaniciId", "adSoyad").lean(),
@@ -180,7 +187,7 @@ async function raporuHesapla(tenantId, query = {}, sabitAralik = null) {
     const toplamEsleme = { ...degerler, donemIcindeAlinanMal: degerler.toplamAlis, donemIcindeSatilanMal: degerler.toplamSatisGeliri, musteriAlacaklari: toplam(musteriAlacakSatirlari, "bakiye"), tedarikciBorclari: toplam(tedarikciBorcSatirlari, "bakiye"), kasaBakiyesi: toplam(kasaSatirlari, "bakiye"), bankaBakiyesi: toplam(bankaSatirlari, "bakiye"), cekSenetPortfoyu: toplam(portfoySatirlari, "tutar"), stokDegeri: donemSonuMalMevcudu, kritikStoklar: kritikStokSatirlari.length, enCokSatanUrunler: toplam(urunSatirlari, "netMiktar"), enCokKarBirakanUrunler: toplam(urunSatirlari, "kar"), musteriBazliSatis: degerler.netSatislar, tedarikciBazliAlis: degerler.netAlis, satisTemsilcisiPerformansi: degerler.netSatislar, tahsilatRaporu: toplam(tahsilatlar, "tutar"), odemeRaporu: toplam(odemeler, "tutar"), giderKategoriRaporu: degerler.toplamGiderler };
     const raporlar = Object.fromEntries(RAPORLAR.map(([kod, raporAdi]) => [kod, { kod, ad: raporAdi, toplam: yuvarla(toplamEsleme[kod]), satirlar: satirEsleme[kod] || [] }]));
     const ozet = { toplamSatis: degerler.toplamSatisGeliri, netSatis: degerler.netSatislar, toplamAlis: degerler.toplamAlis, tahsilat: toplamEsleme.tahsilatRaporu, odeme: toplamEsleme.odemeRaporu, gider: degerler.toplamGiderler, brutKar: degerler.brutKar, netKarZarar: degerler.netKarZarar, musteriAlacagi: toplamEsleme.musteriAlacaklari, tedarikciBorcu: toplamEsleme.tedarikciBorclari, kasa: toplamEsleme.kasaBakiyesi, banka: toplamEsleme.bankaBakiyesi, stokDegeri: donemSonuMalMevcudu };
-    return { meta: { firmaAdi: tenant?.firmaBilgileri?.unvan || tenant?.name || "İşletme", raporAdi: "Profesyonel ERP Rapor Merkezi", donem: aralik, filtreler: { sube, depoId, musteriId, tedarikciId, urunId, marka: query.marka || "", kategori: query.kategori || "", temsilciId, odemeTipi }, olusturulmaTarihi: new Date(), degerlemeYontemi: "Kayıtlı stok ve stok hareketi birim maliyetleri; kârlılıkta KDV hariç net belge tutarları", subeNotu: sube ? "Şube filtresi kasa, banka, para hareketi ve gider hesaplarına uygulanmıştır; satış/alış belgelerinde şube alanı bulunmadığından bu belgelere uygulanmamıştır." : "" }, ozet, degerler, raporlar, donemRaporu: [{ ad: "Dönem Başı Mal Mevcudu", isaret: "", tutar: degerler.donemBasiMalMevcudu }, { ad: "Dönem İçi Net Alış", isaret: "+", tutar: degerler.netAlis }, { ad: "Satılabilir Mal Toplamı", isaret: "=", tutar: yuvarla(degerler.donemBasiMalMevcudu + degerler.netAlis) }, { ad: "Dönem Sonu Mal Mevcudu", isaret: "−", tutar: degerler.donemSonuMalMevcudu }, { ad: "Satılan Malın Maliyeti", isaret: "=", tutar: degerler.satilanMalinMaliyeti }, { ad: "Net Satış", isaret: "", tutar: degerler.netSatislar }, { ad: "Satılan Malın Maliyeti", isaret: "−", tutar: degerler.satilanMalinMaliyeti }, { ad: "Brüt Kâr", isaret: "=", tutar: degerler.brutKar }, { ad: "Diğer Gelirler", isaret: "+", tutar: degerler.digerGelirler }, { ad: "Giderler", isaret: "−", tutar: degerler.toplamGiderler }, { ad: "Net Kâr / Zarar", isaret: "=", tutar: degerler.netKarZarar }], grafikler: { gunluk: [...gunler.values()].sort((a, b) => a.tarih.localeCompare(b.tarih)).map(x => Object.fromEntries(Object.entries(x).map(([k, v]) => [k, k === "tarih" ? v : yuvarla(v)]))), enCokSatan: [...urunSatirlari].sort((a, b) => b.netMiktar - a.netMiktar).slice(0, 10), enCokKar: [...urunSatirlari].sort((a, b) => b.kar - a.kar).slice(0, 10) } };
+    return { meta: { firmaAdi: tenant?.firmaBilgileri?.unvan || tenant?.name || "İşletme", raporAdi: "Profesyonel ERP Rapor Merkezi", donem: aralik, filtreler: { sube, depoId, musteriId, tedarikciId, urunId, marka: query.marka || "", kategori: query.kategori || "", temsilciId, odemeTipi }, olusturulmaTarihi: new Date(), degerlemeYontemi: "Kayıtlı stok ve stok hareketi birim maliyetleri; kârlılıkta KDV hariç net belge tutarları", subeNotu: sube ? "Şube filtresi depo bağlantısı üzerinden satış, alış, iade ve stok kayıtlarına; hesap şubesi üzerinden kasa, banka ve gider kayıtlarına uygulanmıştır." : "" }, ozet, degerler, raporlar, donemRaporu: [{ ad: "Dönem Başı Mal Mevcudu", isaret: "", tutar: degerler.donemBasiMalMevcudu }, { ad: "Dönem İçi Net Alış", isaret: "+", tutar: degerler.netAlis }, { ad: "Satılabilir Mal Toplamı", isaret: "=", tutar: yuvarla(degerler.donemBasiMalMevcudu + degerler.netAlis) }, { ad: "Dönem Sonu Mal Mevcudu", isaret: "−", tutar: degerler.donemSonuMalMevcudu }, { ad: "Satılan Malın Maliyeti", isaret: "=", tutar: degerler.satilanMalinMaliyeti }, { ad: "Net Satış", isaret: "", tutar: degerler.netSatislar }, { ad: "Satılan Malın Maliyeti", isaret: "−", tutar: degerler.satilanMalinMaliyeti }, { ad: "Brüt Kâr", isaret: "=", tutar: degerler.brutKar }, { ad: "Diğer Gelirler", isaret: "+", tutar: degerler.digerGelirler }, { ad: "Giderler", isaret: "−", tutar: degerler.toplamGiderler }, { ad: "Net Kâr / Zarar", isaret: "=", tutar: degerler.netKarZarar }], grafikler: { gunluk: [...gunler.values()].sort((a, b) => a.tarih.localeCompare(b.tarih)).map(x => Object.fromEntries(Object.entries(x).map(([k, v]) => [k, k === "tarih" ? v : yuvarla(v)]))), enCokSatan: [...urunSatirlari].sort((a, b) => b.netMiktar - a.netMiktar).slice(0, 10), enCokKar: [...urunSatirlari].sort((a, b) => b.kar - a.kar).slice(0, 10) } };
 }
 
 async function profesyonelRapor(tenantId, query = {}) {
@@ -191,4 +198,4 @@ async function profesyonelRapor(tenantId, query = {}) {
     return mevcut;
 }
 
-module.exports = { RAPORLAR, tarihAraligi, oncekiAralik, karsilastirmaAraligi, hesaplamalariTamamla, filtreSecenekleri, profesyonelRapor, raporuHesapla };
+module.exports = { RAPORLAR, tarihAraligi, oncekiAralik, karsilastirmaAraligi, hesaplamalariTamamla, depoKosuluOlustur, filtreSecenekleri, profesyonelRapor, raporuHesapla };
