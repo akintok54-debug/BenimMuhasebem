@@ -107,4 +107,5 @@ StokHareketSchema.index({
 StokHareketSchema.index({ tenantId: 1, islemAnahtari: 1 }, { unique: true, sparse: true });
 StokHareketSchema.index({ tenantId: 1, tarih: -1, depoId: 1 });
 
+StokHareketSchema.plugin(require("./plugins/transactionPlugin"));
 module.exports = mongoose.model("StokHareket", StokHareketSchema);

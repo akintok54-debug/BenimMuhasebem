@@ -19,4 +19,5 @@ const StokSayimSchema = new mongoose.Schema({
 
 StokSayimSchema.index({ tenantId: 1, belgeNo: 1 }, { unique: true });
 
+StokSayimSchema.plugin(require("./plugins/transactionPlugin"));
 module.exports = mongoose.model("StokSayim", StokSayimSchema);

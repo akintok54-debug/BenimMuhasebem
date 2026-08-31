@@ -89,8 +89,19 @@ test("İptal kayıtları geçmişi silmeden ters hareket bağlantısını korur"
 
 test("Günlük kasa ekranı gerekli alanları, rapor dönemlerini ve dışa aktarımı sunar", () => {
     const js = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
-    for (const metin of ["Dünden / Dönemden Devir", "Toplam Giriş", "Toplam Çıkış", "Gün Sonu / Dönem Sonu", "İşlem Sonrası", "İşlemi Yapan", "GUNLUK", "HAFTALIK", "AYLIK"]) assert.match(js, new RegExp(metin));
+    for (const metin of ["Dünden Devreden Bakiye", "Dönemden Devreden Bakiye", "Toplam Giriş", "Toplam Çıkış", "Gün Sonu Bakiye", "Dönem Sonu Bakiye", "İşlem Sonrası", "İşlemi Yapan", "GUNLUK", "HAFTALIK", "AYLIK"]) assert.match(js, new RegExp(metin));
     assert.match(js, /\/api\/tenant\/finans\/kasalar\/\$\{encodeURIComponent\(id\)\}\/rapor/);
     assert.match(js, /XLSX\.utils\.json_to_sheet/);
+    for (const sayfa of ["Özet", "Günler", "Kasa Hareketleri"]) assert.match(js, new RegExp(`book_append_sheet\\(wb, [^,]+, "${sayfa}"`));
     assert.match(js, /gunlukKasaPdf/);
+});
+
+test("Alış ödemesi tedarikçiyle zenginleştirilir ve personel finansı tek işlem kilidi kullanır", () => {
+    const finans = fs.readFileSync(path.join(__dirname, "controllers", "finansController.js"), "utf8");
+    const personelRoute = fs.readFileSync(path.join(__dirname, "routes", "personelRotasi.js"), "utf8");
+    assert.match(finans, /Alis\.find/);
+    assert.match(finans, /ilgiliTip\s*=\s*"TEDARIKCI"/);
+    assert.match(finans, /islemNo/);
+    for (const kapsam of ["PERSONEL_TOPLU_TAHAKKUK", "PERSONEL_FINANS", "PERSONEL_FINANS_IPTAL"]) assert.match(personelRoute, new RegExp(kapsam));
+    assert.ok(require("./models/PersonelFinansIslem").schema.path("transactionId"));
 });

@@ -15,4 +15,5 @@ const StokTransferSchema = new mongoose.Schema({
 
 StokTransferSchema.index({ tenantId: 1, belgeNo: 1 }, { unique: true });
 
+StokTransferSchema.plugin(require("./plugins/transactionPlugin"));
 module.exports = mongoose.model("StokTransfer", StokTransferSchema);

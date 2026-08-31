@@ -2,6 +2,7 @@ const express = require("express");
 const kimlikKontrol = require("../middleware/kimlikKontrol");
 const tenantKontrol = require("../middleware/tenantKontrol");
 const { yetkiKontrol } = require("../middleware/yetkiKontrol");
+const tekIslemKontrol = require("../middleware/tekIslemKontrol");
 const controller = require("../controllers/sahaController");
 
 const router = express.Router();
@@ -20,9 +21,9 @@ router.post("/ziyaret/baslat", yetkiKontrol("field.write"), controller.ziyaretBa
 router.post("/ziyaret/:id/bitir", yetkiKontrol("field.write"), controller.ziyaretBitir);
 router.post("/mola/baslat", yetkiKontrol("field.write"), controller.molaBaslat);
 router.post("/mola/:id/bitir", yetkiKontrol("field.write"), controller.molaBitir);
-router.post("/masraf", yetkiKontrol("field.write"), controller.masrafOlustur);
-router.post("/tesellum/:id/teslim-al", yetkiKontrol("field.settle"), controller.teslimAl);
-router.post("/kasa-teslim", yetkiKontrol("field.settle"), controller.kasaTeslim);
+router.post("/masraf", yetkiKontrol("field.write"), tekIslemKontrol("SAHA_MASRAF"), controller.masrafOlustur);
+router.post("/tesellum/:id/teslim-al", yetkiKontrol("field.settle"), tekIslemKontrol("GUN_SONU_TESELLUM"), controller.teslimAl);
+router.post("/kasa-teslim", yetkiKontrol("field.settle"), tekIslemKontrol("GUN_SONU_TESELLUM"), controller.kasaTeslim);
 router.post("/tesellum/paylas", yetkiKontrol("field.read"), controller.tesellumPaylas);
 
 module.exports = router;

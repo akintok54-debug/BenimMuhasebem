@@ -1,6 +1,9 @@
 ﻿const mongoose = require("mongoose");
 const Tedarikci = require("../models/Tedarikci");
 const CariHareket = require("../models/CariHareket");
+const Alis = require("../models/Alis");
+const AlisIade = require("../models/AlisIade");
+const SatinAlmaSiparis = require("../models/SatinAlmaSiparis");
 
 function tenantObjectId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
@@ -58,6 +61,76 @@ async function detay(req, res, next) {
         return res.json({
             basarili: true,
             tedarikci
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+async function merkez(req, res, next) {
+    try {
+        const tenantId = tenantObjectId(req);
+        if (!mongoose.Types.ObjectId.isValid(String(req.params.id || ""))) {
+            return res.status(400).json({ basarili: false, mesaj: "Geçersiz tedarikçi bilgisi." });
+        }
+
+        const tedarikci = await Tedarikci.findOne({ _id: req.params.id, tenantId }).lean();
+        if (!tedarikci) return res.status(404).json({ basarili: false, mesaj: "Tedarikçi bulunamadı." });
+
+        const [alislar, iadeler, hareketler, siparisler] = await Promise.all([
+            Alis.find({ tenantId, tedarikciId: tedarikci._id })
+                .populate("depoId", "kod ad")
+                .sort({ tarih: -1, createdAt: -1 })
+                .lean(),
+            AlisIade.find({ tenantId, tedarikciId: tedarikci._id })
+                .populate("depoId", "kod ad")
+                .sort({ tarih: -1, createdAt: -1 })
+                .lean(),
+            CariHareket.find({ tenantId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id })
+                .sort({ tarih: -1, createdAt: -1 })
+                .lean(),
+            SatinAlmaSiparis.find({ tenantId, tedarikciId: tedarikci._id })
+                .sort({ tarih: -1, createdAt: -1 })
+                .lean()
+        ]);
+
+        const vadeGun = Number(tedarikci.vadeGun || 0);
+        const vadeler = alislar
+            .filter(item => Number(item.kalanTutar || 0) > 0)
+            .map(item => ({
+                alisId: item._id,
+                belgeNo: item.belgeNo,
+                tarih: item.tarih,
+                vadeTarihi: new Date(new Date(item.tarih).getTime() + vadeGun * 86400000),
+                kalanTutar: Number(item.kalanTutar || 0)
+            }))
+            .sort((a, b) => a.vadeTarihi - b.vadeTarihi);
+
+        const odemeler = hareketler.filter(item => item.tip === "ODEME" && item.durum !== "IPTAL");
+        const avanslar = odemeler
+            .filter(item => Number(item.sonrakiBakiye) < 0)
+            .map(item => ({ ...item, avansTutari: Math.min(Number(item.tutar || 0), Math.abs(Number(item.sonrakiBakiye || 0))) }));
+        const toplamAlis = alislar.reduce((sum, item) => sum + Number(item.genelToplam || 0), 0);
+        const toplamOdeme = odemeler.reduce((sum, item) => sum + Number(item.tutar || 0), 0);
+        const toplamIade = iadeler.reduce((sum, item) => sum + Number(item.genelToplam || 0), 0);
+
+        return res.json({
+            basarili: true,
+            tedarikci,
+            bakiye: {
+                tutar: Number(tedarikci.bakiye || 0),
+                durum: Number(tedarikci.bakiye || 0) > 0 ? "BORC" : Number(tedarikci.bakiye || 0) < 0 ? "AVANS_ALACAK" : "KAPALI"
+            },
+            alislar,
+            odemeler,
+            avanslar,
+            iadeler,
+            siparisler,
+            cariHareketler: hareketler,
+            ekstre: hareketler,
+            vadeler,
+            sonIslemler: hareketler.slice(0, 10),
+            ozet: { toplamAlis, toplamOdeme, toplamIade, acikFatura: vadeler.reduce((sum, item) => sum + item.kalanTutar, 0) }
         });
     } catch (error) {
         next(error);
@@ -241,6 +314,7 @@ async function sil(req, res, next) {
 module.exports = {
     listele,
     detay,
+    merkez,
     olustur,
     guncelle,
     durumDegistir,

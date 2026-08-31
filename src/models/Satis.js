@@ -191,5 +191,6 @@ SatisSchema.index({
     tarih: -1
 });
 
+SatisSchema.plugin(require("./plugins/transactionPlugin"));
 module.exports = mongoose.model("Satis", SatisSchema);
 

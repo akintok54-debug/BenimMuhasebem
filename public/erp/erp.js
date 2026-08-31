@@ -66,7 +66,16 @@
         return `Sayın ${musteriAdi || "Yetkili"},\n\n${firmaAdi} tarafından hazırlanan ${belgeAdi.toLocaleLowerCase("tr-TR")}${belgeNo ? ` (${belgeNo})` : ""} ${link ? "aşağıdaki güvenli bağlantıda" : ek ? "ekte" : "bilgilerinize"} sunulmuştur.${link ? `\n\n${link}` : ""}\n\nBelgeyle ilgili sorularınız için bizimle iletişime geçebilirsiniz.\n\nSaygılarımızla,\n${firmaAdi}`;
     }
 
+    const devamEdenMutasyonlar = new Map();
+
     async function api(url, options = {}) {
+        const method = String(options.method || "GET").toUpperCase();
+        const mutasyon = !["GET", "HEAD", "OPTIONS"].includes(method);
+        const parmakIzi = mutasyon ? `${method}:${url}:${String(options.body || "")}` : null;
+        if (parmakIzi && devamEdenMutasyonlar.has(parmakIzi)) {
+            return devamEdenMutasyonlar.get(parmakIzi);
+        }
+
         const headers = {
             Accept: "application/json",
             ...(options.headers || {})
@@ -76,9 +85,15 @@
             headers["Content-Type"] = "application/json";
         }
 
-        if (!["GET", "HEAD", "OPTIONS"].includes(String(options.method || "GET").toUpperCase())) {
+        if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
             const csrf = sessionStorage.getItem("bmCsrfToken");
             if (csrf) headers["X-CSRF-Token"] = csrf;
+        }
+
+        if (mutasyon && !headers["Idempotency-Key"]) {
+            let bodyTransactionId = "";
+            try { bodyTransactionId = JSON.parse(options.body || "{}")?.transactionId || ""; } catch (_) {}
+            headers["Idempotency-Key"] = String(options.transactionId || bodyTransactionId || globalThis.crypto?.randomUUID?.() || `tx-${Date.now()}-${Math.random().toString(36).slice(2)}`);
         }
 
         const t = token();
@@ -88,30 +103,39 @@
                 : `Bearer ${t}`;
         }
 
-        const response = await fetch(url, {
-            ...options,
-            headers,
-            credentials: "include"
-        });
+        const istek = (async () => {
+            const response = await fetch(url, {
+                ...options,
+                headers,
+                credentials: "include"
+            });
 
-        const text = await response.text();
-        let data = null;
+            const text = await response.text();
+            let data = null;
 
+            try {
+                data = text ? JSON.parse(text) : {};
+            } catch {
+                data = { message: text };
+            }
+
+            if (!response.ok) {
+                throw new Error(
+                    data?.mesaj ||
+                    data?.message ||
+                    `API hatası: ${response.status}`
+                );
+            }
+
+            return data;
+        })();
+
+        if (parmakIzi) devamEdenMutasyonlar.set(parmakIzi, istek);
         try {
-            data = text ? JSON.parse(text) : {};
-        } catch {
-            data = { message: text };
+            return await istek;
+        } finally {
+            if (parmakIzi && devamEdenMutasyonlar.get(parmakIzi) === istek) devamEdenMutasyonlar.delete(parmakIzi);
         }
-
-        if (!response.ok) {
-            throw new Error(
-                data?.mesaj ||
-                data?.message ||
-                `API hatası: ${response.status}`
-            );
-        }
-
-        return data;
     }
 
     let oturumKullanici = null;
@@ -3371,23 +3395,21 @@
     }
 
     async function cariYukle() {
-        setTitle("Cari");
+        setTitle("Cari Kontrol");
         loading();
 
         try {
             const musteriErisimi = oturumYetkisiVar("customer.read");
             const tedarikciErisimi = oturumYetkisiVar("supplier.read");
-            const [ozetData, musteriData, tedarikciData, profilData] =
+            const [ozetData, musteriData, tedarikciData] =
                 await Promise.all([
                     api("/api/tenant/cari/ozet"),
                     musteriErisimi ? api("/api/tenant/musteriler") : Promise.resolve({ musteriler: [] }),
-                    tedarikciErisimi ? api("/api/tenant/tedarikciler") : Promise.resolve({ tedarikciler: [] }),
-                    api("/api/auth/profil")
+                    tedarikciErisimi ? api("/api/tenant/tedarikciler") : Promise.resolve({ tedarikciler: [] })
                 ]);
 
             const musteriler = musteriData.musteriler || [];
             const tedarikciler = tedarikciData.tedarikciler || [];
-            const oturumKullanici = profilData.kullanici || {}, bakiyeDuzeltYetkisi = ["OWNER", "ADMIN", "SUPER_ADMIN"].includes(oturumKullanici.rol) || (oturumKullanici.ozelYetkiler || []).includes("balance.adjust");
 
             content.innerHTML = `
                 <div class="dashboard-panel">
@@ -3436,13 +3458,7 @@
                         </button>` : ""}
                         </div>
 
-                        <button
-                            type="button"
-                            class="erp-primary-button"
-                            id="yeniMusteriBtn"
-                        >
-                            + Yeni Müşteri
-                        </button>
+                        <span class="dashboard-card-info">Toplu bakiye ve ekstre kontrolü · işlemler ilgili müşteri/tedarikçi kartındadır.</span>
                     </div>
 
                     <input id="cariArama"
@@ -3455,10 +3471,8 @@
 
             let aktif = musteriErisimi ? "musteri" : "tedarikci";
             const arama = document.getElementById("cariArama");
-            const yeniCariBtn = document.getElementById("yeniMusteriBtn");
 
             const render = () => {
-                yeniCariBtn.textContent = aktif === "musteri" ? "+ Yeni Müşteri" : "+ Yeni Tedarikçi";
                 const q = arama.value.trim().toLocaleLowerCase("tr-TR");
                 const kaynakListe = aktif === "musteri" ? musteriler : tedarikciler;
                 const list = kaynakListe
@@ -3502,12 +3516,7 @@
                                                         data-cari-tip="${aktif}">
                                                     Ekstre
                                                 </button>
-                                                <button type="button" class="erp-small-button" data-cari-islem="${item._id}" data-cari-tip="${aktif}">Cari İşlem</button>
-                                                <button type="button" class="erp-small-button" data-cari-tahsilat="${item._id}" data-cari-tip="${aktif}">${aktif === "musteri" ? "Tahsilat Al" : "Tedarikçiden Tahsilat"}</button>
-                                                <button type="button" class="erp-small-button" data-cari-odeme-yap="${item._id}" data-cari-tip="${aktif}">${aktif === "musteri" ? "Müşteriye Öde" : "Tedarikçiye Öde"}</button>
-                                                ${bakiyeDuzeltYetkisi ? `<button type="button" class="erp-small-button" data-cari-bakiye="${item._id}" data-cari-tip="${aktif}">Bakiye Düzelt</button>` : ""}
-                                                <button type="button" class="erp-small-button" data-cari-durum="${item._id}" data-cari-tip="${aktif}" data-cari-aktif="${item.aktif !== false}">${item.aktif === false ? "Aktif Et" : "Pasife Al"}</button>
-                                                <button type="button" class="erp-small-button danger-button" data-cari-sil="${item._id}" data-cari-tip="${aktif}">Sil</button>
+                                                <small>Kartı açmak için satıra tıklayın</small>
                                             </div>
                                         </td>
                                     </tr>
@@ -3535,12 +3544,6 @@
             arama.addEventListener("input", render);
             render();
 
-            document
-                .getElementById("yeniMusteriBtn")
-                ?.addEventListener(
-                    "click",
-                    () => aktif === "musteri" ? yeniMusteriPaneli() : tedarikciFormAc()
-                );
         } catch (error) {
             errorBox(error);
         }
@@ -3944,12 +3947,53 @@
     }
 
     async function tedarikciDashboardAc(id, aktifSekme = "ozet") {
-        loading("Tedarikçi paneli hazırlanıyor..."); const [d, a, c, i, s] = await Promise.all([api(`/api/tenant/tedarikciler/${id}`), api(`/api/tenant/alis?tedarikciId=${id}`), api(`/api/tenant/cari/hareketler?tarafTipi=TEDARIKCI&tarafId=${id}`), api(`/api/tenant/alis/iade?tedarikciId=${id}`), api(`/api/tenant/alis/siparis?tedarikciId=${id}`)]); const t = d.tedarikci; tedarikciV2Index = Math.max(0, tedarikciV2Liste.findIndex(x => x._id === id)); const alislar = a.alislar || [], hareketler = c.hareketler || [], iadeler = i.iadeler || [], siparisler = s.siparisler || []; const simdi = new Date(), aylik = alislar.filter(x => { const dt = new Date(x.tarih); return dt.getMonth() === simdi.getMonth() && dt.getFullYear() === simdi.getFullYear(); }).reduce((n, x) => n + Number(x.genelToplam || 0), 0), yillik = alislar.filter(x => new Date(x.tarih).getFullYear() === simdi.getFullYear()).reduce((n, x) => n + Number(x.genelToplam || 0), 0), toplam = alislar.reduce((n, x) => n + Number(x.genelToplam || 0), 0);
-        const odenenCari = hareketler.filter(x => x.tip === "ODEME").reduce((n, x) => n + Number(x.tutar || 0), 0), vadeGun = Number(t.vadeGun || 0), yediGun = new Date(simdi.getTime() + 7 * 86400000), vadesiYaklasan = alislar.filter(x => Number(x.kalanTutar || 0) > 0 && new Date(new Date(x.tarih).getTime() + vadeGun * 86400000) <= yediGun).reduce((n, x) => n + Number(x.kalanTutar || 0), 0);
-        setTitle("Tedarikçi"); content.innerHTML = `<div class="supplier-hero"><div><span>${escapeHtml(t.kod)}</span><h2>${escapeHtml(tedarikciAdi(t))}</h2><p>${escapeHtml(t.yetkili || "Yetkili belirtilmemiş")} · ${escapeHtml(t.telefon || "Telefon yok")}</p></div><div class="supplier-nav"><button id="tedOnceki" ${tedarikciV2Index <= 0 ? "disabled" : ""}>← Önceki</button><button id="tedListe">Tedarikçi Listesi</button><button id="tedSonraki" ${tedarikciV2Index >= tedarikciV2Liste.length - 1 ? "disabled" : ""}>Sonraki →</button></div></div><div class="dashboard-grid">${card("Güncel Borç", para(t.bakiye), "Cari bakiye")}${card("Ödenen", para(odenenCari), "Cari ödemeler")}${card("Kalan Borç", para(t.bakiye), "Ödenecek")}${card("Bu Ay Alış", para(aylik), "Aylık")}${card("Bu Yıl Alış", para(yillik), "Yıllık")}${card("Toplam Alış", para(toplam), `${alislar.length} belge`)}${card("Vadesi Yaklaşan", para(vadesiYaklasan), "7 gün içinde")}</div><div class="supplier-tabs">${[["ozet", "Özet"], ["alis", "Alış Yap"], ["alislar", "Alışlar"], ["odeme", "Ödeme Yap"], ["cari", "Cari / Ekstre"], ["iade", "Alış İade"], ["iadeler", "İadeler"], ["siparis", "Sipariş Oluştur"], ["siparisler", "Siparişler"], ["whatsapp", "WhatsApp"], ["bilgiler", "Bilgiler / Düzenle"]].map(([k, l]) => `<button data-ted-tab="${k}" class="${aktifSekme === k ? "active" : ""}">${l}</button>`).join("")}</div><div id="tedarikciSekme"></div>`;
-        const panel = content.querySelector("#tedarikciSekme"); const tablo = (baslik, rows, noKey) => `<div class="dashboard-panel"><div class="panel-heading"><div><h2>${baslik}</h2><p>${rows.length} kayıt</p></div></div><div class="table-scroll"><table><thead><tr><th>Tarih</th><th>Belge</th><th>Tutar</th><th>Durum/Açıklama</th></tr></thead><tbody>${rows.length ? rows.map(x => `<tr><td>${tarihKisa(x.tarih)}</td><td>${escapeHtml(x[noKey] || x.belgeNo || x.belgeNo || "-")}</td><td>${para(x.genelToplam || x.tutar)}</td><td>${escapeHtml(x.durum || x.aciklama || x.notlar || "-")}</td></tr>`).join("") : `<tr><td colspan="4">Henüz kayıt yok.</td></tr>`}</tbody></table></div></div>`;
-        const cariTablo = () => { let bakiye = 0; const sirali = [...hareketler].sort((a, b) => new Date(a.tarih) - new Date(b.tarih)); return `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Tedarikçi Cari Ekstresi</h2><p>Normal ve detaylı hareket görünümü</p></div><div><button class="erp-small-button" id="tedNormal">Normal Ekstre</button> <button class="erp-primary-button" id="tedDetay">Detaylı Ekstre</button></div></div><div class="table-scroll"><table><thead><tr><th>Tarih</th><th>İşlem</th><th>Belge</th><th class="ted-detay">Açıklama</th><th>Borç</th><th>Alacak</th><th>Bakiye</th></tr></thead><tbody>${sirali.map(x => { const borc = x.tip === "ODEME" || x.tip === "IADE" ? Number(x.tutar || 0) : 0, alacak = borc ? 0 : Number(x.tutar || 0); bakiye += alacak - borc; return `<tr><td>${tarihKisa(x.tarih)}</td><td>${escapeHtml(x.tip)}</td><td>${escapeHtml(x.belgeNo || "-")}</td><td class="ted-detay">${escapeHtml(x.aciklama || "-")}</td><td>${borc ? para(borc) : "-"}</td><td>${alacak ? para(alacak) : "-"}</td><td><b>${para(bakiye)}</b></td></tr>`; }).join("") || `<tr><td colspan="7">Henüz cari hareket yok.</td></tr>`}</tbody></table></div></div>`; };
-        const sekmeAc = async key => { if (key === "alis") return tedarikciBelgeFormu("alis", t); if (key === "odeme") return tedarikciOdemeFormu(t); if (key === "iade") return tedarikciBelgeFormu("iade", t); if (key === "siparis") return tedarikciBelgeFormu("siparis", t); if (key === "bilgiler") return tedarikciFormAc(t); if (key === "whatsapp") { const tel = String(t.whatsapp || t.telefon || "").replace(/\D/g, ""); if (!tel) return alert("Tedarikçinin WhatsApp numarası yok."); window.open(`https://wa.me/${tel}?text=${encodeURIComponent(`${tedarikciAdi(t)} cari bakiye: ${para(t.bakiye)}`)}`, "_blank", "noopener"); return; } if (key === "alislar") panel.innerHTML = tablo("Alışlar", alislar, "belgeNo"); else if (key === "iadeler") panel.innerHTML = tablo("Alış İadeleri", iadeler, "belgeNo"); else if (key === "siparisler") panel.innerHTML = tablo("Satın Alma Siparişleri", siparisler, "siparisNo"); else if (key === "cari") { panel.innerHTML = cariTablo(); panel.querySelector("#tedNormal").onclick = () => panel.querySelectorAll(".ted-detay").forEach(x => x.style.display = "none"); panel.querySelector("#tedDetay").onclick = () => panel.querySelectorAll(".ted-detay").forEach(x => x.style.display = ""); } else panel.innerHTML = `<div class="dashboard-panel"><h2>Tedarikçi Özeti</h2><div class="supplier-info"><div><b>Yetkili</b><span>${escapeHtml(t.yetkili || "-")}</span></div><div><b>Telefon</b><span>${escapeHtml(t.telefon || "-")}</span></div><div><b>WhatsApp</b><span>${escapeHtml(t.whatsapp || "-")}</span></div><div><b>E-posta</b><span>${escapeHtml(t.email || "-")}</span></div><div><b>Vergi No</b><span>${escapeHtml(t.vergiNo || "-")}</span></div><div><b>IBAN</b><span>${escapeHtml(t.iban || "-")}</span></div></div></div>`; }; content.querySelectorAll("[data-ted-tab]").forEach(b => b.onclick = () => sekmeAc(b.dataset.tedTab)); content.querySelector("#tedListe").onclick = tedarikcilerYukle; content.querySelector("#tedOnceki").onclick = () => tedarikciDashboardAc(tedarikciV2Liste[tedarikciV2Index - 1]._id); content.querySelector("#tedSonraki").onclick = () => tedarikciDashboardAc(tedarikciV2Liste[tedarikciV2Index + 1]._id); await sekmeAc(aktifSekme);
+        loading("Tedarikçi kartı hazırlanıyor...");
+        const merkez = await api(`/api/tenant/tedarikciler/${encodeURIComponent(id)}/merkez`);
+        const t = merkez.tedarikci;
+        const alislar = merkez.alislar || [], hareketler = merkez.cariHareketler || [];
+        const iadeler = merkez.iadeler || [], odemeler = merkez.odemeler || [];
+        const avanslar = merkez.avanslar || [], vadeler = merkez.vadeler || [];
+        const siparisler = merkez.siparisler || [], sonIslemler = merkez.sonIslemler || [];
+        tedarikciV2Index = Math.max(0, tedarikciV2Liste.findIndex(x => String(x._id) === String(id)));
+        const bakiyeEtiketi = merkez.bakiye?.durum === "AVANS_ALACAK" ? "Tedarikçi Avansı" : merkez.bakiye?.durum === "KAPALI" ? "Kapalı Bakiye" : "Güncel Borç";
+
+        setTitle("Tedarikçi");
+        content.innerHTML = `<div class="supplier-hero"><div><span>${escapeHtml(t.kod)}</span><h2>${escapeHtml(tedarikciAdi(t))}</h2><p>${escapeHtml(t.yetkili || "Yetkili belirtilmemiş")} · ${escapeHtml(t.telefon || "Telefon yok")} · Vade ${Number(t.vadeGun || 0)} gün</p></div><div class="supplier-nav"><button id="tedOnceki" ${tedarikciV2Index <= 0 ? "disabled" : ""}>← Önceki</button><button id="tedListe">Tedarikçi Listesi</button><button id="tedSonraki" ${tedarikciV2Index >= tedarikciV2Liste.length - 1 ? "disabled" : ""}>Sonraki →</button></div></div>
+        <div class="musteri-toolbar"><button class="dashboard-action dashboard-action-green" id="tedHizliAlis">+ Yeni Alış</button><button class="dashboard-action dashboard-action-blue" id="tedHizliOdeme">Hızlı Ödeme</button><button class="dashboard-action shortcut-orange" id="tedHizliIade">İade</button><button class="dashboard-action dashboard-action-purple" id="tedEkstrePdf">PDF Ekstre</button><button class="dashboard-action dashboard-action-purple" id="tedEkstreExcel">Excel Ekstre</button></div>
+        <div class="dashboard-grid">${card(bakiyeEtiketi, para(Math.abs(Number(t.bakiye || 0))), merkez.bakiye?.durum || "Cari bakiye")}${card("Toplam Alış", para(merkez.ozet?.toplamAlis), `${alislar.length} fatura`)}${card("Ödemeler", para(merkez.ozet?.toplamOdeme), `${odemeler.length} hareket`)}${card("Avans", para(Math.abs(Math.min(0, Number(t.bakiye || 0)))), `${avanslar.length} avans hareketi`)}${card("İadeler", para(merkez.ozet?.toplamIade), `${iadeler.length} belge`)}${card("Açık Fatura", para(merkez.ozet?.acikFatura), `${vadeler.length} vade`)}</div>
+        <div class="supplier-tabs">${[["ozet", "Son İşlemler"], ["alislar", "Alış Faturaları"], ["odemeler", "Ödemeler"], ["avanslar", "Avanslar"], ["iadeler", "İadeler"], ["cari", "Cari Hareketler / Ekstre"], ["vadeler", "Vade"], ["siparisler", "Siparişler"], ["bilgiler", "Kart Bilgileri"]].map(([k, l]) => `<button data-ted-tab="${k}" class="${aktifSekme === k ? "active" : ""}">${l}</button>`).join("")}</div><div id="tedarikciSekme"></div>`;
+
+        const panel = content.querySelector("#tedarikciSekme");
+        const tablo = (baslik, rows, noKey = "belgeNo", tutarKey = "tutar") => `<div class="dashboard-panel"><div class="panel-heading"><div><h2>${baslik}</h2><p>${rows.length} kayıt · tek tedarikçi kartından görüntüleniyor</p></div></div><div class="table-scroll"><table><thead><tr><th>Tarih</th><th>Belge</th><th>Tutar</th><th>Durum / Açıklama</th></tr></thead><tbody>${rows.length ? rows.map(x => `<tr><td>${tarihKisa(x.tarih)}</td><td>${escapeHtml(x[noKey] || x.belgeNo || "-")}</td><td>${para(x[tutarKey] ?? x.genelToplam ?? x.tutar)}</td><td>${escapeHtml(x.odemeDurumu || x.durum || x.aciklama || x.notlar || "-")}</td></tr>`).join("") : `<tr><td colspan="4">Henüz kayıt yok.</td></tr>`}</tbody></table></div></div>`;
+        const ekstreTablo = () => {
+            let bakiye = 0;
+            const sirali = [...hareketler].sort((a, b) => new Date(a.tarih) - new Date(b.tarih));
+            return `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Tedarikçi Cari Ekstresi</h2><p>Tüm modüller aynı cari hareket kaynağını kullanır.</p></div><div><button class="erp-small-button" id="tedNormal">Normal</button> <button class="erp-small-button" id="tedDetay">Detaylı</button> <button class="erp-primary-button" id="tedPanelPdf">PDF</button> <button class="erp-primary-button" id="tedPanelExcel">Excel</button></div></div><div class="table-scroll"><table><thead><tr><th>Tarih</th><th>İşlem</th><th>Belge</th><th class="ted-detay">Açıklama</th><th>Borç</th><th>Alacak</th><th>Bakiye</th></tr></thead><tbody>${sirali.map(x => { const degisim = x.bakiyeDegisimi !== null && x.bakiyeDegisimi !== undefined ? Number(x.bakiyeDegisimi) : (["ODEME", "IADE"].includes(x.tip) ? -Number(x.tutar || 0) : Number(x.tutar || 0)); bakiye += degisim; return `<tr><td>${tarihKisa(x.tarih)}</td><td>${escapeHtml(x.tip)}</td><td>${escapeHtml(x.belgeNo || "-")}</td><td class="ted-detay">${escapeHtml(x.aciklama || "-")}</td><td>${degisim > 0 ? para(degisim) : "-"}</td><td>${degisim < 0 ? para(Math.abs(degisim)) : "-"}</td><td><b>${para(bakiye)}</b></td></tr>`; }).join("") || `<tr><td colspan="7">Henüz cari hareket yok.</td></tr>`}</tbody></table></div></div>`;
+        };
+        const ekstreExcel = () => { if (!window.XLSX) return alert("Excel kitaplığı yüklenemedi."); const ws = XLSX.utils.json_to_sheet([...hareketler].reverse().map(x => ({ Tarih: String(x.tarih || "").slice(0, 10), İşlem: x.tip, "Belge No": x.belgeNo || "", Açıklama: x.aciklama || "", Tutar: Number(x.tutar || 0), "Bakiye Değişimi": Number(x.bakiyeDegisimi ?? 0), "Sonraki Bakiye": x.sonrakiBakiye }))); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Ekstre"); XLSX.writeFile(wb, `${t.kod}-tedarikci-ekstre.xlsx`); };
+        const ekstrePdf = () => stokYazdir(`${tedarikciAdi(t)} · Tedarikçi Ekstresi`, [...hareketler].reverse().map(x => [tarihKisa(x.tarih), x.tip, x.belgeNo || "-", x.aciklama || "-", para(x.tutar), para(x.sonrakiBakiye)]), ["Tarih", "İşlem", "Belge", "Açıklama", "Tutar", "Bakiye"], `Güncel bakiye: ${para(t.bakiye)}`);
+        const sekmeAc = key => {
+            content.querySelectorAll("[data-ted-tab]").forEach(b => b.classList.toggle("active", b.dataset.tedTab === key));
+            if (key === "bilgiler") return tedarikciFormAc(t);
+            if (key === "alislar") panel.innerHTML = tablo("Alış Faturaları", alislar, "belgeNo", "genelToplam");
+            else if (key === "odemeler") panel.innerHTML = tablo("Ödemeler", odemeler);
+            else if (key === "avanslar") panel.innerHTML = tablo("Avanslar", avanslar, "belgeNo", "avansTutari");
+            else if (key === "iadeler") panel.innerHTML = tablo("Alış İadeleri", iadeler, "belgeNo", "genelToplam");
+            else if (key === "siparisler") panel.innerHTML = tablo("Satın Alma Siparişleri", siparisler, "siparisNo", "genelToplam");
+            else if (key === "vadeler") panel.innerHTML = `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Vade Takibi</h2><p>Tedarikçi kartındaki ${Number(t.vadeGun || 0)} günlük vadeye göre hesaplanır.</p></div></div><div class="table-scroll"><table><thead><tr><th>Fatura</th><th>Fatura Tarihi</th><th>Vade Tarihi</th><th>Kalan</th></tr></thead><tbody>${vadeler.map(x => `<tr><td>${escapeHtml(x.belgeNo)}</td><td>${tarihKisa(x.tarih)}</td><td>${tarihKisa(x.vadeTarihi)}</td><td><b>${para(x.kalanTutar)}</b></td></tr>`).join("") || '<tr><td colspan="4">Açık vadeli fatura yok.</td></tr>'}</tbody></table></div></div>`;
+            else if (key === "cari") { panel.innerHTML = ekstreTablo(); panel.querySelector("#tedNormal").onclick = () => panel.querySelectorAll(".ted-detay").forEach(x => x.style.display = "none"); panel.querySelector("#tedDetay").onclick = () => panel.querySelectorAll(".ted-detay").forEach(x => x.style.display = ""); panel.querySelector("#tedPanelPdf").onclick = ekstrePdf; panel.querySelector("#tedPanelExcel").onclick = ekstreExcel; }
+            else panel.innerHTML = `${tablo("Son İşlemler", sonIslemler)}<div class="dashboard-panel"><h2>Kart Özeti</h2><div class="supplier-info"><div><b>Yetkili</b><span>${escapeHtml(t.yetkili || "-")}</span></div><div><b>Telefon</b><span>${escapeHtml(t.telefon || "-")}</span></div><div><b>E-posta</b><span>${escapeHtml(t.email || "-")}</span></div><div><b>Vergi No</b><span>${escapeHtml(t.vergiNo || "-")}</span></div><div><b>IBAN</b><span>${escapeHtml(t.iban || "-")}</span></div><div><b>Vade</b><span>${Number(t.vadeGun || 0)} gün</span></div></div></div>`;
+        };
+        content.querySelectorAll("[data-ted-tab]").forEach(b => b.onclick = () => sekmeAc(b.dataset.tedTab));
+        content.querySelector("#tedHizliAlis").onclick = () => tedarikciBelgeFormu("alis", t);
+        content.querySelector("#tedHizliOdeme").onclick = () => tedarikciOdemeFormu(t);
+        content.querySelector("#tedHizliIade").onclick = () => tedarikciBelgeFormu("iade", t);
+        content.querySelector("#tedEkstrePdf").onclick = ekstrePdf;
+        content.querySelector("#tedEkstreExcel").onclick = ekstreExcel;
+        content.querySelector("#tedListe").onclick = tedarikcilerYukle;
+        content.querySelector("#tedOnceki").onclick = () => tedarikciDashboardAc(tedarikciV2Liste[tedarikciV2Index - 1]._id);
+        content.querySelector("#tedSonraki").onclick = () => tedarikciDashboardAc(tedarikciV2Liste[tedarikciV2Index + 1]._id);
+        sekmeAc(aktifSekme);
     }
 
     function tedarikciExcelPaneli() {
@@ -3964,17 +4008,28 @@
     let alisMerkezi = { alislar: [], iadeler: [], tedarikciler: [] };
 
     async function alisMerkeziYukle(aktifSekme = "alislar") {
-        setTitle("Alışlar"); loading("Alış merkezi hazırlanıyor...");
+        setTitle("Alışlar"); loading("Alış faturaları hazırlanıyor...");
         try {
-            const [a, i, t] = await Promise.all([api("/api/tenant/alis"), api("/api/tenant/alis/iade"), api("/api/tenant/tedarikciler")]);
-            alisMerkezi = { alislar: a.alislar || [], iadeler: i.iadeler || [], tedarikciler: (t.tedarikciler || []).filter(x => x.aktif !== false) };
-            const toplam = alisMerkezi.alislar.reduce((n, x) => n + Number(x.genelToplam || 0), 0), odenen = alisMerkezi.alislar.reduce((n, x) => n + Number(x.odenenTutar || 0), 0), kalan = alisMerkezi.alislar.reduce((n, x) => n + Number(x.kalanTutar || 0), 0), iadeToplam = alisMerkezi.iadeler.reduce((n, x) => n + Number(x.genelToplam || 0), 0), buAy = alisMerkezi.alislar.filter(x => { const d = new Date(x.tarih), n = new Date(); return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear(); }).reduce((n, x) => n + Number(x.genelToplam || 0), 0);
-            content.innerHTML = `<div class="purchase-hero"><div><span>ALIŞ MERKEZİ</span><h2>Satın alma ve tedarik kontrolü</h2><p>Alış faturalarını, ödemeleri, iadeleri ve stok girişlerini tek merkezden yönetin.</p></div><div class="stock-hero-actions"><button id="alisExcel">Excel Dökümü</button><button id="alisYazdir">Yazdır / PDF</button><button id="alisYenile">Yenile</button><button id="alisYeni">+ Yeni Alış</button></div></div><div class="dashboard-grid">${card("Toplam Alış", para(toplam), `${alisMerkezi.alislar.length} belge`)}${card("Bu Ay", para(buAy), "Aylık satın alma")}${card("Ödenen", para(odenen), "Gerçekleşen ödeme")}${card("Açık Borç", para(kalan), "Ödenecek tutar")}${card("Alış İadesi", para(iadeToplam), `${alisMerkezi.iadeler.length} belge`)}</div><div class="stock-tabs">${[["alislar", "Alış Faturaları"], ["yeni", "Yeni Alış"], ["iadeler", "Alış İadeleri"], ["iade", "Yeni İade"], ["analiz", "Tedarikçi Analizi"]].map(([k, l]) => `<button data-alis-tab="${k}" class="${aktifSekme === k ? "active" : ""}">${l}</button>`).join("")}</div><div id="alisAltPanel"></div>`;
+            const [a, t] = await Promise.all([api("/api/tenant/alis"), api("/api/tenant/tedarikciler")]);
+            alisMerkezi = { alislar: a.alislar || [], iadeler: [], tedarikciler: (t.tedarikciler || []).filter(x => x.aktif !== false) };
+            const toplam = alisMerkezi.alislar.reduce((n, x) => n + Number(x.genelToplam || 0), 0), odenen = alisMerkezi.alislar.reduce((n, x) => n + Number(x.odenenTutar || 0), 0), kalan = alisMerkezi.alislar.reduce((n, x) => n + Number(x.kalanTutar || 0), 0), buAy = alisMerkezi.alislar.filter(x => { const d = new Date(x.tarih), n = new Date(); return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear(); }).reduce((n, x) => n + Number(x.genelToplam || 0), 0);
+            content.innerHTML = `<div class="purchase-hero"><div><span>ALIŞLAR</span><h2>Alış faturaları</h2><p>Tüm alış faturalarının genel listesi, filtreleme, yeni alış ve raporlama. Tedarikçiye özel işlemler tedarikçi kartındadır.</p></div><div class="stock-hero-actions"><button id="alisExcel">Excel Raporu</button><button id="alisYazdir">PDF Raporu</button><button id="alisYenile">Yenile</button><button id="alisYeni">+ Yeni Alış</button></div></div><div class="dashboard-grid">${card("Toplam Alış", para(toplam), `${alisMerkezi.alislar.length} fatura`)}${card("Bu Ay", para(buAy), "Aylık satın alma")}${card("Ödenen", para(odenen), "Faturalarda ödenen")}${card("Açık Tutar", para(kalan), "Faturalarda kalan")}</div><div class="stock-tabs">${[["alislar", "Tüm Alış Faturaları"], ["yeni", "Yeni Alış"], ["rapor", "Raporlama"]].map(([k, l]) => `<button data-alis-tab="${k}" class="${aktifSekme === k ? "active" : ""}">${l}</button>`).join("")}</div><div id="alisAltPanel"></div>`;
             const panel = content.querySelector("#alisAltPanel");
-            const ac = key => { content.querySelectorAll("[data-alis-tab]").forEach(b => b.classList.toggle("active", b.dataset.alisTab === key)); if (key === "yeni") return alisIslemBaslat(panel, "alis"); if (key === "iade") return alisIslemBaslat(panel, "iade"); if (key === "iadeler") return alisIadeListesi(panel); if (key === "analiz") return alisTedarikciAnalizi(panel); return alisFaturaListesi(panel); };
+            const ac = key => { content.querySelectorAll("[data-alis-tab]").forEach(b => b.classList.toggle("active", b.dataset.alisTab === key)); if (key === "yeni") return alisIslemBaslat(panel, "alis"); if (key === "rapor") return alisGenelRaporu(panel); return alisFaturaListesi(panel); };
             content.querySelectorAll("[data-alis-tab]").forEach(b => b.onclick = () => ac(b.dataset.alisTab));
             content.querySelector("#alisYeni").onclick = () => ac("yeni"); content.querySelector("#alisYenile").onclick = () => alisMerkeziYukle(aktifSekme); content.querySelector("#alisExcel").onclick = alisExcelDokumu; content.querySelector("#alisYazdir").onclick = () => alisListeYazdir(alisMerkezi.alislar, "Alış Faturaları Dökümü"); ac(aktifSekme);
         } catch (error) { errorBox(error); }
+    }
+
+    function alisGenelRaporu(panel) {
+        const rows = alisMerkezi.alislar;
+        const durumlar = ["ACIK", "KISMI", "ODENDI"].map(durum => {
+            const liste = rows.filter(x => x.odemeDurumu === durum);
+            return { durum, adet: liste.length, toplam: liste.reduce((n, x) => n + Number(x.genelToplam || 0), 0), kalan: liste.reduce((n, x) => n + Number(x.kalanTutar || 0), 0) };
+        });
+        panel.innerHTML = `<div class="dashboard-panel"><div class="panel-heading"><div><h2>Genel Alış Raporu</h2><p>Alış faturalarının ödeme durumuna göre toplu görünümü</p></div><div><button id="alisRaporExcel" class="erp-small-button">Excel</button> <button id="alisRaporPdf" class="erp-primary-button">PDF</button></div></div><div class="table-scroll"><table><thead><tr><th>Durum</th><th>Fatura</th><th>Toplam</th><th>Kalan</th></tr></thead><tbody>${durumlar.map(x => `<tr><td><span class="purchase-status ${x.durum.toLowerCase()}">${x.durum}</span></td><td>${x.adet}</td><td>${para(x.toplam)}</td><td>${para(x.kalan)}</td></tr>`).join("")}</tbody></table></div></div>`;
+        panel.querySelector("#alisRaporExcel").onclick = alisExcelDokumu;
+        panel.querySelector("#alisRaporPdf").onclick = () => alisListeYazdir(rows, "Genel Alış Raporu");
     }
 
     function alisFaturaListesi(panel) {
@@ -4568,12 +4623,28 @@
         const kasalar = (data.kasalar || []).filter(x => x.aktif !== false), simdi = new Date(), bugun = `${simdi.getFullYear()}-${String(simdi.getMonth() + 1).padStart(2, "0")}-${String(simdi.getDate()).padStart(2, "0")}`;
         panel.innerHTML = `<div class="dashboard-panel cash-daily-panel"><div class="panel-heading"><div><h2>Günlük Kasa Defteri</h2><p>Dünden devir, gün içi giriş-çıkış ve kapanış bakiyesini işlem bazında izleyin.</p></div></div><div class="cash-daily-filters"><label>Kasa<select id="gunlukKasaId"><option value="">Kasa seçin</option>${kasalar.map(x => `<option value="${x._id}">${escapeHtml(x.kod)} · ${escapeHtml(x.ad)} · ${finansPara(x.bakiye,x.paraBirimi)}</option>`).join("")}</select></label><label>Rapor Tarihi<input id="gunlukKasaTarih" type="date" value="${bugun}"></label><label>Dönem<select id="gunlukKasaDonem"><option value="GUNLUK">Günlük</option><option value="HAFTALIK">Haftalık</option><option value="AYLIK">Aylık</option></select></label><div class="cash-daily-buttons"><button id="gunlukKasaGetir" class="erp-primary-button">Raporu Getir</button><button id="gunlukKasaExcel" class="erp-small-button">Excel</button><button id="gunlukKasaPdf" class="erp-small-button">Yazdır / PDF</button></div></div><div id="gunlukKasaSonuc"><div class="empty-state">Günlük kasa raporu için bir kasa seçin.</div></div></div>`;
         let son = null;
-        const hareketSatirlari = rows => `<div class="table-scroll"><table class="cash-daily-table"><thead><tr><th>Tarih / Saat</th><th>İşlem Türü</th><th>Açıklama</th><th>İlgili Cari / Personel</th><th>Belge / İşlem No</th><th>Giriş</th><th>Çıkış</th><th>İşlem Sonrası</th><th>İşlemi Yapan</th></tr></thead><tbody>${rows.length ? rows.map(x => `<tr><td><b>${new Date(x.tarih).toLocaleDateString("tr-TR")}</b><small>${new Date(x.tarih).toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}</small></td><td><span class="cash-type">${escapeHtml(x.islemTuru||x.kaynak||"Diğer")}</span></td><td>${escapeHtml(x.aciklama||"-")}</td><td>${escapeHtml([x.ilgiliKod,x.ilgiliAd].filter(Boolean).join(" · ")||"-")}<small>${escapeHtml(x.ilgiliTip||"")}</small></td><td>${escapeHtml(x.belgeNo||String(x.kaynakId||"").slice(-8).toUpperCase()||"-")}</td><td class="sales-clear">${x.tip==="GIRIS"?finansPara(x.tutar,x.paraBirimi):"-"}</td><td class="sales-debt">${x.tip==="CIKIS"?finansPara(x.tutar,x.paraBirimi):"-"}</td><td><b>${finansPara(x.yuruyenBakiye,x.paraBirimi)}</b></td><td>${escapeHtml(x.kullaniciId?.adSoyad||x.kullaniciId?.email||"Sistem")}</td></tr>`).join(""):'<tr><td colspan="9">Seçilen dönemde kasa hareketi bulunmuyor.</td></tr>'}</tbody></table></div>`;
-        const getir = async () => { const id=panel.querySelector("#gunlukKasaId").value,tarih=panel.querySelector("#gunlukKasaTarih").value,donem=panel.querySelector("#gunlukKasaDonem").value,alan=panel.querySelector("#gunlukKasaSonuc"); if(!id){alan.innerHTML='<div class="error">Lütfen kasa seçin.</div>';return;} alan.innerHTML='<div class="dashboard-loading">Kasa defteri hesaplanıyor...</div>'; try { son=await api(`/api/tenant/finans/kasalar/${encodeURIComponent(id)}/rapor?tarih=${encodeURIComponent(tarih)}&donem=${encodeURIComponent(donem)}`); const o=son.ozet||{}, kod=son.kasa?.paraBirimi||"TRY"; alan.innerHTML=`<div class="dashboard-grid cash-daily-kpis">${card("Dünden / Dönemden Devir",finansPara(o.devredenBakiye,kod),son.tarih.baslangic)}${card("Toplam Giriş",finansPara(o.toplamGiris,kod),`${son.toplam} hareket`)}${card("Toplam Çıkış",finansPara(o.toplamCikis,kod),son.donem)}${card("Gün Sonu / Dönem Sonu",finansPara(o.kapanisBakiyesi,kod),son.tarih.bitis)}</div>${son.donem!=="GUNLUK"?`<div class="table-scroll cash-period-table"><table><thead><tr><th>Gün</th><th>Devreden</th><th>Giriş</th><th>Çıkış</th><th>Kapanış</th><th>Hareket</th></tr></thead><tbody>${(son.gunler||[]).map(g=>`<tr><td><b>${new Date(`${g.gun}T12:00:00`).toLocaleDateString("tr-TR")}</b></td><td>${finansPara(g.devredenBakiye,kod)}</td><td class="sales-clear">${finansPara(g.toplamGiris,kod)}</td><td class="sales-debt">${finansPara(g.toplamCikis,kod)}</td><td><b>${finansPara(g.kapanisBakiyesi,kod)}</b></td><td>${g.hareketSayisi}</td></tr>`).join("")}</tbody></table></div>`:""}<div class="cash-flow-example"><b>Kasa eşitliği</b><span>${finansPara(o.devredenBakiye,kod)} + ${finansPara(o.toplamGiris,kod)} − ${finansPara(o.toplamCikis,kod)} = <strong>${finansPara(o.kapanisBakiyesi,kod)}</strong></span></div>${hareketSatirlari(son.hareketler||[])}`; } catch(error){alan.innerHTML=`<div class="error">${escapeHtml(error.message)}</div>`;} };
-        panel.querySelector("#gunlukKasaGetir").onclick=getir; panel.querySelector("#gunlukKasaId").onchange=getir; panel.querySelector("#gunlukKasaTarih").onchange=getir; panel.querySelector("#gunlukKasaDonem").onchange=getir;
-        panel.querySelector("#gunlukKasaExcel").onclick=()=>{if(!son)return alert("Önce kasa raporunu getirin.");if(!window.XLSX)return alert("Excel kitaplığı yüklenemedi.");const ws=XLSX.utils.json_to_sheet((son.hareketler||[]).map(x=>({"Tarih/Saat":new Date(x.tarih).toLocaleString("tr-TR"),"İşlem Türü":x.islemTuru,"Açıklama":x.aciklama,"İlgili":[x.ilgiliKod,x.ilgiliAd].filter(Boolean).join(" · "),"Belge/İşlem No":x.belgeNo||"",Giriş:x.tip==="GIRIS"?Number(x.tutar):0,Çıkış:x.tip==="CIKIS"?Number(x.tutar):0,"İşlem Sonrası Bakiye":Number(x.yuruyenBakiye),Kullanıcı:x.kullaniciId?.adSoyad||"Sistem","Para Birimi":x.paraBirimi||"TRY"})));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Kasa Hareketleri");XLSX.writeFile(wb,`kasa-raporu-${son.kasa.kod}-${son.tarih.baslangic}-${son.tarih.bitis}.xlsx`,{compression:true});};
-        panel.querySelector("#gunlukKasaPdf").onclick=()=>{if(!son)return alert("Önce kasa raporunu getirin.");const o=son.ozet,kod=son.kasa.paraBirimi||"TRY";stokYazdir(`${son.kasa.ad} · Kasa Raporu`,(son.hareketler||[]).map(x=>[new Date(x.tarih).toLocaleString("tr-TR"),x.islemTuru,x.aciklama||"-",[x.ilgiliKod,x.ilgiliAd].filter(Boolean).join(" · ")||"-",x.belgeNo||"-",x.tip==="GIRIS"?finansPara(x.tutar,kod):"-",x.tip==="CIKIS"?finansPara(x.tutar,kod):"-",finansPara(x.yuruyenBakiye,kod),x.kullaniciId?.adSoyad||"Sistem"]),["Tarih / Saat","İşlem Türü","Açıklama","İlgili","Belge","Giriş","Çıkış","Bakiye","Kullanıcı"],`Devir ${finansPara(o.devredenBakiye,kod)} · Giriş ${finansPara(o.toplamGiris,kod)} · Çıkış ${finansPara(o.toplamCikis,kod)} · Kapanış ${finansPara(o.kapanisBakiyesi,kod)}`);};
-        if(kasalar.length){panel.querySelector("#gunlukKasaId").value=kasalar[0]._id;await getir();}
+        const hareketSatirlari = rows => `<div class="table-scroll"><table class="cash-daily-table"><thead><tr><th>Tarih / Saat</th><th>İşlem Türü</th><th>Açıklama</th><th>İlgili Cari / Personel</th><th>Belge / İşlem No</th><th>Giriş</th><th>Çıkış</th><th>İşlem Sonrası</th><th>İşlemi Yapan</th></tr></thead><tbody>${rows.length ? rows.map(x => `<tr><td><b>${new Date(x.tarih).toLocaleDateString("tr-TR")}</b><small>${new Date(x.tarih).toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}</small></td><td><span class="cash-type">${escapeHtml(x.islemTuru||x.kaynak||"Diğer")}</span></td><td>${escapeHtml(x.aciklama||"-")}</td><td>${escapeHtml([x.ilgiliKod,x.ilgiliAd].filter(Boolean).join(" · ")||"-")}<small>${escapeHtml(x.ilgiliTip||"")}</small></td><td>${escapeHtml(x.islemNo||"-")}</td><td class="sales-clear">${x.tip==="GIRIS"?finansPara(x.tutar,x.paraBirimi):"-"}</td><td class="sales-debt">${x.tip==="CIKIS"?finansPara(x.tutar,x.paraBirimi):"-"}</td><td><b>${finansPara(x.yuruyenBakiye,x.paraBirimi)}</b></td><td>${escapeHtml(x.kullaniciId?.adSoyad||x.kullaniciId?.email||"Sistem")}</td></tr>`).join(""):'<tr><td colspan="9">Seçilen dönemde kasa hareketi bulunmuyor.</td></tr>'}</tbody></table></div>`;
+        const getir = async () => {
+            const id = panel.querySelector("#gunlukKasaId").value, tarih = panel.querySelector("#gunlukKasaTarih").value, donem = panel.querySelector("#gunlukKasaDonem").value, alan = panel.querySelector("#gunlukKasaSonuc");
+            if (!id) { alan.innerHTML = '<div class="error">Lütfen kasa seçin.</div>'; return; }
+            alan.innerHTML = '<div class="dashboard-loading">Kasa defteri hesaplanıyor...</div>';
+            try {
+                son = await api(`/api/tenant/finans/kasalar/${encodeURIComponent(id)}/rapor?tarih=${encodeURIComponent(tarih)}&donem=${encodeURIComponent(donem)}`);
+                const o = son.ozet || {}, kod = son.kasa?.paraBirimi || "TRY", gunluk = son.donem === "GUNLUK";
+                alan.innerHTML = `<div class="dashboard-grid cash-daily-kpis">${card(gunluk ? "Dünden Devreden Bakiye" : "Dönemden Devreden Bakiye",finansPara(o.devredenBakiye,kod),son.tarih.baslangic)}${card("Toplam Giriş",finansPara(o.toplamGiris,kod),`${son.toplam} hareket`)}${card("Toplam Çıkış",finansPara(o.toplamCikis,kod),son.donem)}${card(gunluk ? "Gün Sonu Bakiye" : "Dönem Sonu Bakiye",finansPara(o.kapanisBakiyesi,kod),son.tarih.bitis)}</div>${!gunluk?`<div class="table-scroll cash-period-table"><table><thead><tr><th>Gün</th><th>Devreden</th><th>Giriş</th><th>Çıkış</th><th>Kapanış</th><th>Hareket</th></tr></thead><tbody>${(son.gunler||[]).map(g=>`<tr><td><b>${new Date(`${g.gun}T12:00:00`).toLocaleDateString("tr-TR")}</b></td><td>${finansPara(g.devredenBakiye,kod)}</td><td class="sales-clear">${finansPara(g.toplamGiris,kod)}</td><td class="sales-debt">${finansPara(g.toplamCikis,kod)}</td><td><b>${finansPara(g.kapanisBakiyesi,kod)}</b></td><td>${g.hareketSayisi}</td></tr>`).join("")}</tbody></table></div>`:""}<div class="cash-flow-example"><b>Kasa eşitliği</b><span>${finansPara(o.devredenBakiye,kod)} + ${finansPara(o.toplamGiris,kod)} − ${finansPara(o.toplamCikis,kod)} = <strong>${finansPara(o.kapanisBakiyesi,kod)}</strong></span></div>${hareketSatirlari(son.hareketler||[])}`;
+            } catch (error) { alan.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; }
+        };
+        panel.querySelector("#gunlukKasaGetir").onclick = getir; panel.querySelector("#gunlukKasaId").onchange = getir; panel.querySelector("#gunlukKasaTarih").onchange = getir; panel.querySelector("#gunlukKasaDonem").onchange = getir;
+        panel.querySelector("#gunlukKasaExcel").onclick = () => {
+            if (!son) return alert("Önce kasa raporunu getirin."); if (!window.XLSX) return alert("Excel kitaplığı yüklenemedi.");
+            const o = son.ozet || {}, wb = XLSX.utils.book_new();
+            const ozet = XLSX.utils.json_to_sheet([{ Kasa: `${son.kasa.kod} · ${son.kasa.ad}`, Dönem: son.donem, Başlangıç: son.tarih.baslangic, Bitiş: son.tarih.bitis, "Devreden Bakiye": Number(o.devredenBakiye), "Toplam Giriş": Number(o.toplamGiris), "Toplam Çıkış": Number(o.toplamCikis), "Kapanış Bakiyesi": Number(o.kapanisBakiyesi), "Para Birimi": son.kasa.paraBirimi || "TRY" }]);
+            const gunler = XLSX.utils.json_to_sheet((son.gunler || []).map(g => ({ Gün: g.gun, Devreden: Number(g.devredenBakiye), Giriş: Number(g.toplamGiris), Çıkış: Number(g.toplamCikis), Kapanış: Number(g.kapanisBakiyesi), "Hareket Sayısı": g.hareketSayisi })));
+            const hareketler = XLSX.utils.json_to_sheet((son.hareketler || []).map(x => ({ "Tarih/Saat": new Date(x.tarih).toLocaleString("tr-TR"), "İşlem Türü": x.islemTuru, Açıklama: x.aciklama, İlgili: [x.ilgiliKod,x.ilgiliAd].filter(Boolean).join(" · "), "Belge/İşlem No": x.islemNo || "", Giriş: x.tip === "GIRIS" ? Number(x.tutar) : 0, Çıkış: x.tip === "CIKIS" ? Number(x.tutar) : 0, "İşlem Sonrası Bakiye": Number(x.yuruyenBakiye), Kullanıcı: x.kullaniciId?.adSoyad || "Sistem", "Para Birimi": x.paraBirimi || "TRY" })));
+            XLSX.utils.book_append_sheet(wb, ozet, "Özet"); XLSX.utils.book_append_sheet(wb, gunler, "Günler"); XLSX.utils.book_append_sheet(wb, hareketler, "Kasa Hareketleri"); XLSX.writeFile(wb, `kasa-raporu-${son.kasa.kod}-${son.tarih.baslangic}-${son.tarih.bitis}.xlsx`, { compression: true });
+        };
+        panel.querySelector("#gunlukKasaPdf").onclick = () => { if(!son)return alert("Önce kasa raporunu getirin.");const o=son.ozet,kod=son.kasa.paraBirimi||"TRY";stokYazdir(`${son.kasa.ad} · Kasa Raporu`,(son.hareketler||[]).map(x=>[new Date(x.tarih).toLocaleString("tr-TR"),x.islemTuru,x.aciklama||"-",[x.ilgiliKod,x.ilgiliAd].filter(Boolean).join(" · ")||"-",x.islemNo||"-",x.tip==="GIRIS"?finansPara(x.tutar,kod):"-",x.tip==="CIKIS"?finansPara(x.tutar,kod):"-",finansPara(x.yuruyenBakiye,kod),x.kullaniciId?.adSoyad||"Sistem"]),["Tarih / Saat","İşlem Türü","Açıklama","İlgili","Belge","Giriş","Çıkış","Bakiye","Kullanıcı"],`Devir ${finansPara(o.devredenBakiye,kod)} · Giriş ${finansPara(o.toplamGiris,kod)} · Çıkış ${finansPara(o.toplamCikis,kod)} · Kapanış ${finansPara(o.kapanisBakiyesi,kod)}`); };
+        if (kasalar.length) { panel.querySelector("#gunlukKasaId").value = kasalar[0]._id; await getir(); }
     }
 
     async function finansYukle(aktifSekme = "ozet") {

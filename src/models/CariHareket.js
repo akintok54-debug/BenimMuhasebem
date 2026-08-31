@@ -69,7 +69,7 @@ const CariHareketSchema = new mongoose.Schema(
         bakiyeDegisimi: { type: Number, default: null },
         oncekiBakiye: { type: Number, default: null },
         sonrakiBakiye: { type: Number, default: null },
-        durum: { type: String, enum: ["AKTIF", "IPTAL"], default: "AKTIF", index: true },
+        durum: { type: String, enum: ["AKTIF", "IPTAL_ISLENIYOR", "IPTAL"], default: "AKTIF", index: true },
         iptalTarihi: { type: Date, default: null },
         iptalNedeni: { type: String, trim: true, default: "" },
         iptalEdenKullaniciId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null },
@@ -99,5 +99,12 @@ CariHareketSchema.index({
 });
 
 CariHareketSchema.index({ tenantId: 1, islemAnahtari: 1 }, { unique: true, sparse: true });
+CariHareketSchema.pre("validate", function () {
+    const transactionId = this.transactionId || require("../services/islemBaglami").aktifTransactionId();
+    if (this.isNew && !this.islemAnahtari && transactionId) {
+        this.islemAnahtari = ["TX", transactionId, "CARI", this.tarafTipi, this.tarafId, this.tip, this.kaynak].map(String).join(":");
+    }
+});
 
+CariHareketSchema.plugin(require("./plugins/transactionPlugin"));
 module.exports = mongoose.model("CariHareket", CariHareketSchema);

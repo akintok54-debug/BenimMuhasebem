@@ -24,4 +24,5 @@ CekSenetPortfoySchema.index(
 );
 CekSenetPortfoySchema.index({ tenantId: 1, durum: 1, vadeTarihi: 1 });
 
+CekSenetPortfoySchema.plugin(require("./plugins/transactionPlugin"));
 module.exports = mongoose.model("CekSenetPortfoy", CekSenetPortfoySchema);

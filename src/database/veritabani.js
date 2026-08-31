@@ -12,6 +12,10 @@ async function veritabaniBaglan() {
         autoIndex: process.env.NODE_ENV !== "production"
     });
 
+    // Üretimde autoIndex kapalıdır; işlem tekilleştirme indeksi güvenlik kuralıdır
+    // ve boş/yeni koleksiyonda başlangıçta açıkça kurulmalıdır.
+    await require("../models/IslemKaydi").createIndexes();
+
     console.log("MongoDB bağlantısı başarılı.");
 }
 

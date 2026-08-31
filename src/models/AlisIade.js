@@ -22,4 +22,5 @@ const AlisIadeSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 AlisIadeSchema.index({ tenantId: 1, belgeNo: 1 }, { unique: true });
+AlisIadeSchema.plugin(require("./plugins/transactionPlugin"));
 module.exports = mongoose.model("AlisIade", AlisIadeSchema);

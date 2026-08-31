@@ -12,6 +12,7 @@ router.use(tenantKontrol);
 router.use(yetkiKontrol("supplier.read"));
 
 router.get("/", tedarikciController.listele);
+router.get("/:id/merkez", yetkiKontrol("purchase.read"), tedarikciController.merkez);
 router.get("/:id", tedarikciController.detay);
 router.post("/", yetkiKontrol("supplier.write"), tedarikciController.olustur);
 router.patch("/:id", yetkiKontrol("supplier.write"), tedarikciController.guncelle);

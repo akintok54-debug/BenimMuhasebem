@@ -130,4 +130,5 @@ MasrafSchema.index({
     tarih: -1
 });
 
+MasrafSchema.plugin(require("./plugins/transactionPlugin"));
 module.exports = mongoose.model("Masraf", MasrafSchema);

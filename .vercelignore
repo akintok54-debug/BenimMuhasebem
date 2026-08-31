@@ -10,3 +10,6 @@ private-backup-keys/
 uploads/
 *.SNAPSHOT-*
 *.bak
+sistem-kontrol.ps1
+scripts/backup-key-init.js
+scripts/mukerrer-finans-audit.js

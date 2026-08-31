@@ -101,11 +101,15 @@ ParaHareketSchema.index({
 
 ParaHareketSchema.index({ tenantId: 1, islemAnahtari: 1 }, { unique: true, sparse: true });
 ParaHareketSchema.pre("validate", function () {
-    if (!this.islemAnahtari && this.kaynakId && this.kaynak && this.kaynak !== "MANUEL") {
+    const transactionId = this.transactionId || require("../services/islemBaglami").aktifTransactionId();
+    if (this.isNew && !this.islemAnahtari && transactionId) {
+        this.islemAnahtari = ["TX", transactionId, "PARA", this.hesapTipi, this.hesapId, this.tip, this.kaynak].map(String).join(":");
+    } else if (!this.islemAnahtari && this.kaynakId && this.kaynak && this.kaynak !== "MANUEL") {
         this.islemAnahtari = [this.hesapTipi, this.hesapId, this.tip, this.kaynak, this.kaynakId].map(String).join(":");
     }
 });
 
+ParaHareketSchema.plugin(require("./plugins/transactionPlugin"));
 module.exports = mongoose.model(
     "ParaHareket",
     ParaHareketSchema

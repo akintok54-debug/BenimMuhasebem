@@ -33,4 +33,6 @@ PersonelFinansIslemSchema.index(
     { unique: true, partialFilterExpression: { tur: "MAAS_TAHAKKUK", durum: "AKTIF" } }
 );
 
+PersonelFinansIslemSchema.plugin(require("./plugins/transactionPlugin"));
+
 module.exports = mongoose.model("PersonelFinansIslem", PersonelFinansIslemSchema);

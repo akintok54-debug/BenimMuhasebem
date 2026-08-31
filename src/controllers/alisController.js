@@ -6,12 +6,11 @@ const Depo = require("../models/Depo");
 const Stok = require("../models/Stok");
 const StokHareket = require("../models/StokHareket");
 const Tedarikci = require("../models/Tedarikci");
-const CariHareket = require("../models/CariHareket");
 const Kasa = require("../models/Kasa");
 const Banka = require("../models/Banka");
-const ParaHareket = require("../models/ParaHareket");
 const AlisIade = require("../models/AlisIade");
 const SatinAlmaSiparis = require("../models/SatinAlmaSiparis");
+const { hareketKaydet, tedarikciAlisKaydet } = require("../services/cariHesapServisi");
 
 function tenantObjectId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
@@ -327,23 +326,23 @@ async function olustur(req, res, next) {
         /*
          * AÇIK / KISM ALIŞ -> TEDARKÇ BORCU
          */
-        tedarikci.bakiye += kalanTutar;
-        await tedarikci.save();
-
-        await CariHareket.create({ tenantId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id, tip: "ALACAK", tutar: genelToplam, belgeNo, aciklama: `Alış ${belgeNo}`, kaynak: "ALIS", kaynakId: alis._id, tarih: body.tarih || new Date(), kullaniciId: kullaniciId(req) });
-
-        if (odenenTutar > 0) {
-            odemeHesabi.bakiye -= odenenTutar;
-            await odemeHesabi.save();
-            const odemeCari = await CariHareket.create({ tenantId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id, tip: "ODEME", tutar: odenenTutar, belgeNo, aciklama: `Alış ödemesi ${belgeNo}`, kaynak: "ALIS_ODEME", kaynakId: alis._id, tarih: body.tarih || new Date(), kullaniciId: kullaniciId(req) });
-            await ParaHareket.create({ tenantId, hesapTipi, hesapId: odemeHesabi._id, tip: "CIKIS", tutar: odenenTutar, paraBirimi: odemeHesabi.paraBirimi || "TRY", belgeNo, aciklama: `Alış ödemesi ${belgeNo}`, kaynak: "ALIS_ODEME", kaynakId: odemeCari._id, tarih: body.tarih || new Date(), kullaniciId: kullaniciId(req) });
-        }
+        const muhasebe = await tedarikciAlisKaydet({
+            tenantId,
+            tedarikciId: tedarikci._id,
+            genelToplam,
+            odenenTutar,
+            hesap: odemeHesabi,
+            kaynakId: alis._id,
+            belgeNo,
+            tarih: body.tarih || new Date(),
+            kullaniciId: kullaniciId(req)
+        });
 
         return res.status(201).json({
             basarili: true,
             mesaj: "Alış kaydedildi. Stok güncellendi.",
             alis,
-            tedarikciBakiye: tedarikci.bakiye
+            tedarikciBakiye: muhasebe.taraf.bakiye
         });
     } catch (error) {
         next(error);
@@ -380,9 +379,8 @@ async function iadeOlustur(req, res, next) {
             const iadeBirimMaliyeti = kalem.birimFiyat * (1 - Number(kalem.iskonto || 0) / 100);
             await StokHareket.create({ tenantId, urunId: kalem.urunId, depoId: depo._id, tip: "IADE_CIKIS", miktar: kalem.miktar, tarih: iade.tarih, birimMaliyet: iadeBirimMaliyeti, maliyetDogrulandi: iadeBirimMaliyeti > 0, maliyetKaynagi: "ALIS_IADE_BELGESI", kaynak: "ALIS_IADE", kaynakId: iade._id, aciklama: `Alış iadesi ${belgeNo}`, kullaniciId: req.kullanici?._id || req.user?._id || null });
         }
-        tedarikci.bakiye -= genelToplam; await tedarikci.save();
-        const cariHareket = await CariHareket.create({ tenantId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id, tip: "IADE", tutar: genelToplam, belgeNo, aciklama: `Alış iadesi ${belgeNo}`, kaynak: "ALIS_IADE", kaynakId: iade._id, tarih: body.tarih || new Date(), kullaniciId: req.kullanici?._id || req.user?._id || null });
-        res.status(201).json({ basarili: true, iade, cariHareket, tedarikciBakiye: tedarikci.bakiye });
+        const muhasebe = await hareketKaydet({ tenantId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id, tip: "IADE", tutar: genelToplam, bakiyeDegisimi: -genelToplam, belgeNo, aciklama: `Alış iadesi ${belgeNo}`, kaynak: "ALIS_IADE", kaynakId: iade._id, tarih: body.tarih || new Date(), kullaniciId: req.kullanici?._id || req.user?._id || null });
+        res.status(201).json({ basarili: true, iade, cariHareket: muhasebe.cariHareket, tedarikciBakiye: muhasebe.taraf.bakiye });
     } catch (error) { next(error); }
 }
 

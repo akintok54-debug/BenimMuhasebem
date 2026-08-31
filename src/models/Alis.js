@@ -168,5 +168,6 @@ AlisSchema.index({
     tarih: -1
 });
 
+AlisSchema.plugin(require("./plugins/transactionPlugin"));
 module.exports = mongoose.model("Alis", AlisSchema);
 

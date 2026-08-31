@@ -50,10 +50,10 @@ test("Cari hareket modeli profesyonel ödeme yöntemlerini ve düzeltme izini de
     assert.ok(CariHareket.schema.path("sonrakiBakiye"));
 });
 
-test("Cari arayüzü aktif tarafa göre yeni kayıt açar ve müşteri güncellemesini CSRF uyumlu API ile yapar", () => {
+test("Cari arayüzü toplu bakiye ve ekstre kontrolüne odaklanır", () => {
     const js = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
-    assert.match(js, /aktif === "musteri" \? "\+ Yeni Müşteri" : "\+ Yeni Tedarikçi"/);
-    assert.match(js, /aktif === "musteri" \? yeniMusteriPaneli\(\) : tedarikciFormAc\(\)/);
+    assert.match(js, /Toplu bakiye ve ekstre kontrolü/);
+    assert.match(js, /Kartı açmak için satıra tıklayın/);
     assert.match(js, /await api\(`\/api\/tenant\/musteriler\/\$\{encodeURIComponent\(id\)\}`/);
     assert.match(js, /musteriTahsilatDuzenleFormu/);
     assert.match(js, /Tutarı Değiştir/);

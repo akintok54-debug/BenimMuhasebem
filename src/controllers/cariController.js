@@ -12,6 +12,7 @@ const CariEkstrePaylasim = require("../models/CariEkstrePaylasim");
 const Tenant = require("../modules/platform/models/Tenant");
 const crypto = require("crypto");
 const { etkinYetkiler } = require("../middleware/yetkiKontrol");
+const { hareketKaydet, tedarikciOdemeKaydet } = require("../services/cariHesapServisi");
 
 function tenantId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
@@ -363,7 +364,7 @@ async function musteriTahsilat(req, res, next) {
 }
 
 async function musteriTahsilatSil(req, res, next) {
-    let hareket = null, musteri = null, hesap = null, paraHareket = null, tersHareket = null, bakiyelerGuncellendi = false;
+    let hareket = null, musteri = null, hesap = null, paraHareket = null, tersHareket = null, bakiyelerGuncellendi = false, iptalSahiplenildi = false;
     try {
         const tId = tenantId(req);
         hareket = await CariHareket.findOne({
@@ -394,6 +395,13 @@ async function musteriTahsilatSil(req, res, next) {
             }
         }
 
+        const claim = await CariHareket.updateOne(
+            { _id: hareket._id, tenantId: tId, durum: "AKTIF" },
+            { $set: { durum: "IPTAL_ISLENIYOR" } }
+        );
+        if (!claim.modifiedCount) return res.status(409).json({ basarili: false, mesaj: "Tahsilat iptali başka bir istek tarafından işleniyor veya tamamlandı." });
+        iptalSahiplenildi = true;
+
         musteri.bakiye += Number(hareket.tutar || 0);
         await musteri.save();
         if (hesap) {
@@ -414,6 +422,7 @@ async function musteriTahsilatSil(req, res, next) {
             if (musteri?._id) await Musteri.updateOne({ _id: musteri._id, tenantId: tId }, { $inc: { bakiye: -Number(hareket?.tutar || 0) } }).catch(() => {});
             if (hesap?._id) { const Model = paraHareket?.hesapTipi === "KASA" ? Kasa : Banka; await Model.updateOne({ _id: hesap._id, tenantId: tId }, { $inc: { bakiye: Number(paraHareket?.tutar || 0) } }).catch(() => {}); }
         }
+        if (iptalSahiplenildi && hareket?._id) await CariHareket.updateOne({ _id: hareket._id, tenantId: tId, durum: "IPTAL_ISLENIYOR" }, { $set: { durum: "AKTIF" } }).catch(() => {});
         next(error);
     }
 }
@@ -497,34 +506,15 @@ async function musteriOdeme(req, res, next) {
         if (!musteri) return res.status(404).json({ basarili: false, mesaj: "Müşteri bulunamadı." });
         const hesap = odeme.hesapTipi ? await hesapBul(req, odeme.hesapTipi, body.hesapId) : null;
         if (odeme.hesapTipi && !hesap) return res.status(404).json({ basarili: false, mesaj: "Ödeme hesabı bulunamadı." });
-        if (hesap && Number(hesap.bakiye || 0) < tutar) return res.status(409).json({ basarili: false, mesaj: "Ödeme hesabında yeterli bakiye yok." });
-
-        const oncekiBakiye = Number(musteri.bakiye || 0);
-        musteri.bakiye = oncekiBakiye + tutar;
-        if (hesap) hesap.bakiye -= tutar;
-        await musteri.save();
-        if (hesap) await hesap.save();
-
-        try {
-            const cariHareket = await CariHareket.create({
-                tenantId: tId, tarafTipi: "MUSTERI", tarafId: musteri._id, tip: "ODEME", tutar,
-                aciklama: String(body.aciklama || "Müşteriye ödeme").trim(), kaynak: "MUSTERI_ODEME",
-                belgeNo: String(body.belgeNo || "").trim(), odemeYontemi: odeme.yontem,
-                oncekiBakiye, sonrakiBakiye: musteri.bakiye, bakiyeDegisimi: tutar,
-                tarih: body.tarih || new Date(), kullaniciId: aktorId(req)
-            });
-            const paraHareket = hesap ? await ParaHareket.create({
-                tenantId: tId, hesapTipi: odeme.hesapTipi, hesapId: hesap._id, tip: "CIKIS", tutar, paraBirimi: hesap.paraBirimi || "TRY",
-                aciklama: String(body.aciklama || "Müşteriye ödeme").trim(), kaynak: "MUSTERI_ODEME",
-                kaynakId: cariHareket._id, belgeNo: String(body.belgeNo || "").trim(), tarih: body.tarih || new Date(),
-                kullaniciId: aktorId(req)
-            }) : null;
-            return res.status(201).json({ basarili: true, mesaj: "Müşteri ödemesi kaydedildi.", musteriBakiye: musteri.bakiye, cariHareket, paraHareket });
-        } catch (error) {
-            musteri.bakiye = oncekiBakiye; await musteri.save();
-            if (hesap) { hesap.bakiye += tutar; await hesap.save(); }
-            throw error;
-        }
+        const sonuc = await hareketKaydet({
+            tenantId: tId, tarafTipi: "MUSTERI", tarafId: musteri._id,
+            tip: "ODEME", tutar, bakiyeDegisimi: tutar,
+            aciklama: String(body.aciklama || "Müşteriye ödeme").trim(), kaynak: "MUSTERI_ODEME",
+            belgeNo: body.belgeNo, odemeYontemi: odeme.yontem,
+            tarih: body.tarih || new Date(), kullaniciId: aktorId(req),
+            hesap, paraTipi: hesap ? "CIKIS" : null
+        });
+        return res.status(201).json({ basarili: true, mesaj: "Müşteri ödemesi kaydedildi.", musteriBakiye: sonuc.taraf.bakiye, cariHareket: sonuc.cariHareket, paraHareket: sonuc.paraHareket });
     } catch (error) { next(error); }
 }
 
@@ -567,18 +557,6 @@ async function tedarikciOdeme(req, res, next) {
         const odeme = odemeBilgisi(body);
         if (!odeme) return res.status(400).json({ basarili: false, mesaj: "Ödeme yöntemi nakit, kredi kartı, senet veya çek olmalıdır." });
 
-        const tedarikci = await Tedarikci.findOne({
-            _id: body.tedarikciId,
-            tenantId: tId
-        });
-
-        if (!tedarikci) {
-            return res.status(404).json({
-                basarili: false,
-                mesaj: "Tedarikçi bulunamadı."
-            });
-        }
-
         const hesap = odeme.hesapTipi ? await hesapBul(req, odeme.hesapTipi, body.hesapId) : null;
 
         if (odeme.hesapTipi && !hesap) {
@@ -588,69 +566,18 @@ async function tedarikciOdeme(req, res, next) {
             });
         }
 
-        if (hesap && hesap.bakiye < tutar) {
-            return res.status(409).json({
-                basarili: false,
-                mesaj: "Ödeme hesabında yeterli bakiye yok."
-            });
-        }
-
-        const oncekiBakiye = Number(tedarikci.bakiye || 0);
-        tedarikci.bakiye = tedarikciOdemeSonrasiBakiye(oncekiBakiye, tutar);
-        if (hesap) hesap.bakiye -= tutar;
-
-        let cariHareket = null, paraHareket = null;
-        try {
-            await tedarikci.save();
-            if (hesap) await hesap.save();
-
-            cariHareket = await CariHareket.create({
-                tenantId: tId,
-                tarafTipi: "TEDARIKCI",
-                tarafId: tedarikci._id,
-                tip: "ODEME",
-                tutar,
-                bakiyeDegisimi: -tutar,
-                oncekiBakiye,
-                sonrakiBakiye: tedarikci.bakiye,
-                aciklama: body.aciklama || "Tedarikçi ödemesi",
-                kaynak: "ODEME",
-                belgeNo: String(body.belgeNo || "").trim(),
-                odemeYontemi: odeme.yontem,
-                tarih: body.tarih || new Date(),
-                kullaniciId: aktorId(req)
-            });
-
-            paraHareket = hesap ? await ParaHareket.create({
-                tenantId: tId,
-                hesapTipi: odeme.hesapTipi,
-                hesapId: hesap._id,
-                tip: "CIKIS",
-                tutar,
-                paraBirimi: hesap.paraBirimi || "TRY",
-                aciklama: body.aciklama || "Tedarikçi ödemesi",
-                kaynak: "ODEME",
-                kaynakId: cariHareket._id,
-                belgeNo: String(body.belgeNo || "").trim(),
-                tarih: body.tarih || new Date(),
-                kullaniciId: aktorId(req)
-            }) : null;
-
-            return res.status(201).json({
-                basarili: true,
-                mesaj: tedarikci.bakiye < 0 ? "Ödeme kaydedildi; tedarikçi hesabı avans/alacak bakiyesine geçti." : "Ödeme kaydedildi.",
-                tedarikciBakiye: tedarikci.bakiye,
-                hesap,
-                cariHareket,
-                paraHareket
-            });
-        } catch (error) {
-            if (cariHareket?._id) await CariHareket.deleteOne({ _id: cariHareket._id, tenantId: tId }).catch(() => {});
-            tedarikci.bakiye = oncekiBakiye;
-            await tedarikci.save().catch(() => {});
-            if (hesap) { hesap.bakiye += tutar; await hesap.save().catch(() => {}); }
-            throw error;
-        }
+        const sonuc = await tedarikciOdemeKaydet({
+            tenantId: tId, tedarikciId: body.tedarikciId, tutar,
+            aciklama: body.aciklama || "Tedarikçi ödemesi",
+            belgeNo: body.belgeNo, odemeYontemi: odeme.yontem,
+            tarih: body.tarih || new Date(), kullaniciId: aktorId(req),
+            hesap
+        });
+        return res.status(201).json({
+            basarili: true,
+            mesaj: sonuc.taraf.bakiye < 0 ? "Ödeme kaydedildi; tedarikçi hesabı avans/alacak bakiyesine geçti." : "Ödeme kaydedildi.",
+            tedarikciBakiye: sonuc.taraf.bakiye, hesap, cariHareket: sonuc.cariHareket, paraHareket: sonuc.paraHareket
+        });
     } catch (error) {
         next(error);
     }
@@ -661,12 +588,8 @@ async function tedarikciManuelHareket(req, res, next) {
         const tId = tenantId(req), body = req.body || {}, tutar = Number(body.tutar || 0), tip = String(body.tip || "").toUpperCase();
         if (!mongoose.Types.ObjectId.isValid(String(body.tedarikciId || "")) || !["BORC", "ALACAK", "MASRAF"].includes(tip) || !Number.isFinite(tutar) || tutar <= 0) return res.status(400).json({ basarili: false, mesaj: "Tedarikçi, işlem türü ve pozitif tutar zorunludur." });
         const hareketTipi = tip === "MASRAF" ? "ALACAK" : tip, degisim = hareketTipi === "ALACAK" ? tutar : -tutar;
-        const tedarikci = await Tedarikci.findOneAndUpdate({ _id: body.tedarikciId, tenantId: tId }, { $inc: { bakiye: degisim } }, { new: true });
-        if (!tedarikci) return res.status(404).json({ basarili: false, mesaj: "Tedarikçi bulunamadı." });
-        try {
-            const hareket = await CariHareket.create({ tenantId: tId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id, tip: hareketTipi, tutar, bakiyeDegisimi: degisim, sonrakiBakiye: tedarikci.bakiye, oncekiBakiye: Number(tedarikci.bakiye) - degisim, aciklama: String(body.aciklama || "Manuel tedarikçi cari işlemi").trim(), kaynak: tip === "MASRAF" ? "MASRAF" : "MANUEL", belgeNo: String(body.belgeNo || "").trim(), tarih: body.tarih || new Date(), kullaniciId: aktorId(req) });
-            return res.status(201).json({ basarili: true, mesaj: "Tedarikçi cari hareketi kaydedildi.", tedarikciBakiye: tedarikci.bakiye, hareket });
-        } catch (error) { await Tedarikci.updateOne({ _id: tedarikci._id, tenantId: tId }, { $inc: { bakiye: -degisim } }); throw error; }
+        const sonuc = await hareketKaydet({ tenantId: tId, tarafTipi: "TEDARIKCI", tarafId: body.tedarikciId, tip: hareketTipi, tutar, bakiyeDegisimi: degisim, aciklama: String(body.aciklama || "Manuel tedarikçi cari işlemi").trim(), kaynak: tip === "MASRAF" ? "MASRAF" : "MANUEL", belgeNo: body.belgeNo, tarih: body.tarih || new Date(), kullaniciId: aktorId(req) });
+        return res.status(201).json({ basarili: true, mesaj: "Tedarikçi cari hareketi kaydedildi.", tedarikciBakiye: sonuc.taraf.bakiye, hareket: sonuc.cariHareket });
     } catch (error) { next(error); }
 }
 
@@ -678,9 +601,8 @@ async function tedarikciBakiyeDuzelt(req, res, next) {
         if (!tedarikci) return res.status(404).json({ basarili: false, mesaj: "Tedarikçi bulunamadı." });
         const oncekiBakiye = Number(tedarikci.bakiye || 0), fark = yeniBakiye - oncekiBakiye;
         if (Math.abs(fark) < 0.000001) return res.status(409).json({ basarili: false, mesaj: "Yeni bakiye mevcut bakiyeyle aynı." });
-        tedarikci.bakiye = yeniBakiye; await tedarikci.save();
-        try { const hareket = await CariHareket.create({ tenantId: tId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id, tip: "DUZELTME", tutar: Math.abs(fark), bakiyeDegisimi: fark, oncekiBakiye, sonrakiBakiye: yeniBakiye, aciklama: String(body.aciklama || "Yetkili tedarikçi bakiye düzeltmesi").trim(), kaynak: "BAKIYE_DUZELTME", belgeNo: String(body.belgeNo || "").trim(), tarih: body.tarih || new Date(), kullaniciId: aktorId(req) }); return res.json({ basarili: true, mesaj: "Tedarikçi bakiyesi düzeltildi.", tedarikciBakiye: yeniBakiye, hareket }); }
-        catch (error) { tedarikci.bakiye = oncekiBakiye; await tedarikci.save(); throw error; }
+        const sonuc = await hareketKaydet({ tenantId: tId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id, tip: "DUZELTME", tutar: Math.abs(fark), bakiyeDegisimi: fark, aciklama: String(body.aciklama || "Yetkili tedarikçi bakiye düzeltmesi").trim(), kaynak: "BAKIYE_DUZELTME", belgeNo: body.belgeNo, tarih: body.tarih || new Date(), kullaniciId: aktorId(req) });
+        return res.json({ basarili: true, mesaj: "Tedarikçi bakiyesi düzeltildi.", tedarikciBakiye: sonuc.taraf.bakiye, hareket: sonuc.cariHareket });
     } catch (error) { next(error); }
 }
 
@@ -688,11 +610,9 @@ async function tedarikciTahsilat(req, res, next) {
     try {
         const tId = tenantId(req), body = req.body || {}, tutar = Number(body.tutar || 0), odeme = odemeBilgisi(body);
         if (!mongoose.Types.ObjectId.isValid(String(body.tedarikciId || "")) || !Number.isFinite(tutar) || tutar <= 0 || !odeme) return res.status(400).json({ basarili: false, mesaj: "Tedarikçi, pozitif tutar ve geçerli ödeme yöntemi zorunludur." });
-        const tedarikci = await Tedarikci.findOne({ _id: body.tedarikciId, tenantId: tId }); if (!tedarikci) return res.status(404).json({ basarili: false, mesaj: "Tedarikçi bulunamadı." });
         const hesap = odeme.hesapTipi ? await hesapBul(req, odeme.hesapTipi, body.hesapId) : null; if (odeme.hesapTipi && !hesap) return res.status(404).json({ basarili: false, mesaj: "Tahsilat hesabı bulunamadı." });
-        const oncekiBakiye = Number(tedarikci.bakiye || 0); tedarikci.bakiye = oncekiBakiye + tutar; if (hesap) hesap.bakiye += tutar; await tedarikci.save(); if (hesap) await hesap.save();
-        try { const cariHareket = await CariHareket.create({ tenantId: tId, tarafTipi: "TEDARIKCI", tarafId: tedarikci._id, tip: "TAHSILAT", tutar, bakiyeDegisimi: tutar, oncekiBakiye, sonrakiBakiye: tedarikci.bakiye, odemeYontemi: odeme.yontem, aciklama: String(body.aciklama || "Tedarikçiden tahsilat").trim(), kaynak: "TEDARIKCI_TAHSILAT", belgeNo: String(body.belgeNo || "").trim(), tarih: body.tarih || new Date(), kullaniciId: aktorId(req) }); const paraHareket = hesap ? await ParaHareket.create({ tenantId: tId, hesapTipi: odeme.hesapTipi, hesapId: hesap._id, tip: "GIRIS", tutar, paraBirimi: hesap.paraBirimi || "TRY", aciklama: String(body.aciklama || "Tedarikçiden tahsilat").trim(), kaynak: "TEDARIKCI_TAHSILAT", kaynakId: cariHareket._id, belgeNo: String(body.belgeNo || "").trim(), tarih: body.tarih || new Date(), kullaniciId: aktorId(req) }) : null; return res.status(201).json({ basarili: true, mesaj: "Tedarikçi tahsilatı kaydedildi.", tedarikciBakiye: tedarikci.bakiye, cariHareket, paraHareket }); }
-        catch (error) { tedarikci.bakiye = oncekiBakiye; await tedarikci.save(); if (hesap) { hesap.bakiye -= tutar; await hesap.save(); } throw error; }
+        const sonuc = await hareketKaydet({ tenantId: tId, tarafTipi: "TEDARIKCI", tarafId: body.tedarikciId, tip: "TAHSILAT", tutar, bakiyeDegisimi: tutar, odemeYontemi: odeme.yontem, aciklama: String(body.aciklama || "Tedarikçiden tahsilat").trim(), kaynak: "TEDARIKCI_TAHSILAT", belgeNo: body.belgeNo, tarih: body.tarih || new Date(), kullaniciId: aktorId(req), hesap, paraTipi: hesap ? "GIRIS" : null });
+        return res.status(201).json({ basarili: true, mesaj: "Tedarikçi tahsilatı kaydedildi.", tedarikciBakiye: sonuc.taraf.bakiye, cariHareket: sonuc.cariHareket, paraHareket: sonuc.paraHareket });
     } catch (error) { next(error); }
 }
 

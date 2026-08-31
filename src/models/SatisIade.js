@@ -18,4 +18,5 @@ const SatisIadeSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 SatisIadeSchema.index({ tenantId: 1, belgeNo: 1 }, { unique: true });
+SatisIadeSchema.plugin(require("./plugins/transactionPlugin"));
 module.exports = mongoose.model("SatisIade", SatisIadeSchema);

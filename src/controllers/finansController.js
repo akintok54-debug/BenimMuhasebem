@@ -8,6 +8,7 @@ const CekSenetPortfoy = require("../models/CekSenetPortfoy");
 const Musteri = require("../models/Musteri");
 const Tedarikci = require("../models/Tedarikci");
 const Satis = require("../models/Satis");
+const Alis = require("../models/Alis");
 const Masraf = require("../models/Masraf");
 const PersonelFinansIslem = require("../models/PersonelFinansIslem");
 const Personel = require("../models/Personel");
@@ -86,16 +87,17 @@ async function hareketleriZenginlestir(tId, hareketler) {
     const ids = [...new Set(hareketler.map(x => String(x.kaynakId || "")).filter(mongoose.Types.ObjectId.isValid))].map(x => new mongoose.Types.ObjectId(x));
     const karsiKasaIds = hareketler.filter(x => x.karsiHesapTipi === "KASA" && x.karsiHesapId).map(x => x.karsiHesapId);
     const karsiBankaIds = hareketler.filter(x => x.karsiHesapTipi === "BANKA" && x.karsiHesapId).map(x => x.karsiHesapId);
-    const [cariler, satislar, masraflar, personelIslemleri, karsiKasalar, karsiBankalar] = await Promise.all([
+    const [cariler, satislar, alislar, masraflar, personelIslemleri, karsiKasalar, karsiBankalar] = await Promise.all([
         CariHareket.find({ _id: { $in: ids }, tenantId: tId }).select("tarafTipi tarafId belgeNo kaynak kaynakId").lean(),
         Satis.find({ _id: { $in: ids }, tenantId: tId }).select("musteriId belgeNo").lean(),
+        Alis.find({ _id: { $in: ids }, tenantId: tId }).select("tedarikciId belgeNo").lean(),
         Masraf.find({ _id: { $in: ids }, tenantId: tId }).select("personelId firma fisNo kategori").lean(),
         PersonelFinansIslem.find({ _id: { $in: ids }, tenantId: tId }).select("personelId belgeNo tur").lean(),
         Kasa.find({ _id: { $in: karsiKasaIds }, tenantId: tId }).select("kod ad").lean(),
         Banka.find({ _id: { $in: karsiBankaIds }, tenantId: tId }).select("kod bankaAdi").lean()
     ]);
     const musteriIds = [...cariler.filter(x => x.tarafTipi === "MUSTERI").map(x => x.tarafId), ...satislar.map(x => x.musteriId)];
-    const tedarikciIds = cariler.filter(x => x.tarafTipi === "TEDARIKCI").map(x => x.tarafId);
+    const tedarikciIds = [...cariler.filter(x => x.tarafTipi === "TEDARIKCI").map(x => x.tarafId), ...alislar.map(x => x.tedarikciId)];
     const personelIds = [...masraflar.map(x => x.personelId).filter(Boolean), ...personelIslemleri.map(x => x.personelId).filter(Boolean)];
     const [musteriler, tedarikciler, personeller] = await Promise.all([
         Musteri.find({ _id: { $in: musteriIds }, tenantId: tId }).select("kod unvan adSoyad").lean(),
@@ -103,15 +105,17 @@ async function hareketleriZenginlestir(tId, hareketler) {
         Personel.find({ _id: { $in: personelIds }, tenantId: tId }).select("kod adSoyad").lean()
     ]);
     const map = rows => new Map(rows.map(x => [String(x._id), x]));
-    const cariMap = map(cariler), satisMap = map(satislar), masrafMap = map(masraflar), personelIslemMap = map(personelIslemleri), musteriMap = map(musteriler), tedarikciMap = map(tedarikciler), personelMap = map(personeller), kasaMap = map(karsiKasalar), bankaMap = map(karsiBankalar);
+    const cariMap = map(cariler), satisMap = map(satislar), alisMap = map(alislar), masrafMap = map(masraflar), personelIslemMap = map(personelIslemleri), musteriMap = map(musteriler), tedarikciMap = map(tedarikciler), personelMap = map(personeller), kasaMap = map(karsiKasalar), bankaMap = map(karsiBankalar);
     return hareketler.map(h => {
-        const kaynakId = String(h.kaynakId || ""), cari = cariMap.get(kaynakId), satis = satisMap.get(kaynakId), masraf = masrafMap.get(kaynakId), personelIslem = personelIslemMap.get(kaynakId);
+        const kaynakId = String(h.kaynakId || ""), cari = cariMap.get(kaynakId), satis = satisMap.get(kaynakId), alis = alisMap.get(kaynakId), masraf = masrafMap.get(kaynakId), personelIslem = personelIslemMap.get(kaynakId);
         let ilgiliTip = "", ilgiliAd = "", ilgiliKod = "", belgeNo = h.belgeNo || "";
         if (cari) {
             const taraf = cari.tarafTipi === "MUSTERI" ? musteriMap.get(String(cari.tarafId)) : tedarikciMap.get(String(cari.tarafId));
             ilgiliTip = cari.tarafTipi; ilgiliAd = taraf?.unvan || taraf?.adSoyad || ""; ilgiliKod = taraf?.kod || ""; belgeNo ||= cari.belgeNo || "";
         } else if (satis) {
             const musteri = musteriMap.get(String(satis.musteriId)); ilgiliTip = "MUSTERI"; ilgiliAd = musteri?.unvan || musteri?.adSoyad || ""; ilgiliKod = musteri?.kod || ""; belgeNo ||= satis.belgeNo || "";
+        } else if (alis) {
+            const tedarikci = tedarikciMap.get(String(alis.tedarikciId)); ilgiliTip = "TEDARIKCI"; ilgiliAd = tedarikci?.unvan || tedarikci?.adSoyad || ""; ilgiliKod = tedarikci?.kod || ""; belgeNo ||= alis.belgeNo || "";
         } else if (personelIslem || masraf?.personelId) {
             const personel = personelMap.get(String(personelIslem?.personelId || masraf.personelId)); ilgiliTip = "PERSONEL"; ilgiliAd = personel?.adSoyad || masraf?.firma || ""; ilgiliKod = personel?.kod || ""; belgeNo ||= personelIslem?.belgeNo || masraf?.fisNo || "";
         } else if (masraf) {
@@ -119,7 +123,8 @@ async function hareketleriZenginlestir(tId, hareketler) {
         } else if (h.karsiHesapId) {
             const karsi = h.karsiHesapTipi === "KASA" ? kasaMap.get(String(h.karsiHesapId)) : bankaMap.get(String(h.karsiHesapId)); ilgiliTip = h.karsiHesapTipi || ""; ilgiliAd = karsi?.ad || karsi?.bankaAdi || ""; ilgiliKod = karsi?.kod || "";
         }
-        return { ...h, islemTuru: hareketTuruBelirle(h), ilgiliTip, ilgiliAd, ilgiliKod, belgeNo };
+        const islemNo = belgeNo || h.transactionId || kaynakId || String(h._id || "");
+        return { ...h, islemTuru: hareketTuruBelirle(h), ilgiliTip, ilgiliAd, ilgiliKod, belgeNo, islemNo };
     });
 }
 
@@ -303,11 +308,11 @@ async function transfer(req, res, next) {
         if (!kaynak) return res.status(409).json({ basarili: false, mesaj: "Kaynak hesap bakiyesi yetersiz." });
         const hedef = await HedefModel.findOneAndUpdate({ _id: hedefId, tenantId: tId, aktif: { $ne: false } }, { $inc: { bakiye: tutar } }, { new: true });
         if (!hedef) { await KaynakModel.updateOne({ _id: kaynakId, tenantId: tId }, { $inc: { bakiye: tutar } }); return res.status(409).json({ basarili: false, mesaj: "Hedef hesap güncellenemedi." }); }
-        const transferId = new mongoose.Types.ObjectId(), ortak = { tenantId: tId, tutar, paraBirimi: kaynak.paraBirimi || "TRY", kaynak: "TRANSFER", kaynakId: transferId, belgeNo: metin(body.belgeNo) || `TRF-${Date.now()}`, aciklama: metin(body.aciklama) || "Hesaplar arası transfer", tarih: body.tarih || new Date(), kullaniciId: kullaniciId(req) };
+        const transferId = new mongoose.Types.ObjectId(), ortak = { tenantId: tId, transactionId: req.transactionId, tutar, paraBirimi: kaynak.paraBirimi || "TRY", kaynak: "TRANSFER", kaynakId: transferId, belgeNo: metin(body.belgeNo) || `TRF-${Date.now()}`, aciklama: metin(body.aciklama) || "Hesaplar arası transfer", tarih: body.tarih || new Date(), kullaniciId: kullaniciId(req) };
         try {
             const hareketler = await ParaHareket.insertMany([
-                { ...ortak, hesapTipi: kaynakTip, hesapId: kaynak._id, tip: "CIKIS", karsiHesapTipi: hedefTip, karsiHesapId: hedef._id },
-                { ...ortak, hesapTipi: hedefTip, hesapId: hedef._id, tip: "GIRIS", karsiHesapTipi: kaynakTip, karsiHesapId: kaynak._id }
+                { ...ortak, hesapTipi: kaynakTip, hesapId: kaynak._id, tip: "CIKIS", islemAnahtari: `TX:${req.transactionId}:PARA:${kaynakTip}:${kaynak._id}:CIKIS:TRANSFER`, karsiHesapTipi: hedefTip, karsiHesapId: hedef._id },
+                { ...ortak, hesapTipi: hedefTip, hesapId: hedef._id, tip: "GIRIS", islemAnahtari: `TX:${req.transactionId}:PARA:${hedefTip}:${hedef._id}:GIRIS:TRANSFER`, karsiHesapTipi: kaynakTip, karsiHesapId: kaynak._id }
             ]);
             res.status(201).json({ basarili: true, mesaj: "Hesaplar arası transfer tamamlandı.", kaynak, hedef, hareketler });
         } catch (error) {
