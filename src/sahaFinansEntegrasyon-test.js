@@ -79,3 +79,11 @@ test("tesellüm yalnızca saha gününe açıkça bağlı tahsilatları sayar", 
     assert.match(cari, /kaynakKanal:\s*sahaIslemi\s*\?\s*"SAHA"\s*:\s*"MERKEZ"/);
     assert.match(cari, /sahaGunId:\s*sahaGun\?\._id\s*\|\|\s*null/);
 });
+
+test("saha paneli araç çıkış-dönüş kilometresini ve tıklanabilir teslim alanını gösterir", () => {
+    const arayuz = oku("../public/erp/erp.js");
+    assert.match(arayuz, /Çıkış:.*Dönüş:/);
+    assert.match(arayuz, /data-saha-teslim-ozet/);
+    assert.match(arayuz, /sahaAksiyonBagli\("teslim",\s*d\)/);
+    assert.match(arayuz, /Kasa transferinden önce saha gününü bitirin/);
+});
