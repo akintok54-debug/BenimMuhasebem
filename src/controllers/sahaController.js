@@ -66,11 +66,12 @@ async function gunBul(req, { tamamlanmisDahil = true } = {}) {
 
 async function tesellumHesapla(req, kullaniciId, gun) {
     const tenantId = tId(req), { baslangic, bitis } = sinirlar(gun), ortak = { tenantId, kullaniciId, tarih: { $gte: baslangic, $lte: bitis } };
+    const bagliSahaGun = await SahaGun.findOne({ tenantId, kullaniciId, gun }).select("_id").lean();
     const [satislar, iadeler, masraflar, tahsilatlar] = await Promise.all([
         Satis.find({ ...ortak, satisKanali: "SAHA" }).select("genelToplam odenenTutar kalanTutar odemeTipi belgeNo tarih musteriId").populate("musteriId", "kod unvan adSoyad whatsapp telefon").lean(),
         SatisIade.find({ ...ortak, satisKanali: "SAHA" }).select("genelToplam odemeTipi belgeNo tarih musteriId").lean(),
         Masraf.find({ ...ortak, durum: { $ne: "IPTAL" }, kaynak: "SAHA" }).select("kategori tutar aciklama fisNo hesapTipi").lean(),
-        CariHareket.find({ ...ortak, tarafTipi: "MUSTERI", tip: "TAHSILAT", kaynak: "TAHSILAT", durum: { $ne: "IPTAL" } }).select("tutar odemeYontemi kaynak").lean()
+        CariHareket.find({ ...ortak, tarafTipi: "MUSTERI", tip: "TAHSILAT", kaynak: "TAHSILAT", kaynakKanal: "SAHA", sahaGunId: bagliSahaGun?._id || null, durum: { $ne: "IPTAL" } }).select("tutar odemeYontemi kaynak kaynakKanal sahaGunId").lean()
     ]);
     const toplam = (liste, alan = "genelToplam") => liste.reduce((n, x) => n + Number(x[alan] || 0), 0);
     const odemeler = { nakit: 0, posKrediKarti: 0, iban: 0, cek: 0, senet: 0, acikHesap: 0 };
@@ -104,24 +105,24 @@ async function tesellumHesapla(req, kullaniciId, gun) {
 
 async function panel(req, res, next) {
     try {
-        const tenantId = tId(req), kullaniciId = hedefKullaniciId(req), gun = gunMetni(req.query.gun);
+        const tenantId = tId(req), kullaniciId = hedefKullaniciId(req), gun = gunMetni(req.query.gun), kendiHesabi = String(kullaniciId) === String(aktorId(req));
+        const sahaKasasi = await sahaKasasiBulVeyaOlustur(tenantId, kullaniciId);
         const [sahaGun, temsilciler, musteriler, kasalar, anaKasalar, bankalar] = await Promise.all([
             SahaGun.findOne({ tenantId, kullaniciId, gun }).populate("kullaniciId", "adSoyad email telefon").populate("rota.musteriId", "kod unvan adSoyad adres konum").populate("ziyaretler.musteriId", "kod unvan adSoyad whatsapp telefon").lean(),
             yonetici(req) ? Kullanici.find({ tenantId, rol: { $in: ["SALES", "SATIS"] }, aktif: true, silinmeTarihi: null }).select("adSoyad email telefon").sort({ adSoyad: 1 }).lean() : [],
             Musteri.find({ tenantId, aktif: { $ne: false }, ...(yonetici(req) ? {} : { $or: [{ temsilciId: kullaniciId }, { olusturanKullaniciId: kullaniciId }] }) }).select("kod unvan adSoyad telefon whatsapp email adres il ilce konum temsilciId bakiye notlar").sort({ unvan: 1, adSoyad: 1 }).lean(),
-            Kasa.find({ tenantId, aktif: { $ne: false }, paraBirimi: { $in: ["TRY", null] }, ...(yonetici(req) ? {} : { sorumluKullaniciId: kullaniciId, sahaKasasi: true }) }).select("kod ad kasaTuru paraBirimi sahaKasasi sorumluKullaniciId").sort({ ad: 1 }).lean(),
+            Kasa.find({ tenantId, aktif: { $ne: false }, paraBirimi: { $in: ["TRY", null] }, sorumluKullaniciId: kullaniciId, sahaKasasi: true }).select("kod ad kasaTuru paraBirimi bakiye sahaKasasi sorumluKullaniciId").sort({ ad: 1 }).lean(),
             Kasa.find({ tenantId, aktif: { $ne: false }, paraBirimi: { $in: ["TRY", null] }, sahaKasasi: { $ne: true } }).select("kod ad kasaTuru paraBirimi").sort({ ad: 1 }).lean(),
             Banka.find({ tenantId, aktif: { $ne: false }, paraBirimi: { $in: ["TRY", null] } }).select("kod bankaAdi iban paraBirimi").sort({ bankaAdi: 1 }).lean()
         ]);
         if (sahaGun && !sahaGun.sahaKasaId) {
-            const sahaKasasi = await sahaKasasiBulVeyaOlustur(tenantId, kullaniciId);
             await SahaGun.updateOne({ _id: sahaGun._id, tenantId, sahaKasaId: null }, { $set: { sahaKasaId: sahaKasasi._id } });
             sahaGun.sahaKasaId = sahaKasasi._id;
             if (!kasalar.some(x => String(x._id) === String(sahaKasasi._id))) kasalar.push({ _id: sahaKasasi._id, kod: sahaKasasi.kod, ad: sahaKasasi.ad, kasaTuru: sahaKasasi.kasaTuru, paraBirimi: sahaKasasi.paraBirimi, sahaKasasi: true, sorumluKullaniciId: sahaKasasi.sorumluKullaniciId });
         }
         const tesellum = await tesellumHesapla(req, kullaniciId, gun);
         res.set("Cache-Control", "private, no-store");
-        res.json({ basarili: true, gun, sahaGun, tesellum, temsilciler, musteriler, kasalar, anaKasalar, bankalar, seciliKullaniciId: kullaniciId, yonetici: yonetici(req) });
+        res.json({ basarili: true, gun, sahaGun, tesellum, temsilciler, musteriler, kasalar, anaKasalar, bankalar, sahaKasa: { _id: sahaKasasi._id, kod: sahaKasasi.kod, ad: sahaKasasi.ad, bakiye: sahaKasasi.bakiye, paraBirimi: sahaKasasi.paraBirimi }, seciliKullaniciId: kullaniciId, kendiHesabi, yonetici: yonetici(req) });
     } catch (error) { next(error); }
 }
 
@@ -318,7 +319,33 @@ async function teslimAl(req, res, next) {
 async function kasaTeslim(req, res, next) {
     try {
         const sahaGun = await gunBul(req);
-        if (!sahaGun) return res.status(404).json({ basarili: false, mesaj: "Saha günü bulunamadı." });
+        if (!sahaGun) {
+            const tenantId = tId(req), kullaniciId = aktorId(req), body = req.body || {}, grupId = new mongoose.Types.ObjectId();
+            if (!mongoose.Types.ObjectId.isValid(String(body.hedefKasaId || ""))) return res.status(400).json({ basarili: false, mesaj: "Ana kasa geçerli olmalıdır." });
+            const kaynak = await sahaKasasiBulVeyaOlustur(tenantId, kullaniciId);
+            const teslimEdilen = pozitif(body.teslimEdilen, "Teslim edilen tutar");
+            const hedef = await Kasa.findOne({ _id: body.hedefKasaId, tenantId, aktif: { $ne: false }, sahaKasasi: { $ne: true }, paraBirimi: { $in: ["TRY", null] } });
+            if (!hedef || String(kaynak._id) === String(hedef._id)) return res.status(404).json({ basarili: false, mesaj: "Saha kasası veya ana kasa bulunamadı." });
+            const dusum = await Kasa.updateOne({ _id: kaynak._id, tenantId, bakiye: { $gte: teslimEdilen } }, { $inc: { bakiye: -teslimEdilen } });
+            if (!dusum.modifiedCount) return res.status(409).json({ basarili: false, mesaj: "Saha kasası bakiyesi teslim tutarı için yetersiz veya işlem daha önce tamamlandı." });
+            let hedefArtti = false;
+            try {
+                await Kasa.updateOne({ _id: hedef._id, tenantId }, { $inc: { bakiye: teslimEdilen } });
+                hedefArtti = true;
+                const tarih = new Date(), belgeNo = `ST-${gunMetni(body.gun)}-${String(grupId).slice(-6).toUpperCase()}`;
+                await ParaHareket.create([
+                    { tenantId, hesapTipi: "KASA", hesapId: kaynak._id, tip: "CIKIS", tutar: teslimEdilen, paraBirimi: "TRY", aciklama: `Saha kasa gün sonu teslimi ${gunMetni(body.gun)}`, kaynak: "SAHA_KASA_TESLIM", kaynakId: grupId, kaynakKanal: "SAHA", karsiHesapTipi: "KASA", karsiHesapId: hedef._id, tarih, kullaniciId, belgeNo },
+                    { tenantId, hesapTipi: "KASA", hesapId: hedef._id, tip: "GIRIS", tutar: teslimEdilen, paraBirimi: "TRY", aciklama: `Saha kasa gün sonu teslimi ${gunMetni(body.gun)}`, kaynak: "SAHA_KASA_TESLIM", kaynakId: grupId, kaynakKanal: "SAHA", karsiHesapTipi: "KASA", karsiHesapId: kaynak._id, tarih, kullaniciId, belgeNo }
+                ]);
+                await auditKaydet({ req, action: "SAHA_KASA_GUN_SONU_TESLIM", resource: "Kasa", resourceId: String(kaynak._id), tenantId, category: "SAHA_KASA_TESLIM", severity: "BILGI", details: { gun: gunMetni(body.gun), tutar: teslimEdilen, kaynakKasaId: String(kaynak._id), hedefKasaId: String(hedef._id), transferGrupId: String(grupId) } });
+                return res.json({ basarili: true, mesaj: "Saha kasası ana kasaya aktarıldı.", kasaTeslimi: { teslimEdilen, durum: "TAM", teslimTarihi: tarih } });
+            } catch (error) {
+                if (hedefArtti) await Kasa.updateOne({ _id: hedef._id, tenantId }, { $inc: { bakiye: -teslimEdilen } }).catch(() => {});
+                await Kasa.updateOne({ _id: kaynak._id, tenantId }, { $inc: { bakiye: teslimEdilen } }).catch(() => {});
+                await ParaHareket.deleteMany({ tenantId, kaynak: "SAHA_KASA_TESLIM", kaynakId: grupId }).catch(() => {});
+                throw error;
+            }
+        }
         req.params.id = String(sahaGun._id);
         req.sahaKasaKendiTeslimi = true;
         return teslimAl(req, res, next);

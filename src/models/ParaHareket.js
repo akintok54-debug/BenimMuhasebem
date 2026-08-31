@@ -59,6 +59,20 @@ const ParaHareketSchema = new mongoose.Schema(
             default: null
         },
 
+        kaynakKanal: {
+            type: String,
+            enum: ["MERKEZ", "SAHA"],
+            default: "MERKEZ",
+            index: true
+        },
+
+        sahaGunId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "SahaGun",
+            default: null,
+            index: true
+        },
+
         islemAnahtari: { type: String, default: undefined, select: false },
         orijinalHareketId: { type: mongoose.Schema.Types.ObjectId, ref: "ParaHareket", default: null },
         tersHareketId: { type: mongoose.Schema.Types.ObjectId, ref: "ParaHareket", default: null },

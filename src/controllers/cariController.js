@@ -337,6 +337,7 @@ async function musteriTahsilat(req, res, next) {
             cariHareket = await CariHareket.create({
                 tenantId: tId, tarafTipi: "MUSTERI", tarafId: musteri._id, tip: "TAHSILAT", tutar,
                 aciklama: body.aciklama || "Müşteri tahsilatı", kaynak: "TAHSILAT",
+                kaynakKanal: sahaIslemi ? "SAHA" : "MERKEZ", sahaGunId: sahaGun?._id || null,
                 islemAnahtari,
                 belgeNo: String(body.belgeNo || "").trim(), odemeYontemi: odeme.yontem,
                 oncekiBakiye: Number(musteri.bakiye) + tutar, sonrakiBakiye: Number(musteri.bakiye), bakiyeDegisimi: -tutar,
@@ -346,6 +347,7 @@ async function musteriTahsilat(req, res, next) {
                 tenantId: tId, hesapTipi: odeme.hesapTipi, hesapId: hesap._id, tip: "GIRIS", tutar,
                 paraBirimi: hesap.paraBirimi || "TRY", aciklama: body.aciklama || "Müşteri tahsilatı",
                 kaynak: "TAHSILAT", kaynakId: cariHareket._id, tarih: body.tarih || new Date(),
+                kaynakKanal: sahaIslemi ? "SAHA" : "MERKEZ", sahaGunId: sahaGun?._id || null,
                 belgeNo: String(body.belgeNo || "").trim(), kullaniciId: aktorId(req)
             }) : null;
             if (["CEK", "SENET"].includes(odeme.yontem)) portfoy = await CekSenetPortfoy.create({ tenantId: tId, tur: odeme.yontem, hareketTipi: "GIRIS", musteriId: musteri._id, tutar, belgeNo: String(body.belgeNo || "").trim(), vadeTarihi: body.vadeTarihi || null, banka: String(body.banka || "").trim(), kesideci: String(body.kesideci || "").trim(), kaynak: "TAHSILAT", kaynakId: cariHareket._id, aciklama: body.aciklama || "Müşteri tahsilatı", kullaniciId: aktorId(req) });

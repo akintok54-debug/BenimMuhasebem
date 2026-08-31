@@ -56,6 +56,20 @@ const CariHareketSchema = new mongoose.Schema(
             default: null
         },
 
+        kaynakKanal: {
+            type: String,
+            enum: ["MERKEZ", "SAHA"],
+            default: "MERKEZ",
+            index: true
+        },
+
+        sahaGunId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "SahaGun",
+            default: null,
+            index: true
+        },
+
         islemAnahtari: { type: String, default: undefined, select: false },
 
         belgeNo: { type: String, trim: true, default: "" },

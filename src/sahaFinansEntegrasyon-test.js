@@ -15,6 +15,12 @@ test("saha nakdi personele ait tekil saha kasasına bağlanır", () => {
     assert.ok(Kasa.schema.path("sorumluKullaniciId"));
     assert.ok(Kasa.schema.path("sahaKasasi"));
     assert.ok(SahaGun.schema.path("sahaKasaId"));
+    const CariHareket = require("./models/CariHareket");
+    const ParaHareket = require("./models/ParaHareket");
+    assert.ok(CariHareket.schema.path("kaynakKanal"));
+    assert.ok(CariHareket.schema.path("sahaGunId"));
+    assert.ok(ParaHareket.schema.path("kaynakKanal"));
+    assert.ok(ParaHareket.schema.path("sahaGunId"));
     const index = Kasa.schema.indexes().find(([keys]) => keys.tenantId === 1 && keys.sorumluKullaniciId === 1);
     assert.equal(index?.[1]?.unique, true);
 });
@@ -63,4 +69,13 @@ test("saha satış kullanıcısı günü bitirdikten sonra kendi kasasını ana 
     assert.match(arayuz, /Saha Kasasını Ana Kasaya Teslim Et/);
     assert.match(arayuz, /d\.anaKasalar/);
     assert.match(arayuz, /\/api\/tenant\/saha\/kasa-teslim/);
+    assert.match(arayuz, /d\.kendiHesabi/);
+    assert.match(controller, /kaynakKanal:\s*"SAHA"/);
+});
+
+test("tesellüm yalnızca saha gününe açıkça bağlı tahsilatları sayar", () => {
+    const controller = oku("controllers/sahaController.js"), cari = oku("controllers/cariController.js");
+    assert.match(controller, /kaynakKanal:\s*"SAHA",\s*sahaGunId:/);
+    assert.match(cari, /kaynakKanal:\s*sahaIslemi\s*\?\s*"SAHA"\s*:\s*"MERKEZ"/);
+    assert.match(cari, /sahaGunId:\s*sahaGun\?\._id\s*\|\|\s*null/);
 });
