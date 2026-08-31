@@ -34,7 +34,8 @@ $dosyalar = @(
 foreach ($dosya in $dosyalar) {
     if (Test-Path $dosya) {
         Write-Host "OK  $dosya" -ForegroundColor Green
-    } else {
+    }
+    else {
         Write-Host "YOK $dosya" -ForegroundColor Red
         $hata = $true
     }
@@ -62,7 +63,7 @@ Write-Host ""
 Write-Host "[4/6] ESKI NODE ISLEMLERI TEMIZLENIYOR" -ForegroundColor Yellow
 
 Get-Process node -ErrorAction SilentlyContinue |
-    Stop-Process -Force -ErrorAction SilentlyContinue
+Stop-Process -Force -ErrorAction SilentlyContinue
 
 Start-Sleep -Seconds 1
 
@@ -80,7 +81,7 @@ if (!(Test-Path $logDir)) {
 $stdout = Join-Path $logDir "sunucu-out.log"
 $stderr = Join-Path $logDir "sunucu-error.log"
 
-Remove-Item $stdout,$stderr -Force -ErrorAction SilentlyContinue
+Remove-Item $stdout, $stderr -Force -ErrorAction SilentlyContinue
 
 $process = Start-Process `
     -FilePath "node.exe" `

@@ -7,6 +7,7 @@ server-out.log
 server-err.log
 uploads/
 backups/
+portable-backups/
 private-backup-keys/
 *.SNAPSHOT-*
 *.bak
