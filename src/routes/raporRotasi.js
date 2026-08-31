@@ -11,6 +11,9 @@ router.use(kimlikKontrol);
 router.use(tenantKontrol);
 router.use(yetkiKontrol("reports.read"));
 
+router.get("/filtreler", controller.filtreler);
+router.get("/profesyonel", controller.profesyonel);
+router.get("/detay/:kod", controller.detay);
 router.get("/genel", controller.genel);
 router.get("/satis", yetkiKontrol("customer.read"), controller.satis);
 router.get("/alis", yetkiKontrol("supplier.read"), yetkiKontrol("purchase.read"), controller.alis);

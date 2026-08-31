@@ -6,6 +6,7 @@ const Stok = require("../models/Stok");
 const CariHareket = require("../models/CariHareket");
 const Personel = require("../models/Personel");
 const { etkinYetkiler } = require("../middleware/yetkiKontrol");
+const profesyonelRaporServisi = require("../services/profesyonelRaporServisi");
 
 function tenantId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
@@ -294,11 +295,40 @@ async function personel(req, res, next) {
     }
 }
 
+async function profesyonel(req, res, next) {
+    try {
+        const rapor = await profesyonelRaporServisi.profesyonelRapor(tenantId(req), req.query || {});
+        res.set("Cache-Control", "private, no-store");
+        return res.json({ basarili: true, ...rapor });
+    } catch (error) { next(error); }
+}
+
+async function filtreler(req, res, next) {
+    try {
+        const secenekler = await profesyonelRaporServisi.filtreSecenekleri(tenantId(req));
+        res.set("Cache-Control", "private, no-store");
+        return res.json({ basarili: true, secenekler, raporlar: profesyonelRaporServisi.RAPORLAR.map(([kod, ad]) => ({ kod, ad })) });
+    } catch (error) { next(error); }
+}
+
+async function detay(req, res, next) {
+    try {
+        const kod = String(req.params.kod || ""), tanimli = profesyonelRaporServisi.RAPORLAR.some(([x]) => x === kod);
+        if (!tanimli) return res.status(404).json({ basarili: false, mesaj: "Rapor türü bulunamadı." });
+        const sonuc = await profesyonelRaporServisi.profesyonelRapor(tenantId(req), req.query || {});
+        res.set("Cache-Control", "private, no-store");
+        return res.json({ basarili: true, meta: sonuc.meta, rapor: sonuc.raporlar[kod], karsilastirma: sonuc.karsilastirma });
+    } catch (error) { next(error); }
+}
+
 module.exports = {
     genel,
     satis,
     alis,
     stok,
     cari,
-    personel
+    personel,
+    profesyonel,
+    filtreler,
+    detay
 };
