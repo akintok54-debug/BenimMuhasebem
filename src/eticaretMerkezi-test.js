@@ -116,3 +116,17 @@ test("Frontend 13 sekme, tarih/pazaryeri filtresi ve responsive tasarım sunar",
     assert.doesNotMatch(js.slice(js.indexOf("function raporHucre"), js.indexOf("function raporSatirlariniHazirla")), /JSON\.stringify/);
     assert.match(read("public/erp/index.html"), /topbar-logout/);
 });
+
+test("E-Ticaret UI beş ana gruba ayrılır ve mobilde taşmayan bölüm seçimi kullanır", () => {
+    const js = read("public/erp/erp.js"), css = read("public/erp/erp.css");
+    const gruplar = js.slice(js.indexOf("const eticaretMenuGruplari"), js.indexOf("function eticaretTarihSaat"));
+    for (const grup of ["GENEL", "PAZARYERI", "E_BELGE", "FINANS", "SISTEM"]) assert.match(gruplar, new RegExp(grup));
+    assert.match(js, /ecommerce-mobile-nav/); assert.match(js, /ecommerce-subnav/); assert.match(css, /\.ecommerce-main-tabs/);
+    assert.match(css, /@media \(max-width:760px\)/); assert.match(css, /\.ecommerce-main-tabs,\.ecommerce-subnav \{ display:none/);
+});
+
+test("Profesyonel entegrasyon UI modal, sipariş drawer, e-belge, finans ve hata araçlarını içerir", () => {
+    const js = read("public/erp/erp.js");
+    for (const metin of ["Bağlantıyı Test Et", "ecommerce-provider-grid", "ecommerce-account-card", "ecommerce-drawer", "Masraf Olarak Kaydet", "Tedarikçiye Bağla", "Cari Hesaba İşle", "Brüt Satış", "Net Hakediş", "Tekrar Dene", "Teknik detaylar güvenlik nedeniyle ana listede gösterilmez"]) assert.match(js, new RegExp(metin));
+    assert.match(js, /API Secret<input name="apiSecret" type="password"/);
+});
