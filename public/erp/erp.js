@@ -5122,7 +5122,8 @@
         ORDER_PULL: "Sipariş Alma", RETURN_PULL: "İade Alma", FINANCE_PULL: "Finans Hareketi Alma", DOCUMENT_PULL: "Belge Alma",
         PRODUCT_PUSH: "Ürün Gönderme", STOCK_PUSH: "Stok Gönderme", PRICE_PUSH: "Fiyat Gönderme", QUESTION_PULL: "Müşteri Sorusu Alma",
         AUTHENTICATION: "Kimlik Doğrulama", VALIDATION: "Veri Doğrulama", RATE_LIMIT: "İstek Sınırı", PROVIDER: "Sağlayıcı Hatası", INTERNAL: "Sistem Hatası",
-        SUCCESS: "Başarılı", ACTIVE: "Aktif", INACTIVE: "Devre Dışı", NEW: "Yeni", ANSWERED: "Yanıtlandı", CLOSED: "Kapandı"
+        SUCCESS: "Başarılı", ACTIVE: "Aktif", INACTIVE: "Devre Dışı", NEW: "Yeni", ANSWERED: "Yanıtlandı", CLOSED: "Kapandı",
+        ALINDI: "Alındı", BEKLIYOR: "Bekliyor", IPTAL: "İptal Edildi", HAZIRLANIYOR: "Hazırlanıyor", KARGODA: "Kargoda", TESLIM_EDILDI: "Teslim Edildi"
     };
     function raporKodEtiketi(value) { return RAPOR_KOD_ETIKETLERI[String(value || "").toUpperCase()] || value; }
     function raporAlanBasligi(key) {
@@ -5193,7 +5194,7 @@
     }
 
     const eticaretSekmeleri = [["overview", "Genel Bakış"], ["connections", "Pazaryeri Hesapları"], ["products", "Ürün Entegrasyonu"], ["orders", "Siparişler"], ["returns", "İade & İptaller"], ["cargo", "Kargo & Sevkiyat"], ["invoices", "E-Fatura / E-Arşiv"], ["documents", "Gelen Belgeler & Masraflar"], ["finance", "Finans / Komisyon / Hakediş"], ["categories", "Kategori & Özellik Eşleştirme"], ["sync", "Senkronizasyon Geçmişi"], ["errors", "Hatalar"], ["settings", "Ayarlar"]];
-    const eticaretProviderEtiketi = { TRENDYOL: "Trendyol", HEPSIBURADA: "Hepsiburada", N11: "N11", AMAZON_TR: "Amazon TR", CICEKSEPETI: "ÇiçekSepeti", PAZARAMA: "Pazarama", CUSTOM: "Diğer", EDOCUMENT_CUSTOM: "E-Belge Sağlayıcısı" };
+    const eticaretProviderEtiketi = new Proxy({ TRENDYOL: "Trendyol", HEPSIBURADA: "Hepsiburada", N11: "N11", AMAZON_TR: "Amazon TR", CICEKSEPETI: "ÇiçekSepeti", PAZARAMA: "Pazarama", CUSTOM: "Diğer", EDOCUMENT_CUSTOM: "E-Belge Sağlayıcısı", TEST_MAGAZA: "Test Mağaza" }, { get(target, key) { if (typeof key !== "string") return target[key]; return target[key] || key.replaceAll("_", " ").toLocaleLowerCase("tr-TR").replace(/(^|\s)\S/g, c => c.toLocaleUpperCase("tr-TR")); } });
 
     function eticaretBaglantiFormu(mevcut = null) {
         const overlay = document.createElement("div"); overlay.className = "erp-modal-overlay"; overlay.id = "eticaretModal";

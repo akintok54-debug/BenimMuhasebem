@@ -112,6 +112,7 @@ test("Frontend 13 sekme, tarih/pazaryeri filtresi ve responsive tasarım sunar",
     assert.match(js, /E-Ticaret & E-Belge Entegrasyon Merkezi/); assert.equal((sekmeler.match(/\[\"/g) || []).length, 13);
     assert.match(js, /Özel Tarih Aralığı/); assert.match(js, /Tüm Pazaryerleri/); assert.match(css, /ecommerce-tabs/); assert.match(css, /max-width: 760px/);
     assert.match(js, /eticaretTabloAraclari/); assert.match(js, /XLSX\.utils\.table_to_sheet/); assert.match(js, /Bu tabloda ara/);
+    assert.match(js, /ALINDI: "Alındı"/); assert.match(js, /TEST_MAGAZA: "Test Mağaza"/);
     assert.doesNotMatch(js.slice(js.indexOf("function raporHucre"), js.indexOf("function raporSatirlariniHazirla")), /JSON\.stringify/);
     assert.match(read("public/erp/index.html"), /topbar-logout/);
 });
