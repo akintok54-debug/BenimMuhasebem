@@ -124,13 +124,33 @@ test("IdeaSoft stok ve fiyat güncellemesi resmi Product GET/PUT kaynağını ku
     assert.equal(calls[3].options.body.price1, 15.5);
 });
 
-test("IdeaSoft bağlantısı AKN tenant ortam değişkeniyle sınırlandırılır ve tam senkronizasyon pilot teste bağlıdır", () => {
+test("IdeaSoft tenant izolasyonu oturum tenantıyla korunur ve AKN rollout kimliğiyle sınırlıdır", () => {
     const controller = read("src/controllers/eticaretMerkeziController.js"), routes = read("src/routes/eticaretRotasi.js");
     assert.match(controller, /IDEASOFT_AKN_TENANT_ID/);
     assert.match(controller, /req\.user\?\.tenantId/);
+    assert.match(controller, /IDEASOFT_AKN_TENANT_ID = "6a8dc53a3ff8c8a32ff9545b"/);
+    assert.match(controller, /_id: req\.params\.id, tenantId, active: true/);
+    assert.match(controller, /select\("\+encryptedCredentials"\)/);
     assert.match(controller, /pilotStatus !== "SUCCESS"/);
     assert.match(routes, /ideasoft\/pilot-test/);
     assert.match(routes, /ideasoft\/oauth\/callback/);
+});
+
+test("IdeaSoft tenant kontrolü varsayılan AKN tenantını kabul eder ve diğer tenantı reddeder", () => {
+    const { ideasoftTenantKontrol } = require("./controllers/eticaretMerkeziController");
+    const onceki = process.env.IDEASOFT_AKN_TENANT_ID;
+    const tenantA = "6a8dc53a3ff8c8a32ff9545b", tenantB = "507f1f77bcf86cd799439012";
+    try {
+        delete process.env.IDEASOFT_AKN_TENANT_ID;
+        assert.doesNotThrow(() => ideasoftTenantKontrol(tenantA));
+        assert.throws(() => ideasoftTenantKontrol(tenantB), error => error.code === "INTEGRATION_NOT_CONFIGURED" && error.status === 409);
+        process.env.IDEASOFT_AKN_TENANT_ID = tenantA;
+        assert.doesNotThrow(() => ideasoftTenantKontrol(tenantA));
+        assert.throws(() => ideasoftTenantKontrol(tenantB), error => error.code === "INTEGRATION_NOT_CONFIGURED" && error.status === 409);
+    } finally {
+        if (onceki === undefined) delete process.env.IDEASOFT_AKN_TENANT_ID;
+        else process.env.IDEASOFT_AKN_TENANT_ID = onceki;
+    }
 });
 
 test("IdeaSoft eşleşmeyen ürünleri otomatik ERP ürününe dönüştürmez", () => {

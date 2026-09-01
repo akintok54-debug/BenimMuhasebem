@@ -29,7 +29,14 @@ function text(value, max = 500) { return String(value || "").trim().slice(0, max
 function objectId(value) { return mongoose.Types.ObjectId.isValid(String(value || "")); }
 function tarihAraligi(query) { const now = new Date(), end = query.bitis ? new Date(`${query.bitis}T23:59:59.999+03:00`) : now, start = query.baslangic ? new Date(`${query.baslangic}T00:00:00+03:00`) : new Date(now.getFullYear(), now.getMonth(), 1); return { $gte: start, $lte: end }; }
 function connectionPublic(item) { const value = item?.toObject ? item.toObject() : { ...item }; delete value.encryptedCredentials; value.credentials = "********"; return value; }
-function ideasoftTenantKontrol(tenantId) { const allowed = String(process.env.IDEASOFT_AKN_TENANT_ID || ""); if (!mongoose.Types.ObjectId.isValid(allowed) || String(tenantId) !== allowed) throw Object.assign(new Error("IdeaSoft entegrasyonu AKN tenantı için yapılandırılmadı."), { code: "INTEGRATION_NOT_CONFIGURED", status: 409 }); }
+const IDEASOFT_AKN_TENANT_ID = "6a8dc53a3ff8c8a32ff9545b";
+function ideasoftTenantKontrol(tenantId) {
+    const current = String(tenantId || ""), allowed = String(process.env.IDEASOFT_AKN_TENANT_ID || IDEASOFT_AKN_TENANT_ID).trim();
+    if (!mongoose.Types.ObjectId.isValid(current)) throw Object.assign(new Error("Tenant doğrulaması başarısız."), { status: 403 });
+    // Doğrulanan AKN tenantı varsayılan rollout hedefidir; ortam değişkeni
+    // yalnızca kontrollü deployment override'ı olarak kullanılır.
+    if (!mongoose.Types.ObjectId.isValid(allowed) || current !== allowed) throw Object.assign(new Error("IdeaSoft entegrasyonu bu tenant için etkin değil."), { code: "INTEGRATION_NOT_CONFIGURED", status: 409 });
+}
 function ideasoftRedirectUri() { return `${String(process.env.PUBLIC_APP_URL || "https://www.benimmuhasebe.com").replace(/\/$/, "")}/api/tenant/eticaret/ideasoft/oauth/callback`; }
 async function credentialsBirleştir(connection, incoming) { const current = connection.encryptedCredentials ? credentialsOku(connection) : {}; return { ...current, ...Object.fromEntries(Object.entries(incoming || {}).filter(([, value]) => value !== undefined && value !== "")) }; }
 async function ideasoftTokenSakla(connection, credentials, tokenData) { const merged = { ...credentials, accessToken: tokenData.access_token, refreshToken: tokenData.refresh_token || credentials.refreshToken, tokenType: tokenData.token_type || "bearer", tokenExpiresAt: new Date(Date.now() + Math.max(60, Number(tokenData.expires_in || 86400)) * 1000).toISOString() }; await IntegrationConnection.updateOne({ _id: connection._id, tenantId: connection.tenantId }, { $set: { encryptedCredentials: sifrele(JSON.stringify(merged)) } }); return merged; }
