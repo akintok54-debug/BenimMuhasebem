@@ -158,6 +158,13 @@ const SatisSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             default: null
         },
+        durum: { type: String, enum: ["AKTIF", "DUZELTILIYOR", "IPTAL"], default: "AKTIF", index: true },
+        revizyonNo: { type: Number, default: 0, min: 0 },
+        sonDuzeltmeTarihi: { type: Date, default: null },
+        sonDuzeltenKullaniciId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null },
+        iptalTarihi: { type: Date, default: null },
+        iptalNedeni: { type: String, trim: true, default: "" },
+        iptalEdenKullaniciId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null },
         satisKanali: {
             type: String,
             enum: ["NORMAL", "PERAKENDE", "SAHA"],

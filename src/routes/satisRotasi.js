@@ -16,6 +16,8 @@ router.get("/", controller.listele);
 router.get("/panel", controller.panel);
 router.get("/iade", controller.iadeleriListele);
 router.post("/iade", yetkiKontrol("sales.write"), tekIslemKontrol("SATIS_IADE"), controller.iadeAl);
+router.get("/iade/:id", controller.iadeDetay);
+router.post("/iade/:id/iptal", yetkiKontrol("sales.write"), tekIslemKontrol("SATIS_IADE_IPTAL"), controller.iadeIptalEt);
 router.get("/:id", controller.detay);
 router.patch("/:id", yetkiKontrol("sales.write"), tekIslemKontrol("SATIS_GUNCELLEME"), controller.guncelle);
 router.delete("/:id", yetkiKontrol("sales.write"), tekIslemKontrol("SATIS_IPTAL"), controller.sil);

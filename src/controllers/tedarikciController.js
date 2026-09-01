@@ -95,7 +95,9 @@ async function merkez(req, res, next) {
         ]);
 
         const vadeGun = Number(tedarikci.vadeGun || 0);
-        const vadeler = alislar
+        const aktifAlislar = alislar.filter(item => item.durum !== "IPTAL");
+        const aktifIadeler = iadeler.filter(item => item.durum !== "IPTAL");
+        const vadeler = aktifAlislar
             .filter(item => Number(item.kalanTutar || 0) > 0)
             .map(item => ({
                 alisId: item._id,
@@ -110,9 +112,9 @@ async function merkez(req, res, next) {
         const avanslar = odemeler
             .filter(item => Number(item.sonrakiBakiye) < 0)
             .map(item => ({ ...item, avansTutari: Math.min(Number(item.tutar || 0), Math.abs(Number(item.sonrakiBakiye || 0))) }));
-        const toplamAlis = alislar.reduce((sum, item) => sum + Number(item.genelToplam || 0), 0);
+        const toplamAlis = aktifAlislar.reduce((sum, item) => sum + Number(item.genelToplam || 0), 0);
         const toplamOdeme = odemeler.reduce((sum, item) => sum + Number(item.tutar || 0), 0);
-        const toplamIade = iadeler.reduce((sum, item) => sum + Number(item.genelToplam || 0), 0);
+        const toplamIade = aktifIadeler.reduce((sum, item) => sum + Number(item.genelToplam || 0), 0);
 
         return res.json({
             basarili: true,

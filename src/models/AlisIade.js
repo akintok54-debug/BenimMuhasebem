@@ -18,7 +18,11 @@ const AlisIadeSchema = new mongoose.Schema({
     kalemler: { type: [Kalem], required: true },
     genelToplam: { type: Number, default: 0, min: 0 },
     aciklama: { type: String, trim: true, default: "" },
-    kullaniciId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null }
+    kullaniciId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null },
+    durum: { type: String, enum: ["AKTIF", "IPTAL_ISLENIYOR", "IPTAL"], default: "AKTIF", index: true },
+    iptalTarihi: { type: Date, default: null },
+    iptalNedeni: { type: String, trim: true, default: "" },
+    iptalEdenKullaniciId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null }
 }, { timestamps: true });
 
 AlisIadeSchema.index({ tenantId: 1, belgeNo: 1 }, { unique: true });

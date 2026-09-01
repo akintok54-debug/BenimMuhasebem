@@ -8,9 +8,12 @@ const StokHareket = require("../models/StokHareket");
 const Tedarikci = require("../models/Tedarikci");
 const Kasa = require("../models/Kasa");
 const Banka = require("../models/Banka");
+const CariHareket = require("../models/CariHareket");
 const AlisIade = require("../models/AlisIade");
 const SatinAlmaSiparis = require("../models/SatinAlmaSiparis");
 const { hareketKaydet, tedarikciAlisKaydet } = require("../services/cariHesapServisi");
+const alisDuzeltme = require("../services/alisDuzeltmeServisi");
+const { kaydet: auditKaydet } = require("../modules/platform/services/auditServisi");
 
 function tenantObjectId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
@@ -89,6 +92,10 @@ async function detay(req, res, next) {
             });
         }
 
+        if (!alis.belgeOdemeAyrildi) {
+            const belgeOdemesi = await CariHareket.findOne({ tenantId: tenantObjectId(req), kaynak: "ALIS_ODEME", kaynakId: alis._id, durum: { $ne: "IPTAL" } }).select("tutar").lean();
+            alis.belgeOdemeTutari = Number(belgeOdemesi?.tutar || 0);
+        }
         return res.json({
             basarili: true,
             alis
@@ -266,7 +273,11 @@ async function olustur(req, res, next) {
             odemeDurumu,
             odemeTipi,
             odenenTutar,
+            belgeOdemeTutari: odenenTutar,
+            belgeOdemeAyrildi: true,
             kalanTutar,
+            hesapTipi: odenenTutar > 0 ? hesapTipi : null,
+            hesapId: odenenTutar > 0 ? odemeHesabi?._id : null,
             notlar: body.notlar || "",
             kullaniciId:
                 req.kullanici?._id ||
@@ -356,6 +367,22 @@ async function olustur(req, res, next) {
     }
 }
 
+async function guncelle(req, res, next) {
+    try {
+        const tenantId = tenantObjectId(req), sonuc = await alisDuzeltme.duzelt({ tenantId, alisId: req.params.id, body: req.body || {}, kullaniciId: kullaniciId(req), transactionId: req.transactionId });
+        await auditKaydet({ req, action: "PURCHASE_CORRECTED", resource: "Alis", resourceId: String(req.params.id), tenantId, category: "MUHASEBE_DUZELTME", severity: "UYARI", details: { islemId: String(req.params.id), transactionId: req.transactionId, eskiDeger: sonuc.eski, yeniDeger: sonuc.yeni, cariFarki: sonuc.netCariFarki } });
+        res.json({ basarili: true, mesaj: "Alış; stok, tedarikçi carisi ve ödeme hesabıyla birlikte düzeltildi.", alis: sonuc.alis });
+    } catch (error) { next(error); }
+}
+
+async function iptalEt(req, res, next) {
+    try {
+        const tenantId = tenantObjectId(req), sonuc = await alisDuzeltme.iptal({ tenantId, alisId: req.params.id, neden: req.body?.neden, kullaniciId: kullaniciId(req), transactionId: req.transactionId });
+        await auditKaydet({ req, action: "PURCHASE_CANCELLED", resource: "Alis", resourceId: String(req.params.id), tenantId, category: "MUHASEBE_IPTAL", severity: "KRITIK", details: { islemId: String(req.params.id), transactionId: req.transactionId, eskiDeger: sonuc.eski, yeniDeger: sonuc.yeni } });
+        res.json({ basarili: true, mesaj: "Alış fiziksel olarak silinmeden ters stok, cari ve finans hareketleriyle iptal edildi.", alis: sonuc.alis });
+    } catch (error) { next(error); }
+}
+
 async function iadeleriListele(req, res, next) {
     try {
         const filter = { tenantId: tenantObjectId(req) };
@@ -403,6 +430,38 @@ async function iadeOlustur(req, res, next) {
     }
 }
 
+async function iadeDetay(req, res, next) {
+    try {
+        const iade = await AlisIade.findOne({ _id: req.params.id, tenantId: tenantObjectId(req) }).populate("tedarikciId").populate("depoId").populate("kalemler.urunId").lean();
+        if (!iade) return res.status(404).json({ basarili: false, mesaj: "Alış iadesi bulunamadı." });
+        return res.json({ basarili: true, iade });
+    } catch (error) { next(error); }
+}
+
+async function iadeIptalEt(req, res, next) {
+    const session = await mongoose.startSession();
+    let sonuc;
+    try {
+        await session.withTransaction(async () => {
+            const tenantId = tenantObjectId(req), iade = await AlisIade.findOneAndUpdate({ _id: req.params.id, tenantId, durum: { $in: ["AKTIF", null] } }, { $set: { durum: "IPTAL_ISLENIYOR" } }, { new: false, session });
+            if (!iade) throw Object.assign(new Error("Aktif alış iadesi bulunamadı."), { status: 404 });
+            const eski = iade.toObject();
+            for (const kalem of iade.kalemler) {
+                await Stok.findOneAndUpdate({ tenantId, urunId: kalem.urunId, depoId: iade.depoId }, { $inc: { miktar: Number(kalem.miktar || 0) }, $set: { sonHareketTarihi: new Date() } }, { upsert: true, new: true, session, setDefaultsOnInsert: true });
+                await StokHareket.create([{ tenantId, urunId: kalem.urunId, depoId: iade.depoId, tip: "GIRIS", miktar: kalem.miktar, tarih: new Date(), kaynak: "ALIS_IADE_IPTAL", kaynakId: iade._id, aciklama: `Alış iadesi iptali ${iade.belgeNo}`, kullaniciId: kullaniciId(req), islemAnahtari: `TX:${req.transactionId}:STOK:ALIS_IADE_IPTAL:${iade._id}:${kalem.urunId}` }], { session });
+            }
+            const tedarikci = await Tedarikci.findOneAndUpdate({ _id: iade.tedarikciId, tenantId }, { $inc: { bakiye: Number(iade.genelToplam || 0) } }, { new: true, session });
+            if (!tedarikci) throw Object.assign(new Error("İadenin tedarikçi kaydı bulunamadı."), { status: 409 });
+            await require("../models/CariHareket").create([{ tenantId, tarafTipi: "TEDARIKCI", tarafId: iade.tedarikciId, tip: "DUZELTME", tutar: iade.genelToplam, bakiyeDegisimi: Number(iade.genelToplam || 0), aciklama: `Alış iadesi iptali ${iade.belgeNo}`, kaynak: "ALIS_IADE_IPTAL", kaynakId: iade._id, belgeNo: iade.belgeNo, tarih: new Date(), kullaniciId: kullaniciId(req), islemAnahtari: `TX:${req.transactionId}:CARI:ALIS_IADE_IPTAL:${iade._id}` }], { session });
+            iade.durum = "IPTAL"; iade.iptalTarihi = new Date(); iade.iptalNedeni = String(req.body?.neden || "Alış iadesi iptal edildi").trim(); iade.iptalEdenKullaniciId = kullaniciId(req); await iade.save({ session });
+            sonuc = { iade, tedarikciBakiye: tedarikci.bakiye, eski, yeni: iade.toObject() };
+        });
+        await auditKaydet({ req, action: "PURCHASE_RETURN_CANCELLED", resource: "AlisIade", resourceId: String(req.params.id), tenantId: tenantObjectId(req), category: "MUHASEBE_IPTAL", severity: "KRITIK", details: { islemId: String(req.params.id), transactionId: req.transactionId, eskiDeger: sonuc.eski, yeniDeger: sonuc.yeni } });
+        return res.json({ basarili: true, mesaj: "Alış iadesi ters stok ve cari kaydıyla iptal edildi.", ...sonuc });
+    } catch (error) { next(error); }
+    finally { await session.endSession(); }
+}
+
 async function siparisleriListele(req, res, next) {
     try {
         const filter = { tenantId: tenantObjectId(req) };
@@ -428,8 +487,12 @@ module.exports = {
     listele,
     detay,
     olustur,
+    guncelle,
+    iptalEt,
     iadeleriListele,
     iadeOlustur,
+    iadeDetay,
+    iadeIptalEt,
     siparisleriListele,
     siparisOlustur
 };

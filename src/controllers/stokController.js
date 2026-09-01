@@ -6,6 +6,7 @@ const Stok = require("../models/Stok");
 const StokHareket = require("../models/StokHareket");
 const StokTransfer = require("../models/StokTransfer");
 const StokSayim = require("../models/StokSayim");
+const { kaydet: auditKaydet } = require("../modules/platform/services/auditServisi");
 
 function tenantId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
@@ -484,6 +485,34 @@ async function hareketler(req, res, next) {
     }
 }
 
+async function hareketDetay(req, res, next) {
+    try {
+        const hareket = await StokHareket.findOne({ _id: req.params.id, tenantId: tenantId(req) }).populate("urunId", "kod barkod ad birim").populate("depoId", "kod ad").populate("kullaniciId", "adSoyad email").lean();
+        if (!hareket) return res.status(404).json({ basarili: false, mesaj: "Stok hareketi bulunamadı." });
+        return res.json({ basarili: true, hareket });
+    } catch (error) { next(error); }
+}
+
+async function manuelHareketIptal(req, res, next) {
+    const session = await mongoose.startSession();
+    let sonuc;
+    try {
+        await session.withTransaction(async () => {
+            const tId = tenantId(req), hareket = await StokHareket.findOneAndUpdate({ _id: req.params.id, tenantId: tId, kaynak: "MANUEL", durum: { $in: ["AKTIF", null] } }, { $set: { durum: "IPTAL_ISLENIYOR" } }, { new: true, session });
+            if (!hareket) throw Object.assign(new Error("Aktif manuel stok hareketi bulunamadı."), { status: 404 });
+            const girisTipleri = ["GIRIS", "SAYIM_ARTI", "IADE_GIRIS", "DEVIR_GIRIS"], giris = girisTipleri.includes(hareket.tip), stokFarki = giris ? -Number(hareket.miktar || 0) : Number(hareket.miktar || 0);
+            const stok = await Stok.findOneAndUpdate({ tenantId: tId, urunId: hareket.urunId, depoId: hareket.depoId, ...(stokFarki < 0 ? { miktar: { $gte: -stokFarki } } : {}) }, { $inc: { miktar: stokFarki }, $set: { sonHareketTarihi: new Date() } }, { new: true, session });
+            if (!stok) throw Object.assign(new Error("Stok miktarı bu hareketi geri almaya yetmiyor veya stok kartı bulunamadı."), { status: 409 });
+            const [tersHareket] = await StokHareket.create([{ tenantId: tId, urunId: hareket.urunId, depoId: hareket.depoId, tip: giris ? "CIKIS" : "GIRIS", miktar: hareket.miktar, tarih: new Date(), birimMaliyet: hareket.birimMaliyet || 0, maliyetDogrulandi: hareket.maliyetDogrulandi, maliyetKaynagi: "MANUEL_IPTAL", kaynak: "MANUEL_IPTAL", kaynakId: hareket._id, aciklama: `Manuel stok hareketi iptali: ${hareket.aciklama || hareket._id}`, kullaniciId: req.currentUser?._id || req.kullanici?.kullaniciId || req.user?.kullaniciId || null, islemAnahtari: `TX:${req.transactionId}:STOK:MANUEL_IPTAL:${hareket._id}` }], { session });
+            const eski = hareket.toObject(); hareket.durum = "IPTAL"; hareket.iptalTarihi = new Date(); hareket.iptalNedeni = String(req.body?.neden || "Manuel stok hareketi iptal edildi").trim(); hareket.iptalEdenKullaniciId = req.currentUser?._id || req.kullanici?.kullaniciId || req.user?.kullaniciId || null; hareket.tersHareketId = tersHareket._id; await hareket.save({ session });
+            sonuc = { hareket, tersHareket, stok, eski, yeni: hareket.toObject() };
+        });
+        await auditKaydet({ req, action: "MANUAL_STOCK_MOVEMENT_CANCELLED", resource: "StokHareket", resourceId: String(req.params.id), tenantId: tenantId(req), category: "STOK_IPTAL", severity: "KRITIK", details: { islemId: String(req.params.id), transactionId: req.transactionId, eskiDeger: sonuc.eski, yeniDeger: sonuc.yeni } });
+        return res.json({ basarili: true, mesaj: "Manuel stok hareketi silinmeden ters stok kaydıyla iptal edildi.", ...sonuc });
+    } catch (error) { next(error); }
+    finally { await session.endSession(); }
+}
+
 module.exports = {
     depolar,
     depoOlustur,
@@ -494,5 +523,7 @@ module.exports = {
     transferler,
     sayim,
     sayimlar,
-    hareketler
+    hareketler,
+    hareketDetay,
+    manuelHareketIptal
 };

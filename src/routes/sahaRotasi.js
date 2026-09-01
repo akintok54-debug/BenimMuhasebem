@@ -23,6 +23,7 @@ router.post("/mola/baslat", yetkiKontrol("field.write"), controller.molaBaslat);
 router.post("/mola/:id/bitir", yetkiKontrol("field.write"), controller.molaBitir);
 router.post("/masraf", yetkiKontrol("field.write"), tekIslemKontrol("SAHA_MASRAF"), controller.masrafOlustur);
 router.post("/tesellum/:id/teslim-al", yetkiKontrol("field.settle"), tekIslemKontrol("GUN_SONU_TESELLUM"), controller.teslimAl);
+router.post("/tesellum/:id/iptal", yetkiKontrol("field.settle"), tekIslemKontrol("GUN_SONU_TESELLUM_IPTAL"), controller.teslimIptalEt);
 router.post("/kasa-teslim", yetkiKontrol("field.write"), tekIslemKontrol("GUN_SONU_TESELLUM"), controller.kasaTeslim);
 router.post("/tesellum/paylas", yetkiKontrol("field.read"), controller.tesellumPaylas);
 

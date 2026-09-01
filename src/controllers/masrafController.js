@@ -3,6 +3,7 @@ const Masraf = require("../models/Masraf");
 const Kasa = require("../models/Kasa");
 const Banka = require("../models/Banka");
 const ParaHareket = require("../models/ParaHareket");
+const { kaydet: auditKaydet } = require("../modules/platform/services/auditServisi");
 
 function tenantId(req) { return new mongoose.Types.ObjectId(String(req.tenantId)); }
 function kullaniciId(req) { return req.currentUser?._id || req.kullanici?.kullaniciId || req.user?.kullaniciId || req.kullanici?._id || req.user?._id || null; }
@@ -108,7 +109,20 @@ async function guncelle(req, res, next) {
         if (!mongoose.Types.ObjectId.isValid(req.params.id)) return res.status(400).json({ basarili: false, mesaj: "Geçersiz masraf kaydı." });
         const masraf = await Masraf.findOne({ _id: req.params.id, tenantId: tenantId(req), durum: { $ne: "IPTAL" } });
         if (!masraf) return res.status(404).json({ basarili: false, mesaj: "Aktif masraf kaydı bulunamadı." });
-        const body = req.body || {};
+        const body = req.body || {}, eskiDeger = masraf.toObject();
+        if (body.tutar !== undefined) {
+            const yeniTutar = sayi(body.tutar, "Tutar", { min: 0.01 }), fark = yeniTutar - Number(masraf.tutar || 0), Model = hesapModeli(masraf.hesapTipi);
+            if (Math.abs(fark) > 0.000001) {
+                const hesap = await Model.findOneAndUpdate({ _id: masraf.hesapId, tenantId: tenantId(req), ...(fark > 0 ? { bakiye: { $gte: fark } } : {}) }, { $inc: { bakiye: -fark } }, { new: true });
+                if (!hesap) return res.status(409).json({ basarili: false, mesaj: "Masraf düzeltme farkı için hesap bakiyesi yetersiz veya hesap bulunamadı." });
+                try {
+                    await ParaHareket.create({ tenantId: tenantId(req), hesapTipi: masraf.hesapTipi, hesapId: masraf.hesapId, tip: fark > 0 ? "CIKIS" : "GIRIS", tutar: Math.abs(fark), paraBirimi: masraf.paraBirimi || "TRY", aciklama: `Masraf düzeltmesi: ${masraf.aciklama}`, kaynak: "MASRAF_DUZELTME", kaynakId: masraf._id, orijinalHareketId: masraf.paraHareketId || null, belgeNo: masraf.fisNo || "", tarih: body.tarih || new Date(), kullaniciId: kullaniciId(req), islemAnahtari: `TX:${req.transactionId}:PARA:MASRAF_DUZELTME:${masraf._id}` });
+                } catch (error) { await Model.updateOne({ _id: masraf.hesapId, tenantId: tenantId(req) }, { $inc: { bakiye: fark } }).catch(() => {}); throw error; }
+                masraf.tutar = yeniTutar;
+                const kdvOrani = body.kdvOrani === undefined ? Number(masraf.kdvOrani || 0) : sayi(body.kdvOrani, "KDV oranı", { min: 0, max: 100 });
+                masraf.kdvOrani = kdvOrani; masraf.kdvTutari = body.kdvTutari === undefined ? yeniTutar - yeniTutar / (1 + kdvOrani / 100) : sayi(body.kdvTutari, "KDV tutarı", { min: 0, max: yeniTutar });
+            }
+        }
         if (body.tarih !== undefined) masraf.tarih = body.tarih;
         if (body.kategori !== undefined) masraf.kategori = kategoriDogrula(body.kategori);
         if (body.aciklama !== undefined) masraf.aciklama = metin(body.aciklama, 300);
@@ -118,7 +132,8 @@ async function guncelle(req, res, next) {
         if (body.notlar !== undefined) masraf.notlar = metin(body.notlar, 1500);
         if (body.aracPlaka !== undefined) masraf.aracPlaka = metin(body.aracPlaka, 20).toUpperCase();
         await masraf.save();
-        res.json({ basarili: true, mesaj: "Masraf belge bilgileri güncellendi.", masraf });
+        await auditKaydet({ req, action: "EXPENSE_CORRECTED", resource: "Masraf", resourceId: String(masraf._id), tenantId: tenantId(req), category: "MUHASEBE_DUZELTME", severity: "UYARI", details: { islemId: String(masraf._id), transactionId: req.transactionId, eskiDeger, yeniDeger: masraf.toObject() } });
+        res.json({ basarili: true, mesaj: "Masraf ve bağlı ödeme hesabı fark kadar güncellendi.", masraf });
     } catch (error) { next(error); }
 }
 
@@ -135,6 +150,7 @@ async function iptalEt(req, res, next) {
         hesapGuncellendi = true;
         hareket = await ParaHareket.create({ tenantId: tId, hesapTipi: masraf.hesapTipi, hesapId: masraf.hesapId, tip: "GIRIS", tutar: masraf.tutar, paraBirimi: masraf.paraBirimi || "TRY", aciklama: `Masraf iptali: ${masraf.aciklama}`, kaynak: "MASRAF_IPTAL", kaynakId: masraf._id, belgeNo: masraf.fisNo || "", tarih: new Date(), kullaniciId: kullaniciId(req), orijinalHareketId: masraf.paraHareketId || null });
         masraf.iptalParaHareketId = hareket._id; await masraf.save();
+        await auditKaydet({ req, action: "EXPENSE_CANCELLED", resource: "Masraf", resourceId: String(masraf._id), tenantId: tId, category: "MUHASEBE_IPTAL", severity: "KRITIK", details: { islemId: String(masraf._id), transactionId: req.transactionId, yeniDeger: masraf.toObject() } });
         res.json({ basarili: true, mesaj: "Masraf iptal edildi ve tutar hesaba iade edildi.", masraf, hesap, hareket });
     } catch (error) {
         if (hareket?._id) await ParaHareket.deleteOne({ _id: hareket._id, tenantId: tId }).catch(() => {});

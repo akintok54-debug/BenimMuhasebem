@@ -28,8 +28,10 @@ router.post("/bankalar", yetkiKontrol("cash.write"), tekIslemKontrol("BANKA_ACIL
 router.patch("/hesaplar/:tip/:id", yetkiKontrol("cash.write"), controller.hesapGuncelle);
 
 router.get("/para-hareketleri", controller.paraHareketleri);
+router.get("/para-hareketleri/:id", controller.paraHareketDetay);
 router.get("/cek-senet-portfoyu", controller.cekSenetPortfoyu);
 router.post("/para-hareketleri", yetkiKontrol("cash.write"), tekIslemKontrol("PARA_HAREKETI"), controller.hesapHareketi);
+router.post("/para-hareketleri/:id/iptal", yetkiKontrol("cash.write"), tekIslemKontrol("PARA_HAREKETI_IPTAL"), controller.manuelHareketIptal);
 
 router.post("/transfer", yetkiKontrol("cash.write"), tekIslemKontrol("HESAP_TRANSFERI"), controller.transfer);
 

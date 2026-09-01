@@ -80,6 +80,11 @@ const StokHareketSchema = new mongoose.Schema(
         },
 
         islemAnahtari: { type: String, default: undefined, select: false },
+        durum: { type: String, enum: ["AKTIF", "IPTAL_ISLENIYOR", "IPTAL"], default: "AKTIF", index: true },
+        iptalTarihi: { type: Date, default: null },
+        iptalNedeni: { type: String, trim: true, default: "" },
+        iptalEdenKullaniciId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null },
+        tersHareketId: { type: mongoose.Schema.Types.ObjectId, ref: "StokHareket", default: null },
 
         aciklama: {
             type: String,

@@ -45,9 +45,9 @@ async function genel(req, res, next) {
         const musteriGorebilir = izinler.has("customer.read");
         const tedarikciGorebilir = izinler.has("supplier.read");
 
-        const satisFilter = { tenantId: tId };
-        const alisFilter = { tenantId: tId };
-        const cariFilter = { tenantId: tId };
+        const satisFilter = { tenantId: tId, durum: { $ne: "IPTAL" } };
+        const alisFilter = { tenantId: tId, durum: { $ne: "IPTAL" } };
+        const cariFilter = { tenantId: tId, durum: { $ne: "IPTAL" } };
 
         if (tarih) {
             satisFilter.tarih = tarih;
@@ -150,7 +150,7 @@ async function satis(req, res, next) {
     try {
         const tId = tenantId(req);
 
-        const filtre = { tenantId: tId };
+        const filtre = { tenantId: tId, durum: { $ne: "IPTAL" } };
         const tarih = tarihFiltresi(req);
 
         if (tarih) {
@@ -176,7 +176,7 @@ async function alis(req, res, next) {
     try {
         const tId = tenantId(req);
 
-        const filtre = { tenantId: tId };
+        const filtre = { tenantId: tId, durum: { $ne: "IPTAL" } };
         const tarih = tarihFiltresi(req);
 
         if (tarih) {

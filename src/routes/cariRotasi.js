@@ -24,6 +24,8 @@ router.patch("/musteri/:musteriId/bakiye", yetkiKontrol("customer.write"), yetki
 router.post("/musteri/hareket", yetkiKontrol("customer.write"), yetkiKontrol("accounting.write"), tekIslemKontrol("MUSTERI_CARI"), controller.musteriManuelHareket);
 router.post("/musteri/:musteriId/ekstre-paylas", yetkiKontrol("customer.read"), controller.ekstrePaylas);
 router.post("/tedarikci/odeme", yetkiKontrol("supplier.write"), yetkiKontrol("accounting.write", "cash.write"), tekIslemKontrol("TEDARIKCI_ODEME"), controller.tedarikciOdeme);
+router.patch("/tedarikci/odeme/:id", yetkiKontrol("supplier.write"), yetkiKontrol("accounting.write", "cash.write"), tekIslemKontrol("TEDARIKCI_ODEME_DUZELTME"), controller.tedarikciOdemeGuncelle);
+router.post("/tedarikci/odeme/:id/iptal", yetkiKontrol("supplier.write"), yetkiKontrol("accounting.write", "cash.write"), tekIslemKontrol("TEDARIKCI_ODEME_IPTAL"), controller.tedarikciOdemeIptal);
 router.post("/tedarikci/tahsilat", yetkiKontrol("supplier.write"), yetkiKontrol("accounting.write", "cash.write"), tekIslemKontrol("TEDARIKCI_TAHSILAT"), controller.tedarikciTahsilat);
 router.post("/tedarikci/hareket", yetkiKontrol("supplier.write"), yetkiKontrol("accounting.write"), tekIslemKontrol("TEDARIKCI_CARI"), controller.tedarikciManuelHareket);
 router.patch("/tedarikci/:tedarikciId/bakiye", yetkiKontrol("supplier.write"), yetkiKontrol("balance.adjust"), tekIslemKontrol("TEDARIKCI_BAKIYE_DUZELTME"), controller.tedarikciBakiyeDuzelt);

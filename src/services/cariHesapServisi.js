@@ -169,6 +169,7 @@ async function tedarikciOdemeKaydet({ tenantId, tedarikciId, tutar, hesap = null
     const faturalar = await Alis.find({
         tenantId: tId,
         tedarikciId: objectId(tedarikciId, "tedarikçi"),
+        durum: { $ne: "IPTAL" },
         kalanTutar: { $gt: 0 }
     }).sort({ tarih: 1, createdAt: 1 });
     let dagitilacak = miktar;
@@ -203,4 +204,29 @@ async function tedarikciOdemeKaydet({ tenantId, tedarikciId, tutar, hesap = null
     }
 }
 
-module.exports = { odemeBilgisi, hesapBul, hareketKaydet, tedarikciAlisKaydet, tedarikciOdemeKaydet };
+async function tedarikciFaturalariYenidenDagit({ tenantId, tedarikciId, session = null }) {
+    const tId = objectId(tenantId, "tenant"), tarafId = objectId(tedarikciId, "tedarikçi");
+    const [faturalar, hareketler] = await Promise.all([
+        Alis.find({ tenantId: tId, tedarikciId: tarafId, durum: { $ne: "IPTAL" } }).sort({ tarih: 1, createdAt: 1 }).session(session),
+        CariHareket.find({ tenantId: tId, tarafTipi: "TEDARIKCI", tarafId, tip: "ODEME", kaynak: { $in: ["ALIS_ODEME", "ODEME"] }, durum: { $ne: "IPTAL" } }).select("kaynak kaynakId tutar").session(session).lean()
+    ]);
+    const dogrudan = new Map();
+    let dagitilacak = 0;
+    for (const hareket of hareketler) {
+        if (hareket.kaynak === "ALIS_ODEME" && hareket.kaynakId) dogrudan.set(String(hareket.kaynakId), Number(dogrudan.get(String(hareket.kaynakId)) || 0) + Number(hareket.tutar || 0));
+        else dagitilacak += Number(hareket.tutar || 0);
+    }
+    const guncellemeler = [];
+    for (const fatura of faturalar) {
+        const toplam = Number(fatura.genelToplam || 0);
+        const ilkOdeme = Math.min(toplam, fatura.belgeOdemeAyrildi ? Number(fatura.belgeOdemeTutari || 0) : Number(dogrudan.get(String(fatura._id)) || 0));
+        const ekOdeme = Math.min(Math.max(0, toplam - ilkOdeme), dagitilacak);
+        dagitilacak -= ekOdeme;
+        const odenenTutar = ilkOdeme + ekOdeme, kalanTutar = Math.max(0, toplam - odenenTutar);
+        guncellemeler.push({ updateOne: { filter: { _id: fatura._id, tenantId: tId }, update: { $set: { odenenTutar, kalanTutar, odemeDurumu: kalanTutar <= 0.000001 ? "ODENDI" : odenenTutar > 0 ? "KISMI" : "ACIK" } } } });
+    }
+    if (guncellemeler.length) await Alis.bulkWrite(guncellemeler, session ? { session } : {});
+    return { faturaSayisi: faturalar.length, dagitilmayanAvans: Math.max(0, dagitilacak) };
+}
+
+module.exports = { odemeBilgisi, hesapBul, hareketKaydet, tedarikciAlisKaydet, tedarikciOdemeKaydet, tedarikciFaturalariYenidenDagit };

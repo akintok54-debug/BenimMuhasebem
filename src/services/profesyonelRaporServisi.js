@@ -165,10 +165,10 @@ async function raporuHesapla(tenantId, query = {}, sabitAralik = null) {
     const hesapIds = [...kasalar, ...bankalar].map(x => x._id);
     const subeDepoIds = subeDepolari.map(x => x._id);
     const depoKosulu = depoKosuluOlustur(depoId, sube, subeDepoIds);
-    const satisFiltre = { tenantId, tarih, ...(depoKosulu ? { depoId: depoKosulu } : {}), ...(musteriId ? { musteriId } : {}), ...(temsilciId ? { kullaniciId: temsilciId } : {}), ...(satisOdemeTipi ? { odemeTipi: satisOdemeTipi } : {}), ...(urunKosulu ? { "kalemler.urunId": urunKosulu } : {}) };
-    const alisFiltre = { tenantId, tarih, ...(depoKosulu ? { depoId: depoKosulu } : {}), ...(tedarikciId ? { tedarikciId } : {}), ...(alisOdemeTipi ? { odemeTipi: alisOdemeTipi } : {}), ...(urunKosulu ? { "kalemler.urunId": urunKosulu } : {}) };
-    const satisIadeFiltre = { tenantId, tarih, ...(depoKosulu ? { depoId: depoKosulu } : {}), ...(musteriId ? { musteriId } : {}), ...(temsilciId ? { kullaniciId: temsilciId } : {}), ...(satisOdemeTipi ? { odemeTipi: satisOdemeTipi } : {}), ...(urunKosulu ? { "kalemler.urunId": urunKosulu } : {}) };
-    const alisIadeFiltre = { tenantId, tarih, ...(depoKosulu ? { depoId: depoKosulu } : {}), ...(tedarikciId ? { tedarikciId } : {}), ...(urunKosulu ? { "kalemler.urunId": urunKosulu } : {}) };
+    const satisFiltre = { tenantId, tarih, durum: { $ne: "IPTAL" }, ...(depoKosulu ? { depoId: depoKosulu } : {}), ...(musteriId ? { musteriId } : {}), ...(temsilciId ? { kullaniciId: temsilciId } : {}), ...(satisOdemeTipi ? { odemeTipi: satisOdemeTipi } : {}), ...(urunKosulu ? { "kalemler.urunId": urunKosulu } : {}) };
+    const alisFiltre = { tenantId, tarih, durum: { $ne: "IPTAL" }, ...(depoKosulu ? { depoId: depoKosulu } : {}), ...(tedarikciId ? { tedarikciId } : {}), ...(alisOdemeTipi ? { odemeTipi: alisOdemeTipi } : {}), ...(urunKosulu ? { "kalemler.urunId": urunKosulu } : {}) };
+    const satisIadeFiltre = { tenantId, tarih, durum: { $ne: "IPTAL" }, ...(depoKosulu ? { depoId: depoKosulu } : {}), ...(musteriId ? { musteriId } : {}), ...(temsilciId ? { kullaniciId: temsilciId } : {}), ...(satisOdemeTipi ? { odemeTipi: satisOdemeTipi } : {}), ...(urunKosulu ? { "kalemler.urunId": urunKosulu } : {}) };
+    const alisIadeFiltre = { tenantId, tarih, durum: { $ne: "IPTAL" }, ...(depoKosulu ? { depoId: depoKosulu } : {}), ...(tedarikciId ? { tedarikciId } : {}), ...(urunKosulu ? { "kalemler.urunId": urunKosulu } : {}) };
     const stokFiltre = { tenantId, ...(depoKosulu ? { depoId: depoKosulu } : {}), ...(urunKosulu ? { urunId: urunKosulu } : {}) };
     const cariFiltre = { tenantId, tarih: { $lte: aralik.bitis }, durum: { $ne: "IPTAL" } };
     const masrafFiltre = { tenantId, tarih, durum: { $ne: "IPTAL" }, ...(sube ? { hesapId: { $in: hesapIds } } : {}) };
@@ -176,7 +176,7 @@ async function raporuHesapla(tenantId, query = {}, sabitAralik = null) {
     const [satislar, satisIadeleri, tumSatisIadeleri, alislar, alisIadeleri, stoklar, stokHareketleri, cariHam, donemCariHam, paraSonrasi, digerGelirler, masraflar, portfoy, tenant, cariMusteriler, cariTedarikciler] = await Promise.all([
         Satis.find(satisFiltre).select("belgeNo tarih musteriId depoId kalemler araToplam genelToplam odemeTipi odenenTutar kullaniciId").populate("musteriId", "kod unvan adSoyad").populate("kullaniciId", "adSoyad").lean(),
         SatisIade.find(satisIadeFiltre).select("belgeNo tarih musteriId kalemler genelToplam orijinalSatisId kullaniciId").populate("musteriId", "kod unvan adSoyad").populate("kullaniciId", "adSoyad").lean(),
-        SatisIade.find({ tenantId, ...(depoKosulu ? { depoId: depoKosulu } : {}), ...(urunKosulu ? { "kalemler.urunId": urunKosulu } : {}) }).select("orijinalSatisId depoId kalemler").lean(),
+        SatisIade.find({ tenantId, durum: { $ne: "IPTAL" }, ...(depoKosulu ? { depoId: depoKosulu } : {}), ...(urunKosulu ? { "kalemler.urunId": urunKosulu } : {}) }).select("orijinalSatisId depoId kalemler").lean(),
         Alis.find(alisFiltre).select("belgeNo tarih tedarikciId depoId kalemler araToplam genelToplam odemeTipi odenenTutar").populate("tedarikciId", "kod unvan adSoyad").lean(),
         AlisIade.find(alisIadeFiltre).select("belgeNo tarih tedarikciId kalemler genelToplam").populate("tedarikciId", "kod unvan adSoyad").lean(),
         Stok.find(stokFiltre).select("urunId depoId miktar maliyet").populate("urunId", "kod ad marka kategori kritikStok minimumStok").populate("depoId", "kod ad").lean(),

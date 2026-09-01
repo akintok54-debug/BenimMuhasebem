@@ -18,6 +18,7 @@ const CekSenetPortfoy = require("../models/CekSenetPortfoy");
 const Tedarikci = require("../models/Tedarikci");
 const { etkinYetkiler } = require("../middleware/yetkiKontrol");
 const { tarihAraligi } = require("../services/profesyonelRaporServisi");
+const { kaydet: auditKaydet } = require("../modules/platform/services/auditServisi");
 
 function tenantObjectId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
@@ -117,14 +118,14 @@ async function panel(req, res, next) {
         const finansKosullari = [{ tarafTipi: "MUSTERI", tip: "TAHSILAT" }];
         if (tedarikciOdemesiGorur) finansKosullari.push({ tarafTipi: "TEDARIKCI", tip: "ODEME" });
         const [tumSatislar, acikSiparis, aktifTeklif, iadeler, tumFinansHareketleri] = await Promise.all([
-            Satis.find({ tenantId, tarih: { $gte: sorguBaslangic, $lte: sorguBitis }, ...sahiplik(req) })
+            Satis.find({ tenantId, tarih: { $gte: sorguBaslangic, $lte: sorguBitis }, durum: { $ne: "IPTAL" }, ...sahiplik(req) })
                 .populate("musteriId", "kod unvan adSoyad bakiye")
                 .populate("kalemler.urunId", "kod ad birim alisFiyati")
                 .populate("kullaniciId", "adSoyad email")
                 .sort({ tarih: -1, createdAt: -1 }).lean(),
             Siparis.countDocuments({ tenantId, durum: { $nin: ["TAMAMLANDI", "IPTAL"] }, ...sahiplik(req) }),
             Teklif.countDocuments({ tenantId, durum: { $nin: ["ONAYLANDI", "REDDEDILDI", "IPTAL", "SURESI_DOLDU", "SIPARISE_DONUSTU"] }, ...sahiplik(req) }),
-            SatisIade.find({ tenantId, tarih: { $gte: seciliDonem.baslangic, $lte: seciliDonem.bitis }, ...sahiplik(req) }).select("genelToplam tarih").lean(),
+            SatisIade.find({ tenantId, tarih: { $gte: seciliDonem.baslangic, $lte: seciliDonem.bitis }, durum: { $ne: "IPTAL" }, ...sahiplik(req) }).select("genelToplam tarih").lean(),
             CariHareket.find({ tenantId, tarih: { $gte: sorguBaslangic, $lte: sorguBitis }, durum: { $ne: "IPTAL" }, $or: finansKosullari, ...sahiplik(req) })
                 .select("tarafTipi tarafId tip tutar odemeYontemi aciklama belgeNo kaynak tarih kullaniciId")
                 .populate("kullaniciId", "adSoyad email").sort({ tarih: -1, createdAt: -1 }).lean()
@@ -649,7 +650,7 @@ async function iadeAl(req, res, next) {
         const [musteri, depo] = await Promise.all([Musteri.findOne({ _id: body.musteriId, tenantId, ...(yonetici(req) ? {} : { $or: [{ temsilciId: islemKullaniciId(req) }, { olusturanKullaniciId: islemKullaniciId(req) }] }) }), Depo.findOne({ _id: body.depoId, tenantId })]);
         if (!musteri || !depo) return res.status(404).json({ basarili: false, mesaj: "Müşteri veya depo bulunamadı." });
         const orijinalSatis = mongoose.Types.ObjectId.isValid(String(body.orijinalSatisId || ""))
-            ? await Satis.findOne({ _id: body.orijinalSatisId, tenantId, musteriId: musteri._id, depoId: depo._id, ...sahiplik(req) })
+            ? await Satis.findOne({ _id: body.orijinalSatisId, tenantId, musteriId: musteri._id, depoId: depo._id, durum: { $ne: "IPTAL" }, ...sahiplik(req) })
             : null;
         if (body.orijinalSatisId && !orijinalSatis) return res.status(404).json({ basarili: false, mesaj: "İade edilecek satış bulunamadı veya bu satışa erişiminiz yok." });
         const kalemler = []; let genelToplam = 0; const iadeUrunleri = new Set();
@@ -665,7 +666,7 @@ async function iadeAl(req, res, next) {
             kalemler.push({ urunId: urun._id, miktar, birimFiyat, kdv, iskonto, toplam }); genelToplam += toplam;
         }
         if (orijinalSatis) {
-            const oncekiIadeler = await SatisIade.find({ tenantId, orijinalSatisId: orijinalSatis._id }).select("kalemler").lean();
+            const oncekiIadeler = await SatisIade.find({ tenantId, orijinalSatisId: orijinalSatis._id, durum: { $ne: "IPTAL" } }).select("kalemler").lean();
             for (const kalem of kalemler) {
                 const satilan = orijinalSatis.kalemler.filter(x => String(x.urunId) === String(kalem.urunId)).reduce((n, x) => n + Number(x.miktar || 0), 0);
                 const iadeEdilen = oncekiIadeler.flatMap(x => x.kalemler || []).filter(x => String(x.urunId) === String(kalem.urunId)).reduce((n, x) => n + Number(x.miktar || 0), 0);
@@ -725,9 +726,53 @@ async function iadeAl(req, res, next) {
     }
 }
 
+async function iadeDetay(req, res, next) {
+    try {
+        const iade = await SatisIade.findOne({ _id: req.params.id, tenantId: tenantObjectId(req), ...sahiplik(req) }).populate("musteriId").populate("depoId").populate("kalemler.urunId").lean();
+        if (!iade) return res.status(404).json({ basarili: false, mesaj: "Satış iadesi bulunamadı." });
+        return res.json({ basarili: true, iade });
+    } catch (error) { next(error); }
+}
+
+async function iadeIptalEt(req, res, next) {
+    const session = await mongoose.startSession();
+    let sonuc;
+    try {
+        await session.withTransaction(async () => {
+            const tenantId = tenantObjectId(req), iade = await SatisIade.findOneAndUpdate({ _id: req.params.id, tenantId, durum: { $in: ["AKTIF", null] }, ...sahiplik(req) }, { $set: { durum: "IPTAL_ISLENIYOR" } }, { new: false, session });
+            if (!iade) throw Object.assign(new Error("Aktif satış iadesi bulunamadı."), { status: 404 });
+            const eski = iade.toObject();
+            for (const kalem of iade.kalemler) {
+                const stok = await Stok.findOneAndUpdate({ tenantId, urunId: kalem.urunId, depoId: iade.depoId, miktar: { $gte: Number(kalem.miktar || 0) } }, { $inc: { miktar: -Number(kalem.miktar || 0) }, $set: { sonHareketTarihi: new Date() } }, { new: true, session });
+                if (!stok) throw Object.assign(new Error("Satış iadesi iptal edilemedi; iade stoğu kullanılmış veya yetersiz."), { status: 409 });
+                await StokHareket.create([{ tenantId, urunId: kalem.urunId, depoId: iade.depoId, tip: "CIKIS", miktar: kalem.miktar, tarih: new Date(), birimMaliyet: stok.maliyet || 0, maliyetDogrulandi: Number(stok.maliyet || 0) > 0, maliyetKaynagi: "SATIS_IADE_IPTAL", kaynak: "SATIS_IADE_IPTAL", kaynakId: iade._id, aciklama: `Satış iadesi iptali ${iade.belgeNo}`, kullaniciId: islemKullaniciId(req), islemAnahtari: `TX:${req.transactionId}:STOK:SATIS_IADE_IPTAL:${iade._id}:${kalem.urunId}` }], { session });
+            }
+            const nakdenIade = !["ACIK_HESAP", "DIGER"].includes(iade.odemeTipi);
+            let musteri = await Musteri.findOne({ _id: iade.musteriId, tenantId }).session(session);
+            if (!musteri) throw Object.assign(new Error("İadenin müşteri kaydı bulunamadı."), { status: 409 });
+            if (!nakdenIade) {
+                const oncekiBakiye = Number(musteri.bakiye || 0); musteri.bakiye = oncekiBakiye + Number(iade.genelToplam || 0); await musteri.save({ session });
+                await CariHareket.create([{ tenantId, tarafTipi: "MUSTERI", tarafId: iade.musteriId, tip: "DUZELTME", tutar: iade.genelToplam, bakiyeDegisimi: Number(iade.genelToplam || 0), oncekiBakiye, sonrakiBakiye: musteri.bakiye, aciklama: `Satış iadesi iptali ${iade.belgeNo}`, kaynak: "SATIS_IADE_IPTAL", kaynakId: iade._id, belgeNo: iade.belgeNo, tarih: new Date(), kullaniciId: islemKullaniciId(req), islemAnahtari: `TX:${req.transactionId}:CARI:SATIS_IADE_IPTAL:${iade._id}` }], { session });
+            }
+            let paraHareket = null;
+            if (nakdenIade && iade.hesapTipi && iade.hesapId) {
+                const Model = iade.hesapTipi === "KASA" ? Kasa : Banka, hesap = await Model.findOneAndUpdate({ _id: iade.hesapId, tenantId }, { $inc: { bakiye: Number(iade.genelToplam || 0) } }, { new: true, session });
+                if (!hesap) throw Object.assign(new Error("İadenin ödeme hesabı bulunamadı."), { status: 409 });
+                [paraHareket] = await ParaHareket.create([{ tenantId, hesapTipi: iade.hesapTipi, hesapId: iade.hesapId, tip: "GIRIS", tutar: iade.genelToplam, paraBirimi: hesap.paraBirimi || "TRY", aciklama: `Satış iadesi iptali ${iade.belgeNo}`, kaynak: "SATIS_IADE_IPTAL", kaynakId: iade._id, belgeNo: iade.belgeNo, tarih: new Date(), kullaniciId: islemKullaniciId(req), islemAnahtari: `TX:${req.transactionId}:PARA:SATIS_IADE_IPTAL:${iade._id}` }], { session });
+            }
+            iade.durum = "IPTAL"; iade.iptalTarihi = new Date(); iade.iptalNedeni = String(req.body?.neden || "Satış iadesi iptal edildi").trim(); iade.iptalEdenKullaniciId = islemKullaniciId(req); await iade.save({ session });
+            await CekSenetPortfoy.updateMany({ tenantId, kaynak: "SATIS_IADE", kaynakId: iade._id, durum: { $ne: "IPTAL" } }, { $set: { durum: "IPTAL" } }, { session });
+            sonuc = { iade, musteriBakiye: musteri.bakiye, paraHareket, eski, yeni: iade.toObject() };
+        });
+        await auditKaydet({ req, action: "SALE_RETURN_CANCELLED", resource: "SatisIade", resourceId: String(req.params.id), tenantId: tenantObjectId(req), category: "MUHASEBE_IPTAL", severity: "KRITIK", details: { islemId: String(req.params.id), transactionId: req.transactionId, eskiDeger: sonuc.eski, yeniDeger: sonuc.yeni } });
+        return res.json({ basarili: true, mesaj: "Satış iadesi ters stok, cari ve finans kayıtlarıyla iptal edildi.", ...sonuc });
+    } catch (error) { next(error); }
+    finally { await session.endSession(); }
+}
+
 async function guncelle(req, res, next) {
     try {
-        const tenantId=tenantObjectId(req), body=req.body||{}; const satis=await Satis.findOne({_id:req.params.id,tenantId,...sahiplik(req)});
+        const tenantId=tenantObjectId(req), body=req.body||{}; const satis=await Satis.findOne({_id:req.params.id,tenantId,durum:{$ne:"IPTAL"},...sahiplik(req)});
         if(!satis)return res.status(404).json({basarili:false,mesaj:"Satış bulunamadı."});
         if(Number(satis.odenenTutar||0)>0)return res.status(409).json({basarili:false,mesaj:"Ödeme alınmış satış doğrudan değiştirilemez; iade/düzeltme belgesi kullanın."});
         if(!Array.isArray(body.kalemler)||!body.kalemler.length)return res.status(400).json({basarili:false,mesaj:"En az bir satış kalemi gerekir."});
@@ -739,22 +784,25 @@ async function guncelle(req, res, next) {
         for(const [urunId,miktar] of eski){let stok=await Stok.findOne({tenantId,urunId,depoId});if(!stok)stok=new Stok({tenantId,urunId,depoId,miktar:0,maliyet:0});stok.miktar+=miktar;await stok.save();}
         for(const [urunId,miktar] of ihtiyac){const stok=await Stok.findOne({tenantId,urunId,depoId});stok.miktar-=miktar;stok.sonHareketTarihi=new Date();await stok.save();}
         const musteri=await Musteri.findOne({_id:satis.musteriId,tenantId});musteri.bakiye-=Number(satis.kalanTutar||satis.genelToplam||0);musteri.bakiye+=genelToplam;await musteri.save();
-        await CariHareket.findOneAndUpdate({tenantId,kaynak:"SATIS",kaynakId:satis._id,tarafTipi:"MUSTERI"},{tutar:genelToplam,aciklama:`Satış düzeltmesi ${body.belgeNo||satis.belgeNo}`,tarih:body.tarih||satis.tarih},{new:true});
+        await CariHareket.findOneAndUpdate({tenantId,kaynak:"SATIS",kaynakId:satis._id,tarafTipi:"MUSTERI"},{tutar:genelToplam,bakiyeDegisimi:genelToplam,aciklama:`Satış düzeltmesi ${body.belgeNo||satis.belgeNo}`,tarih:body.tarih||satis.tarih},{new:true});
         const degisenUrunler=new Set([...eski.keys(),...ihtiyac.keys()]);
         for(const urunId of degisenUrunler){const fark=Number(eski.get(urunId)||0)-Number(ihtiyac.get(urunId)||0);if(Math.abs(fark)<0.000001)continue;const stok=await Stok.findOne({tenantId,urunId,depoId}).select("maliyet").lean();const maliyet=Number(stok?.maliyet||0);await StokHareket.create({tenantId,urunId,depoId,tip:fark>0?"SAYIM_ARTI":"SAYIM_EKSI",miktar:Math.abs(fark),tarih:body.tarih||satis.tarih,birimMaliyet:maliyet,maliyetDogrulandi:maliyet>0,maliyetKaynagi:"STOK_KARTI",kaynak:"SATIS_DUZELTME",kaynakId:satis._id,aciklama:`Satış ${satis.belgeNo} kalem düzeltmesi`,kullaniciId:req.kullanici?._id||req.user?._id||null});}
-        satis.belgeNo=String(body.belgeNo||satis.belgeNo).trim().toUpperCase();satis.tarih=body.tarih||satis.tarih;satis.kalemler=yeniKalemler;satis.araToplam=araToplam;satis.toplamKdv=toplamKdv;satis.genelToplam=genelToplam;satis.kalanTutar=genelToplam;satis.notlar=body.notlar??satis.notlar;await satis.save();res.json({basarili:true,satis,musteriBakiye:musteri.bakiye});
+        const eskiDeger=satis.toObject();
+        satis.belgeNo=String(body.belgeNo||satis.belgeNo).trim().toUpperCase();satis.tarih=body.tarih||satis.tarih;satis.kalemler=yeniKalemler;satis.araToplam=araToplam;satis.toplamKdv=toplamKdv;satis.genelToplam=genelToplam;satis.kalanTutar=genelToplam;satis.notlar=body.notlar??satis.notlar;satis.revizyonNo=Number(satis.revizyonNo||0)+1;satis.sonDuzeltmeTarihi=new Date();satis.sonDuzeltenKullaniciId=islemKullaniciId(req);await satis.save();
+        await auditKaydet({req,action:"SALE_CORRECTED",resource:"Satis",resourceId:String(satis._id),tenantId,category:"MUHASEBE_DUZELTME",severity:"UYARI",details:{islemId:String(satis._id),transactionId:req.transactionId,eskiDeger,yeniDeger:satis.toObject()}});
+        res.json({basarili:true,satis,musteriBakiye:musteri.bakiye});
     }catch(error){next(error);}
 }
 
 async function sil(req, res, next) {
     try {
         const tenantId = tenantObjectId(req);
-        const satis = await Satis.findOne({ _id: req.params.id, tenantId, ...sahiplik(req) });
+        const satis = await Satis.findOne({ _id: req.params.id, tenantId, durum: { $ne: "IPTAL" }, ...sahiplik(req) });
         if (!satis) return res.status(404).json({ basarili: false, mesaj: "Satış bulunamadı." });
         if (Number(satis.odenenTutar || 0) > 0) {
             return res.status(409).json({
                 basarili: false,
-                mesaj: "Ödemesi alınmış satış silinemez. Önce iade işlemi oluşturun."
+                mesaj: "Ödemesi alınmış satış doğrudan iptal edilemez. İade işlemi oluşturun."
             });
         }
 
@@ -767,15 +815,23 @@ async function sil(req, res, next) {
             stok.miktar += Number(kalem.miktar || 0);
             stok.sonHareketTarihi = new Date();
             await stok.save();
+            await StokHareket.create({ tenantId, urunId: kalem.urunId, depoId: satis.depoId, tip: "GIRIS", miktar: Number(kalem.miktar || 0), tarih: new Date(), birimMaliyet: Number(stok.maliyet || 0), maliyetDogrulandi: Number(stok.maliyet || 0) > 0, maliyetKaynagi: "SATIS_IPTAL", kaynak: "SATIS_IPTAL", kaynakId: satis._id, islemAnahtari: `TX:${req.transactionId}:STOK:SATIS_IPTAL:${satis._id}:${kalem.urunId}`, aciklama: `Satış iptali ${satis.belgeNo}`, kullaniciId: islemKullaniciId(req) });
         }
 
-        musteri.bakiye -= Number(satis.kalanTutar || satis.genelToplam || 0);
+        const eskiDeger = satis.toObject();
+        const geriAlinanCari = Number(satis.kalanTutar || satis.genelToplam || 0);
+        const oncekiBakiye = Number(musteri.bakiye || 0);
+        musteri.bakiye -= geriAlinanCari;
         await musteri.save();
-        await CariHareket.deleteMany({ tenantId, kaynak: "SATIS", kaynakId: satis._id });
-        await StokHareket.deleteMany({ tenantId, kaynak: { $in: ["SATIS", "SATIS_DUZELTME"] }, kaynakId: satis._id });
-        await Satis.deleteOne({ _id: satis._id, tenantId });
+        await CariHareket.create({ tenantId, tarafTipi: "MUSTERI", tarafId: musteri._id, tip: "DUZELTME", tutar: Math.abs(geriAlinanCari), bakiyeDegisimi: -geriAlinanCari, oncekiBakiye, sonrakiBakiye: musteri.bakiye, aciklama: `Satış iptali ${satis.belgeNo}`, kaynak: "SATIS_IPTAL", kaynakId: satis._id, belgeNo: satis.belgeNo, tarih: new Date(), kullaniciId: islemKullaniciId(req), islemAnahtari: `TX:${req.transactionId}:CARI:SATIS_IPTAL:${satis._id}` });
+        satis.durum = "IPTAL";
+        satis.iptalTarihi = new Date();
+        satis.iptalNedeni = String(req.body?.neden || "Satış iptal edildi").trim();
+        satis.iptalEdenKullaniciId = islemKullaniciId(req);
+        await satis.save();
+        await auditKaydet({req,action:"SALE_CANCELLED",resource:"Satis",resourceId:String(satis._id),tenantId,category:"MUHASEBE_IPTAL",severity:"KRITIK",details:{islemId:String(satis._id),transactionId:req.transactionId,eskiDeger,yeniDeger:satis.toObject()}});
 
-        return res.json({ basarili: true, mesaj: "Satış silindi; stok ve cari bakiye geri alındı." });
+        return res.json({ basarili: true, mesaj: "Satış fiziksel olarak silinmeden stok ve cari ters kayıtlarıyla iptal edildi.", satis });
     } catch (error) { next(error); }
 }
 
@@ -785,6 +841,8 @@ module.exports = {
     detay,
     olustur,
     iadeAl,
+    iadeDetay,
+    iadeIptalEt,
     iadeleriListele,
     guncelle,
     sil,

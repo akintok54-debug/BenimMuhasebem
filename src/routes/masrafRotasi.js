@@ -16,7 +16,7 @@ router.get("/", controller.listele);
 router.get("/ozet", controller.ozet);
 router.post("/", yetkiKontrol("accounting.write"), tekIslemKontrol("MASRAF"), controller.olustur);
 router.get("/:id", controller.detay);
-router.patch("/:id", yetkiKontrol("accounting.write"), controller.guncelle);
+router.patch("/:id", yetkiKontrol("accounting.write"), tekIslemKontrol("MASRAF_DUZELTME"), controller.guncelle);
 router.post("/:id/iptal", yetkiKontrol("accounting.write"), tekIslemKontrol("MASRAF_IPTAL"), controller.iptalEt);
 
 module.exports = router;

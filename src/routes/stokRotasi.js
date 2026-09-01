@@ -23,5 +23,7 @@ router.get("/transferler", controller.transferler);
 router.post("/sayim", yetkiKontrol("stock.write"), tekIslemKontrol("STOK_SAYIMI"), controller.sayim);
 router.get("/sayimlar", controller.sayimlar);
 router.get("/hareketler", controller.hareketler);
+router.get("/hareketler/:id", controller.hareketDetay);
+router.post("/hareketler/:id/iptal", yetkiKontrol("stock.write"), tekIslemKontrol("STOK_HAREKETI_IPTAL"), controller.manuelHareketIptal);
 
 module.exports = router;

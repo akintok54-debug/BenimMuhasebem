@@ -76,6 +76,10 @@ const ParaHareketSchema = new mongoose.Schema(
         islemAnahtari: { type: String, default: undefined, select: false },
         orijinalHareketId: { type: mongoose.Schema.Types.ObjectId, ref: "ParaHareket", default: null },
         tersHareketId: { type: mongoose.Schema.Types.ObjectId, ref: "ParaHareket", default: null },
+        durum: { type: String, enum: ["AKTIF", "IPTAL_ISLENIYOR", "IPTAL"], default: "AKTIF", index: true },
+        iptalTarihi: { type: Date, default: null },
+        iptalNedeni: { type: String, trim: true, default: "" },
+        iptalEdenKullaniciId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null },
 
         belgeNo: { type: String, trim: true, default: "" },
 

@@ -12,7 +12,8 @@ const CariEkstrePaylasim = require("../models/CariEkstrePaylasim");
 const Tenant = require("../modules/platform/models/Tenant");
 const crypto = require("crypto");
 const { etkinYetkiler } = require("../middleware/yetkiKontrol");
-const { hareketKaydet, tedarikciOdemeKaydet } = require("../services/cariHesapServisi");
+const { hareketKaydet, tedarikciOdemeKaydet, tedarikciFaturalariYenidenDagit } = require("../services/cariHesapServisi");
+const { kaydet: auditKaydet } = require("../modules/platform/services/auditServisi");
 
 function tenantId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
@@ -366,7 +367,7 @@ async function musteriTahsilat(req, res, next) {
 }
 
 async function musteriTahsilatSil(req, res, next) {
-    let hareket = null, musteri = null, hesap = null, paraHareket = null, tersHareket = null, bakiyelerGuncellendi = false, iptalSahiplenildi = false;
+    let hareket = null, musteri = null, hesap = null, paraHareket = null, tersHareket = null, bakiyelerGuncellendi = false, iptalSahiplenildi = false, eskiDeger = null;
     try {
         const tId = tenantId(req);
         hareket = await CariHareket.findOne({
@@ -378,6 +379,7 @@ async function musteriTahsilatSil(req, res, next) {
             durum: { $ne: "IPTAL" }
         });
         if (!hareket) return res.status(404).json({ basarili: false, mesaj: "Tahsilat kaydı bulunamadı." });
+        eskiDeger = hareket.toObject();
 
         musteri = await Musteri.findOne({ _id: hareket.tarafId, tenantId: tId });
         if (!musteri) return res.status(409).json({ basarili: false, mesaj: "Tahsilatın müşteri kaydı bulunamadı." });
@@ -415,6 +417,8 @@ async function musteriTahsilatSil(req, res, next) {
             tersHareket = await ParaHareket.create({ tenantId: tId, hesapTipi: paraHareket.hesapTipi, hesapId: paraHareket.hesapId, tip: "CIKIS", tutar: paraHareket.tutar, paraBirimi: paraHareket.paraBirimi || "TRY", aciklama: `Tahsilat iptali: ${hareket.aciklama || hareket.belgeNo || "Müşteri tahsilatı"}`, kaynak: "TAHSILAT_IPTAL", kaynakId: hareket._id, belgeNo: hareket.belgeNo || paraHareket.belgeNo || "", tarih: new Date(), kullaniciId: req.currentUser?._id || req.kullanici?.kullaniciId || req.user?.kullaniciId || null, orijinalHareketId: paraHareket._id });
         }
         hareket.durum = "IPTAL"; hareket.iptalTarihi = new Date(); hareket.iptalNedeni = String(req.body?.neden || "Tahsilat iptal edildi").trim(); hareket.iptalEdenKullaniciId = req.currentUser?._id || req.kullanici?.kullaniciId || req.user?.kullaniciId || null; hareket.iptalParaHareketId = tersHareket?._id || null; await hareket.save();
+        await CekSenetPortfoy.updateMany({ tenantId: tId, kaynak: "TAHSILAT", kaynakId: hareket._id, durum: { $ne: "IPTAL" } }, { $set: { durum: "IPTAL" } });
+        await auditKaydet({ req, action: "CUSTOMER_COLLECTION_CANCELLED", resource: "CariHareket", resourceId: String(hareket._id), tenantId: tId, category: "MUHASEBE_IPTAL", severity: "KRITIK", details: { islemId: String(hareket._id), transactionId: req.transactionId, eskiDeger, yeniDeger: hareket.toObject() } });
 
         return res.json({ basarili: true, mesaj: "Tahsilat iptal edildi; geçmiş hareket korundu ve ters kasa hareketi oluşturuldu.", tersHareket });
     } catch (error) {
@@ -447,6 +451,7 @@ async function musteriTahsilatGuncelle(req, res, next) {
             durum: { $ne: "IPTAL" }
         });
         if (!hareket) return res.status(404).json({ basarili: false, mesaj: "Tahsilat kaydı bulunamadı." });
+        const eskiDeger = hareket.toObject();
 
         const musteri = await Musteri.findOne({ _id: hareket.tarafId, tenantId: tId });
         if (!musteri) return res.status(409).json({ basarili: false, mesaj: "Tahsilatın müşteri kaydı bulunamadı." });
@@ -486,6 +491,8 @@ async function musteriTahsilatGuncelle(req, res, next) {
         hareket.tarih = body.tarih || hareket.tarih;
         hareket.aciklama = String(body.aciklama ?? hareket.aciklama ?? "").trim();
         await hareket.save();
+        await CekSenetPortfoy.updateMany({ tenantId: tId, kaynak: "TAHSILAT", kaynakId: hareket._id, durum: { $ne: "IPTAL" } }, { $set: { tutar: yeniTutar } });
+        await auditKaydet({ req, action: "CUSTOMER_COLLECTION_CORRECTED", resource: "CariHareket", resourceId: String(hareket._id), tenantId: tId, category: "MUHASEBE_DUZELTME", severity: "UYARI", details: { islemId: String(hareket._id), transactionId: req.transactionId, eskiDeger, yeniDeger: hareket.toObject() } });
 
         return res.json({
             basarili: true,
@@ -585,6 +592,74 @@ async function tedarikciOdeme(req, res, next) {
     }
 }
 
+async function tedarikciOdemeGuncelle(req, res, next) {
+    const session = await mongoose.startSession();
+    let sonuc;
+    try {
+        await session.withTransaction(async () => {
+            const tId = tenantId(req), body = req.body || {}, yeniTutar = Number(body.tutar || 0);
+            if (!Number.isFinite(yeniTutar) || yeniTutar <= 0) throw Object.assign(new Error("Ödeme tutarı pozitif olmalıdır."), { status: 400 });
+            const hareket = await CariHareket.findOne({ _id: req.params.id, tenantId: tId, tarafTipi: "TEDARIKCI", tip: "ODEME", kaynak: "ODEME", durum: "AKTIF" }).session(session);
+            if (!hareket) throw Object.assign(new Error("Aktif tedarikçi ödemesi bulunamadı."), { status: 404 });
+            const eski = hareket.toObject(), eskiTutar = Number(hareket.tutar || 0), fark = yeniTutar - eskiTutar;
+            const tedarikci = await Tedarikci.findOne({ _id: hareket.tarafId, tenantId: tId }).session(session);
+            if (!tedarikci) throw Object.assign(new Error("Ödemenin tedarikçi kaydı bulunamadı."), { status: 409 });
+            const para = await ParaHareket.findOne({ tenantId: tId, kaynak: "ODEME", kaynakId: hareket._id }).session(session);
+            let hesap = null;
+            if (para) {
+                const Model = para.hesapTipi === "KASA" ? Kasa : Banka;
+                hesap = await Model.findOne({ _id: para.hesapId, tenantId: tId }).session(session);
+                if (!hesap) throw Object.assign(new Error("Ödemenin kasa/banka hesabı bulunamadı."), { status: 409 });
+                if (fark > 0 && Number(hesap.bakiye || 0) < fark) throw Object.assign(new Error("Ödeme hesabında düzeltme farkı için yeterli bakiye yok."), { status: 409 });
+                hesap.bakiye = Number(hesap.bakiye || 0) - fark;
+                await hesap.save({ session });
+                if (Math.abs(fark) > 0.000001) await ParaHareket.create([{ tenantId: tId, hesapTipi: para.hesapTipi, hesapId: para.hesapId, tip: fark > 0 ? "CIKIS" : "GIRIS", tutar: Math.abs(fark), paraBirimi: para.paraBirimi || "TRY", aciklama: `Tedarikçi ödeme düzeltmesi: ${hareket.belgeNo || hareket._id}`, kaynak: "ODEME_DUZELTME", kaynakId: hareket._id, orijinalHareketId: para._id, belgeNo: hareket.belgeNo || "", tarih: body.tarih || new Date(), kullaniciId: aktorId(req), islemAnahtari: `TX:${req.transactionId}:PARA:TEDARIKCI_ODEME_DUZELTME:${hareket._id}` }], { session });
+            }
+            tedarikci.bakiye = Number(tedarikci.bakiye || 0) - fark;
+            await tedarikci.save({ session });
+            hareket.tutar = yeniTutar; hareket.bakiyeDegisimi = -yeniTutar;
+            if (hareket.oncekiBakiye !== null) hareket.sonrakiBakiye = Number(hareket.oncekiBakiye) - yeniTutar;
+            hareket.tarih = body.tarih || hareket.tarih; hareket.aciklama = String(body.aciklama ?? hareket.aciklama ?? "").trim();
+            await hareket.save({ session });
+            const dagitim = await tedarikciFaturalariYenidenDagit({ tenantId: tId, tedarikciId: hareket.tarafId, session });
+            sonuc = { hareket, eski, yeni: hareket.toObject(), tedarikciBakiye: tedarikci.bakiye, dagitim };
+        });
+        await auditKaydet({ req, action: "SUPPLIER_PAYMENT_CORRECTED", resource: "CariHareket", resourceId: String(req.params.id), tenantId: tenantId(req), category: "MUHASEBE_DUZELTME", severity: "UYARI", details: { islemId: String(req.params.id), transactionId: req.transactionId, eskiDeger: sonuc.eski, yeniDeger: sonuc.yeni } });
+        return res.json({ basarili: true, mesaj: "Tedarikçi ödemesi; cari, kasa/banka ve açık faturalarla birlikte düzeltildi.", ...sonuc });
+    } catch (error) { next(error); }
+    finally { await session.endSession(); }
+}
+
+async function tedarikciOdemeIptal(req, res, next) {
+    const session = await mongoose.startSession();
+    let sonuc;
+    try {
+        await session.withTransaction(async () => {
+            const tId = tenantId(req);
+            const hareket = await CariHareket.findOneAndUpdate({ _id: req.params.id, tenantId: tId, tarafTipi: "TEDARIKCI", tip: "ODEME", kaynak: "ODEME", durum: "AKTIF" }, { $set: { durum: "IPTAL_ISLENIYOR" } }, { new: true, session });
+            if (!hareket) throw Object.assign(new Error("Aktif tedarikçi ödemesi bulunamadı veya iptal edilmiş."), { status: 404 });
+            const eski = hareket.toObject(), tutar = Number(hareket.tutar || 0);
+            const tedarikci = await Tedarikci.findOne({ _id: hareket.tarafId, tenantId: tId }).session(session);
+            if (!tedarikci) throw Object.assign(new Error("Ödemenin tedarikçi kaydı bulunamadı."), { status: 409 });
+            tedarikci.bakiye = Number(tedarikci.bakiye || 0) + tutar; await tedarikci.save({ session });
+            const para = await ParaHareket.findOne({ tenantId: tId, kaynak: "ODEME", kaynakId: hareket._id }).session(session);
+            let tersHareket = null;
+            if (para) {
+                const Model = para.hesapTipi === "KASA" ? Kasa : Banka, hesap = await Model.findOne({ _id: para.hesapId, tenantId: tId }).session(session);
+                if (!hesap) throw Object.assign(new Error("Ödemenin kasa/banka hesabı bulunamadı."), { status: 409 });
+                hesap.bakiye = Number(hesap.bakiye || 0) + tutar; await hesap.save({ session });
+                [tersHareket] = await ParaHareket.create([{ tenantId: tId, hesapTipi: para.hesapTipi, hesapId: para.hesapId, tip: "GIRIS", tutar, paraBirimi: para.paraBirimi || "TRY", aciklama: `Tedarikçi ödeme iptali: ${hareket.belgeNo || hareket._id}`, kaynak: "ODEME_IPTAL", kaynakId: hareket._id, orijinalHareketId: para._id, belgeNo: hareket.belgeNo || "", tarih: new Date(), kullaniciId: aktorId(req), islemAnahtari: `TX:${req.transactionId}:PARA:TEDARIKCI_ODEME_IPTAL:${hareket._id}` }], { session });
+            }
+            hareket.durum = "IPTAL"; hareket.iptalTarihi = new Date(); hareket.iptalNedeni = String(req.body?.neden || "Tedarikçi ödemesi iptal edildi").trim(); hareket.iptalEdenKullaniciId = aktorId(req); hareket.iptalParaHareketId = tersHareket?._id || null; await hareket.save({ session });
+            const dagitim = await tedarikciFaturalariYenidenDagit({ tenantId: tId, tedarikciId: hareket.tarafId, session });
+            sonuc = { hareket, eski, yeni: hareket.toObject(), tersHareket, tedarikciBakiye: tedarikci.bakiye, dagitim };
+        });
+        await auditKaydet({ req, action: "SUPPLIER_PAYMENT_CANCELLED", resource: "CariHareket", resourceId: String(req.params.id), tenantId: tenantId(req), category: "MUHASEBE_IPTAL", severity: "KRITIK", details: { islemId: String(req.params.id), transactionId: req.transactionId, eskiDeger: sonuc.eski, yeniDeger: sonuc.yeni } });
+        return res.json({ basarili: true, mesaj: "Tedarikçi ödemesi silinmeden ters finans kaydıyla iptal edildi; faturalar yeniden dağıtıldı.", ...sonuc });
+    } catch (error) { next(error); }
+    finally { await session.endSession(); }
+}
+
 async function tedarikciManuelHareket(req, res, next) {
     try {
         const tId = tenantId(req), body = req.body || {}, tutar = Number(body.tutar || 0), tip = String(body.tip || "").toUpperCase();
@@ -627,6 +702,8 @@ module.exports = {
     musteriOdeme,
     musteriBakiyeDuzelt,
     tedarikciOdeme,
+    tedarikciOdemeGuncelle,
+    tedarikciOdemeIptal,
     tedarikciTahsilat,
     tedarikciManuelHareket,
     tedarikciBakiyeDuzelt,

@@ -64,7 +64,10 @@ const SahaGunSchema = new mongoose.Schema({
         teslimTarihi: { type: Date, default: null },
         transferGrupId: { type: mongoose.Schema.Types.ObjectId, default: null },
         teslimEdenKullaniciId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null },
-        teslimAlanKullaniciId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null }
+        teslimAlanKullaniciId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null },
+        sonIptalTarihi: { type: Date, default: null },
+        sonIptalNedeni: { type: String, trim: true, default: "" },
+        sonIptalEdenKullaniciId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null }
     }
 }, { timestamps: true });
 

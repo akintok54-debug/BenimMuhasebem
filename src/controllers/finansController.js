@@ -12,6 +12,7 @@ const Alis = require("../models/Alis");
 const Masraf = require("../models/Masraf");
 const PersonelFinansIslem = require("../models/PersonelFinansIslem");
 const Personel = require("../models/Personel");
+const { kaydet: auditKaydet } = require("../modules/platform/services/auditServisi");
 
 function tenantId(req) { return new mongoose.Types.ObjectId(String(req.tenantId)); }
 function metin(value) { return String(value ?? "").trim(); }
@@ -292,6 +293,35 @@ async function hesapHareketi(req, res, next) {
     } catch (error) { next(error); }
 }
 
+async function paraHareketDetay(req, res, next) {
+    try {
+        const hareket = await ParaHareket.findOne({ _id: req.params.id, tenantId: tenantId(req) }).populate("kullaniciId", "adSoyad email").populate("iptalEdenKullaniciId", "adSoyad email").lean();
+        if (!hareket) return res.status(404).json({ basarili: false, mesaj: "Para hareketi bulunamadı." });
+        return res.json({ basarili: true, hareket: (await hareketleriZenginlestir(tenantId(req), [hareket]))[0] });
+    } catch (error) { next(error); }
+}
+
+async function manuelHareketIptal(req, res, next) {
+    const session = await mongoose.startSession();
+    let sonuc;
+    try {
+        await session.withTransaction(async () => {
+            const tId = tenantId(req), hareket = await ParaHareket.findOneAndUpdate({ _id: req.params.id, tenantId: tId, kaynak: "MANUEL", durum: { $in: ["AKTIF", null] } }, { $set: { durum: "IPTAL_ISLENIYOR" } }, { new: true, session });
+            if (!hareket) throw Object.assign(new Error("Aktif manuel para hareketi bulunamadı."), { status: 404 });
+            const eski = hareket.toObject(), Model = hesapModeli(hareket.hesapTipi), tersTip = hareket.tip === "GIRIS" ? "CIKIS" : "GIRIS";
+            const filter = { _id: hareket.hesapId, tenantId: tId, ...(tersTip === "CIKIS" ? { bakiye: { $gte: hareket.tutar } } : {}) };
+            const hesap = await Model.findOneAndUpdate(filter, { $inc: { bakiye: tersTip === "GIRIS" ? hareket.tutar : -hareket.tutar } }, { new: true, session });
+            if (!hesap) throw Object.assign(new Error("Hesap bakiyesi hareketi geri almaya yetmiyor veya hesap bulunamadı."), { status: 409 });
+            const [tersHareket] = await ParaHareket.create([{ tenantId: tId, hesapTipi: hareket.hesapTipi, hesapId: hareket.hesapId, tip: tersTip, tutar: hareket.tutar, paraBirimi: hareket.paraBirimi || "TRY", aciklama: `Manuel hareket iptali: ${hareket.aciklama || hareket.belgeNo}`, kaynak: "MANUEL_IPTAL", kaynakId: hareket._id, orijinalHareketId: hareket._id, belgeNo: hareket.belgeNo || "", tarih: new Date(), kullaniciId: kullaniciId(req), islemAnahtari: `TX:${req.transactionId}:PARA:MANUEL_IPTAL:${hareket._id}` }], { session });
+            hareket.durum = "IPTAL"; hareket.iptalTarihi = new Date(); hareket.iptalNedeni = metin(req.body?.neden) || "Manuel para hareketi iptal edildi"; hareket.iptalEdenKullaniciId = kullaniciId(req); hareket.tersHareketId = tersHareket._id; await hareket.save({ session });
+            sonuc = { hareket, tersHareket, hesap, eski, yeni: hareket.toObject() };
+        });
+        await auditKaydet({ req, action: "MANUAL_MONEY_MOVEMENT_CANCELLED", resource: "ParaHareket", resourceId: String(req.params.id), tenantId: tenantId(req), category: "MUHASEBE_IPTAL", severity: "KRITIK", details: { islemId: String(req.params.id), transactionId: req.transactionId, eskiDeger: sonuc.eski, yeniDeger: sonuc.yeni } });
+        return res.json({ basarili: true, mesaj: "Manuel para hareketi silinmeden ters kayıtla iptal edildi.", ...sonuc });
+    } catch (error) { next(error); }
+    finally { await session.endSession(); }
+}
+
 async function transfer(req, res, next) {
     try {
         const tId = tenantId(req), body = req.body || {}, tutar = tutarDogrula(body.tutar);
@@ -352,9 +382,9 @@ async function cekSenetPortfoyu(req, res, next) {
         if (["CEK", "SENET"].includes(String(req.query.tur || "").toUpperCase())) filter.tur = String(req.query.tur).toUpperCase();
         if (req.query.durum) filter.durum = String(req.query.durum).toUpperCase();
         const evraklar = await CekSenetPortfoy.find(filter).populate("musteriId", "kod unvan adSoyad").populate("kullaniciId", "adSoyad email").sort({ vadeTarihi: 1, createdAt: -1 }).lean();
-        const toplamlar = evraklar.reduce((o, x) => { const isaret = x.hareketTipi === "IADE" ? -1 : 1; o[x.tur] = (o[x.tur] || 0) + isaret * Number(x.tutar || 0); return o; }, { CEK: 0, SENET: 0 });
+        const toplamlar = evraklar.filter(x => x.durum !== "IPTAL").reduce((o, x) => { const isaret = x.hareketTipi === "IADE" ? -1 : 1; o[x.tur] = (o[x.tur] || 0) + isaret * Number(x.tutar || 0); return o; }, { CEK: 0, SENET: 0 });
         res.json({ basarili: true, toplam: evraklar.length, toplamlar, evraklar });
     } catch (error) { next(error); }
 }
 
-module.exports = { kasaListele, kasaOlustur, kasaEkstresi, kasaRaporu, bankaListele, bankaOlustur, hesapGuncelle, paraHareketleri, hesapHareketi, transfer, ozet, cekSenetPortfoyu, ekstreOzetle, hareketTuruBelirle, donemSinirlari };
+module.exports = { kasaListele, kasaOlustur, kasaEkstresi, kasaRaporu, bankaListele, bankaOlustur, hesapGuncelle, paraHareketleri, paraHareketDetay, hesapHareketi, manuelHareketIptal, transfer, ozet, cekSenetPortfoyu, ekstreOzetle, hareketTuruBelirle, donemSinirlari };
