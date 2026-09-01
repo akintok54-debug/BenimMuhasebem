@@ -38,9 +38,6 @@
             <button data-page="ayarlar">Ayarlar</button>
         </nav>
 
-        <button id="logoutButton" class="logout">
-            Çıkış Yap
-        </button>
     </aside>
 
     <main class="main">
@@ -49,7 +46,10 @@
                 <h1 id="pageTitle">Ana Sayfa</h1>
                 <span id="tenantInfo">İşletme hesabınız aktif</span>
             </div>
-            <button id="accountButton" class="account-button" type="button"><span class="account-avatar">H</span><span><strong>Hesabım</strong><small>Profil ve güvenlik</small></span></button>
+            <div class="topbar-actions">
+                <button id="accountButton" class="account-button" type="button"><span class="account-avatar">H</span><span><strong>Hesabım</strong><small>Profil ve güvenlik</small></span></button>
+                <button id="logoutButton" class="logout topbar-logout" type="button">Çıkış Yap</button>
+            </div>
         </header>
 
         <section id="content"></section>
@@ -58,7 +58,7 @@
 </div>
 
 <script src="/api/assets/xlsx.js?v=0.18.5"></script>
-<script src="/erp/erp.js?v=20260901-rapor-metinleri05"></script>
+<script src="/erp/erp.js?v=20260901-eticaret-merkezi02"></script>
 </body>
 </html>
 

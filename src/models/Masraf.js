@@ -35,6 +35,8 @@ const MasrafSchema = new mongoose.Schema(
                 "BAKIM",
                 "TEMIZLIK",
                 "SIGORTA",
+                "PAZARYERI_KOMISYON",
+                "PAZARYERI_HIZMET",
                 "DIGER"
             ],
             default: "DIGER",

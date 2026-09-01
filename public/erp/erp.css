@@ -5,6 +5,24 @@
     background: #f5f7fb;
 }
 
+.ecommerce-status { display:flex; gap:10px; align-items:center; justify-content:space-between; padding:12px 16px; margin:14px 0; border-radius:12px; border:1px solid #d7dee9; background:#fff; }
+.ecommerce-status.connected { border-color:#8bd3ad; background:#f0fff7; }
+.ecommerce-status.not-connected { border-color:#f0c36a; background:#fff9eb; }
+.ecommerce-status span { color:#5d6878; font-size:13px; }
+.ecommerce-tabs { overflow-x:auto; flex-wrap:nowrap; padding-bottom:4px; }
+.ecommerce-tabs button { white-space:nowrap; }
+.ecommerce-kpis { grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); }
+.ecommerce-filters { align-items:end; }
+.ecommerce-table-tools { display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end; }
+.ecommerce-table-tools input { width:min(280px,100%);padding:9px 11px;border:1px solid #cbd5e1;border-radius:9px; }
+.ecommerce-pagination { display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:12px;color:#64748b;font-size:13px; }
+@media (max-width: 760px) {
+    .ecommerce-status { align-items:flex-start; flex-direction:column; }
+    .ecommerce-filters > * { width:100%; }
+    .ecommerce-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 440px) { .ecommerce-kpis { grid-template-columns:1fr; } }
+
 /* Tedarikçiler V2 */
 .supplier-hero { display:flex; justify-content:space-between; align-items:center; gap:18px; padding:24px; margin-bottom:18px; border-radius:18px; color:#fff; background:linear-gradient(135deg,#0f766e,#0f172a); box-shadow:0 16px 36px rgba(15,118,110,.18); }
 .supplier-hero span { color:#99f6e4; font-size:12px; font-weight:800; letter-spacing:1px; }
@@ -222,6 +240,10 @@ nav button:focus {
 }
 
 .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
     background: white;
     border-bottom: 1px solid #e5e7eb;
     padding: 18px 28px;
@@ -229,6 +251,11 @@ nav button:focus {
     top: 0;
     z-index: 5;
 }
+
+.topbar-actions { display:flex;align-items:center;gap:9px;margin-left:auto; }
+.topbar .account-button { margin-left:0; }
+.topbar-logout { margin-top:0;background:#fff1f2;color:#be123c;border:1px solid #fecdd3;font-weight:800;white-space:nowrap; }
+.topbar-logout:hover { background:#ffe4e6; }
 
 .topbar h1 {
     margin: 0 0 5px;
@@ -699,9 +726,8 @@ th {
         grid-template-columns: repeat(2, 1fr);
     }
 
-    .logout {
-        margin-top: 15px;
-    }
+    .topbar { padding:14px 16px; }
+    .topbar-logout { margin-top:0; }
 
     .dashboard-two-column {
         grid-template-columns: 1fr;

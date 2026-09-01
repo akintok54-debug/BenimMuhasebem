@@ -10,6 +10,10 @@ const YETKI_KATALOGU = [
     { kod: "cash.read", grup: "Finans", ad: "Kasa ve banka görüntüle" }, { kod: "cash.write", grup: "Finans", ad: "Kasa hareketi ve transfer yap" },
     { kod: "accounting.read", grup: "Muhasebe", ad: "Cari ve masrafları görüntüle" }, { kod: "accounting.write", grup: "Muhasebe", ad: "Tahsilat, ödeme ve masraf yönet" },
     { kod: "reports.read", grup: "Yönetim", ad: "Raporları görüntüle" }, { kod: "tenant.users", grup: "Yönetim", ad: "Kullanıcı ve yetkileri yönet" },
+    { kod: "ecommerce.view", grup: "E-Ticaret", ad: "Entegrasyon merkezini görüntüle" }, { kod: "ecommerce.orders", grup: "E-Ticaret", ad: "Pazaryeri siparişlerini yönet" },
+    { kod: "ecommerce.products", grup: "E-Ticaret", ad: "Ürün, stok ve fiyat eşleştirmelerini yönet" }, { kod: "ecommerce.returns", grup: "E-Ticaret", ad: "İade ve iptalleri yönet" },
+    { kod: "ecommerce.finance", grup: "E-Ticaret", ad: "Komisyon, hakediş ve mutabakatı yönet" }, { kod: "ecommerce.documents", grup: "E-Ticaret", ad: "E-belgeleri yönet" },
+    { kod: "ecommerce.sync", grup: "E-Ticaret", ad: "Senkronizasyonları çalıştır" }, { kod: "ecommerce.settings", grup: "E-Ticaret", ad: "API bağlantı bilgilerini yönet" },
     { kod: "tenant.settings", grup: "Yönetim", ad: "Firma ve sistem ayarlarını yönet" }, { kod: "balance.adjust", grup: "Kritik", ad: "Cari bakiye düzelt" }
 ];
 const YETKILER = {
@@ -17,9 +21,9 @@ const YETKILER = {
     MANAGER: ["sales.*", "purchase.*", "stock.*", "customer.*", "supplier.*", "field.*", "cash.read", "reports.read"],
     SALES: ["sales.*", "field.read", "field.write", "customer.read", "customer.write", "stock.read"],
     CASHIER: ["cash.*", "customer.read", "sales.read"],
-    ACCOUNTING: ["cash.*", "accounting.*", "customer.*", "supplier.*", "reports.read", "sales.read", "purchase.read"],
-    WAREHOUSE: ["stock.*", "sales.read", "purchase.read", "supplier.read"],
-    ECOMMERCE: ["sales.*", "customer.read", "stock.read"]
+    ACCOUNTING: ["cash.*", "accounting.*", "customer.*", "supplier.*", "reports.read", "sales.read", "purchase.read", "ecommerce.view", "ecommerce.documents", "ecommerce.finance"],
+    WAREHOUSE: ["stock.*", "sales.read", "purchase.read", "supplier.read", "ecommerce.view", "ecommerce.orders"],
+    ECOMMERCE: ["sales.*", "customer.read", "stock.read", "ecommerce.view", "ecommerce.orders", "ecommerce.products", "ecommerce.returns", "ecommerce.sync"]
 };
 
 const ESKI_CARI_YETKILERI = {

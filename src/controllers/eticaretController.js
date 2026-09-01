@@ -13,6 +13,7 @@ async function listele(req, res, next) {
         const siparisler = await EticaretSiparis.find({
             tenantId: tenantId(req)
         })
+            .select("-hamVeri")
             .populate("musteriId", "kod unvan adSoyad telefon whatsapp")
             .populate("urunler.urunId", "kod barkod ad")
             .sort({ createdAt: -1 })
