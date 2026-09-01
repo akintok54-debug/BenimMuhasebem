@@ -4,6 +4,7 @@ const MarketplaceProductMappingSchema = new mongoose.Schema({
     productId: { type: mongoose.Schema.Types.ObjectId, ref: "Urun", required: true, index: true },
     provider: { type: String, required: true, index: true },
     storeConnectionId: { type: mongoose.Schema.Types.ObjectId, ref: "IntegrationConnection", required: true, index: true },
+    connectionId: { type: mongoose.Schema.Types.ObjectId, ref: "IntegrationConnection", default: null, index: true },
     externalProductId: { type: String, default: "" }, externalBarcode: { type: String, default: "" }, externalSku: { type: String, default: "" }, externalCategoryId: { type: String, default: "" },
     categoryAttributes: { type: mongoose.Schema.Types.Mixed, default: {} },
     safetyStock: { type: Number, min: 0, default: 0 }, reservedStock: { type: Number, min: 0, default: 0 },

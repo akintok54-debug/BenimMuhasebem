@@ -5,6 +5,7 @@ const tenantKontrol = require("../middleware/tenantKontrol");
 const controller = require("../controllers/eticaretController");
 const merkez = require("../controllers/eticaretMerkeziController");
 const { yetkiKontrol } = require("../middleware/yetkiKontrol");
+const tekIslemKontrol = require("../middleware/tekIslemKontrol");
 
 const router = express.Router();
 
@@ -16,6 +17,8 @@ router.post("/connections", yetkiKontrol("ecommerce.settings"), merkez.connectio
 router.patch("/connections/:id", yetkiKontrol("ecommerce.settings"), merkez.connectionUpdate);
 router.delete("/connections/:id", yetkiKontrol("ecommerce.settings"), merkez.connectionDisable);
 router.post("/connections/:id/test", yetkiKontrol("ecommerce.settings"), merkez.connectionTest);
+router.post("/connections/:id/ideasoft/pilot-test", yetkiKontrol("ecommerce.settings", "ecommerce.sync"), tekIslemKontrol("IDEASOFT_PILOT"), merkez.ideasoftPilot);
+router.get("/ideasoft/oauth/callback", merkez.ideasoftOauthCallback);
 router.post("/sync", yetkiKontrol("ecommerce.sync"), merkez.syncCreate);
 router.get("/sync-jobs", yetkiKontrol("ecommerce.view"), merkez.syncJobs);
 router.get("/errors", yetkiKontrol("ecommerce.view"), merkez.errors);

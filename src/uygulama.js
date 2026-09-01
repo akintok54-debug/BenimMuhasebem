@@ -54,7 +54,7 @@ uygulama.use(girdiTemizleme);
 uygulama.use(csrfKontrol);
 uygulama.use(httpsZorunlulugu);
 uygulama.use(rateLimit({ pencereMs: 15 * 60 * 1000, limit: 500, anahtar: req => `api:${req.ip}` }));
-uygulama.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev", { skip: req => req.path === "/api/saglik" }));
+uygulama.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev", { skip: req => req.path === "/api/saglik" || req.path === "/api/tenant/eticaret/ideasoft/oauth/callback" }));
 
 const publicKlasoru = path.join(__dirname, "..", "public");
 const platformPaneliGonder = (req, res) => {

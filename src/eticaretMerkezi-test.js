@@ -13,8 +13,11 @@ const IncomingDocument = require("./models/IncomingDocument");
 const MarketplaceReturn = require("./models/MarketplaceReturn");
 const MarketplaceFinanceTransaction = require("./models/MarketplaceFinanceTransaction");
 const MarketplaceCategoryMapping = require("./models/MarketplaceCategoryMapping");
+const MarketplaceProductMapping = require("./models/MarketplaceProductMapping");
 const MarketplaceAdapter = require("./integrations/marketplace/MarketplaceAdapter");
 const TrendyolAdapter = require("./integrations/marketplace/TrendyolAdapter");
+const IdeaSoftAdapter = require("./integrations/marketplace/IdeaSoftAdapter");
+const { domainUrl } = require("./integrations/marketplace/IdeaSoftAdapter");
 const { guvenliDetay, tekrarDene } = require("./services/eticaretSyncServisi");
 
 function uniqueIndex(Model, keys) { return Model.schema.indexes().some(([fields, options]) => keys.every(key => fields[key] === 1) && options.unique); }
@@ -96,8 +99,56 @@ test("Teknik hata detaylarından secret, token ve authorization alanları temizl
 });
 
 test("Marketplace adapter sözleşmesi istenen operasyonları taşır", () => {
-    const methods = ["testConnection","getCategories","getCategoryAttributes","pushProducts","updateProducts","updateStock","updatePrices","pullOrders","getOrder","updateOrderStatus","pullReturns","pullCancellations","getCargoCompanies","createShipment","getShippingLabel","sendInvoice","pullSettlements","pullFinancialTransactions","pullCustomerQuestions"];
+    const methods = ["testConnection","pullProducts","getCategories","getCategoryAttributes","pushProducts","updateProducts","updateStock","updatePrice","updatePrices","pullOrders","getOrder","updateOrderStatus","pullCustomers","pullCategories","pullReturns","pullCancellations","getCargoCompanies","createShipment","getShippingLabel","sendInvoice","pullSettlements","pullFinancialTransactions","pullCustomerQuestions"];
     for (const method of methods) assert.equal(typeof MarketplaceAdapter.prototype[method], "function", method);
+});
+
+test("IdeaSoft adapter yalnız resmi HTTPS mağaza domainini ve doğrulanmış Admin API yollarını kullanır", async () => {
+    assert.equal(domainUrl("akn-motosiklet.myideasoft.com").toString(), "https://akn-motosiklet.myideasoft.com/");
+    assert.throws(() => domainUrl("http://localhost:5000"), /HTTPS/);
+    const calls = [];
+    const adapter = new IdeaSoftAdapter({ provider: "IDEASOFT", apiBaseUrl: "https://akn-motosiklet.myideasoft.com", active: true }, { clientId: "client", clientSecret: "secret", accessToken: "token" });
+    adapter.request = async (url, options = {}) => { calls.push({ url, options }); return []; };
+    await adapter.pullProducts({ limit: 5 }); await adapter.pullOrders({ limit: 5 }); await adapter.pullCustomers({ limit: 5 }); await adapter.pullCategories({ limit: 5 });
+    assert.deepEqual(calls.map(x => x.url), ["/admin-api/products", "/admin-api/orders", "/admin-api/members", "/admin-api/categories"]);
+    assert.equal(adapter.authorizationUrl({ redirectUri: "https://www.benimmuhasebe.com/api/tenant/eticaret/ideasoft/oauth/callback", state: "state" }).includes("/panel/auth"), true);
+});
+
+test("IdeaSoft stok ve fiyat güncellemesi resmi Product GET/PUT kaynağını kullanır", async () => {
+    const calls = [], adapter = new IdeaSoftAdapter({ _id: "507f1f77bcf86cd799439011", tenantId: "507f1f77bcf86cd799439012", provider: "IDEASOFT", apiBaseUrl: "https://akn-motosiklet.myideasoft.com", active: true }, { clientId: "client", clientSecret: "secret", accessToken: "token" });
+    adapter.request = async (url, options = {}) => { calls.push({ url, options }); return options.method === "PUT" ? options.body : { id: 123, name: "Ürün", sku: "SKU-1", stockAmount: 2, price1: 10 }; };
+    await adapter.updateStock([{ externalProductId: "123", quantity: 7 }]);
+    await adapter.updatePrice([{ externalProductId: "123", salePrice: 15.5 }]);
+    assert.deepEqual(calls.map(x => [x.url, x.options.method || "GET"]), [["/admin-api/products/123", "GET"], ["/admin-api/products/123", "PUT"], ["/admin-api/products/123", "GET"], ["/admin-api/products/123", "PUT"]]);
+    assert.equal(calls[1].options.body.stockAmount, 7);
+    assert.equal(calls[3].options.body.price1, 15.5);
+});
+
+test("IdeaSoft bağlantısı AKN tenant ortam değişkeniyle sınırlandırılır ve tam senkronizasyon pilot teste bağlıdır", () => {
+    const controller = read("src/controllers/eticaretMerkeziController.js"), routes = read("src/routes/eticaretRotasi.js");
+    assert.match(controller, /IDEASOFT_AKN_TENANT_ID/);
+    assert.match(controller, /req\.user\?\.tenantId/);
+    assert.match(controller, /pilotStatus !== "SUCCESS"/);
+    assert.match(routes, /ideasoft\/pilot-test/);
+    assert.match(routes, /ideasoft\/oauth\/callback/);
+});
+
+test("IdeaSoft eşleşmeyen ürünleri otomatik ERP ürününe dönüştürmez", () => {
+    const sync = read("src/services/eticaretSyncServisi.js");
+    const pullBlock = sync.slice(sync.indexOf("async function urunleriAl"), sync.indexOf("async function ideasoftPilotTest"));
+    assert.doesNotMatch(pullBlock, /Urun\.create/);
+    assert.match(pullBlock, /unmatchedProducts/);
+    assert.match(sync, /EticaretSiparis\.exists\(\{ tenantId: job\.tenantId/);
+    assert.match(sync, /Siparis\.findOneAndUpdate\(\{ tenantId: job\.tenantId/);
+    assert.ok(MarketplaceProductMapping.schema.path("connectionId"));
+});
+
+test("IdeaSoft secret ve token alanları response ve loglardan çıkarılır", () => {
+    const model = read("src/models/IntegrationConnection.js"), sync = read("src/services/eticaretSyncServisi.js"), ui = read("public/erp/erp.js");
+    assert.match(model, /delete ret\.encryptedCredentials/);
+    assert.match(sync, /secret\|token\|password\|authorization\|credential/);
+    assert.match(ui, /Client Secret/);
+    assert.match(ui, /type="password"/);
 });
 
 test("E-Ticaret API kimliksiz erişimi reddeder", async () => {
