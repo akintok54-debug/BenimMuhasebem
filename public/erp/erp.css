@@ -182,6 +182,8 @@
 .product-photo-editor { display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;color:#64748b; }
 .product-photo { width:160px;height:160px;border-radius:18px;border:2px dashed #cbd5e1;font-size:48px; }
 .product-modal { max-width:1050px; }
+.product-category-row { display:flex; gap:6px; align-items:center; }
+.product-category-row select { flex:1; }
 .product-modal form { flex:1 1 auto;min-height:0;overflow:hidden; }
 .product-modal .product-form-layout { flex:1 1 auto;min-height:0;overflow-y:auto; }
 .product-modal .erp-modal-footer { position:sticky;bottom:0;z-index:2;box-shadow:0 -8px 18px rgba(15,23,42,.06); }
