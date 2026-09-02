@@ -164,6 +164,9 @@
 .tedarikci-kalem select,.tedarikci-kalem input { width:100%; min-width:90px; padding:9px; border:1px solid #d7dee9; border-radius:8px; }
 .supplier-document-total { margin-top:14px; padding:14px 16px; border-radius:11px; background:#ecfdf5; color:#065f46; text-align:right; font-size:16px; }
 .supplier-document-total strong { margin-left:8px; font-size:21px; }
+.supplier-document-total.invoice-like { display:flex; flex-direction:column; gap:6px; }
+.supplier-document-total.invoice-like div:last-child { border-top:1px solid #a7f3d0; padding-top:8px; }
+.supplier-document-total.invoice-like div:last-child strong { font-size:22px; }
 
 .product-welcome { background:linear-gradient(135deg,#1d4ed8,#6d28d9); }
 .product-hero { display:flex;justify-content:space-between;align-items:center;gap:18px;padding:24px;margin-bottom:18px;border-radius:18px;color:#fff;background:linear-gradient(135deg,#1e3a8a,#6d28d9);box-shadow:0 16px 36px rgba(79,70,229,.2); }
