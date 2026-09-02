@@ -234,6 +234,9 @@ table td small { display:block;margin-top:4px;color:#64748b; }
 .purchase-status.acik { background:#fee2e2;color:#991b1b; }
 .purchase-status.kismi { background:#fef3c7;color:#92400e; }
 .purchase-status.odendi { background:#dcfce7;color:#166534; }
+.purchase-status.iptal { background:#fee2e2;color:#991b1b; }
+.ted-hareket-iptal td { opacity:0.6; text-decoration:line-through; }
+.ted-hareket-iptal td:nth-child(2) { text-decoration:none; }
 .purchase-start { display:flex;align-items:end;gap:12px;max-width:720px; }
 .purchase-start label { display:grid;gap:7px;flex:1;font-weight:700; }
 .purchase-start select { padding:11px;border:1px solid #cbd5e1;border-radius:9px;background:#fff; }
