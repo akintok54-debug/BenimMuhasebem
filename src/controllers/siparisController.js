@@ -12,11 +12,11 @@ const EticaretSiparis = require("../models/EticaretSiparis");
 const IntegrationConnection = require("../models/IntegrationConnection");
 const { marketplaceAdapter } = require("../integrations/marketplace/adapterFactory");
 
-// ERP siparişi iptal edildiğinde kaynak pazaryeri siparişini de iptal olarak işaretler; başarısızlık ERP iptalini engellemez.
+// ERP siparişi iptal edildiğinde kaynak pazaryeri kaydını da IPTAL olarak günceller ve pazaryerine bildirir; pazaryeri bildirimi başarısız olsa da yerel durum güncellenir.
 async function pazaryeriSiparisIptaliniBildir(tId, siparisId) {
+    const eticaretSiparis = await EticaretSiparis.findOneAndUpdate({ tenantId: tId, erpSiparisId: siparisId, durum: { $ne: "IPTAL" } }, { $set: { durum: "IPTAL" } }, { new: true });
+    if (!eticaretSiparis || eticaretSiparis.platform !== "IDEASOFT") return;
     try {
-        const eticaretSiparis = await EticaretSiparis.findOne({ tenantId: tId, erpSiparisId: siparisId });
-        if (!eticaretSiparis || eticaretSiparis.platform !== "IDEASOFT") return;
         const connection = await IntegrationConnection.findOne({ _id: eticaretSiparis.connectionId, tenantId: tId, active: true }).select("+encryptedCredentials");
         if (!connection) return;
         await marketplaceAdapter(connection).updateOrderStatus(eticaretSiparis.externalOrderId, "cancelled");
