@@ -118,14 +118,24 @@ async function siparisleriAl(job, connection, adapter) {
 }
 
 async function urunleriAl(job, connection, adapter, { limit = 100, maxPages = 100 } = {}) {
-    let processed = 0, success = 0, unmatched = 0; const unmatchedProducts = [];
+    let processed = 0, success = 0, created = 0, unmatched = 0; const unmatchedProducts = [];
     for (let page = 1; page <= maxPages; page++) {
         const response = await tekrarDene(() => adapter.pullProducts({ limit, page })), products = yanitSatirlari(response, ["products"]);
         for (const external of products) {
             const externalProductId = String(external.id || ""); if (!externalProductId) continue;
             const externalSku = String(external.sku || external.stockCode || external.productCode || "").trim(), externalBarcode = String(external.barcode || external.ean || "").trim(), filters = [...(externalBarcode ? [{ barkod: externalBarcode }] : []), ...(externalSku ? [{ kod: externalSku.toUpperCase() }] : [])];
-            const product = filters.length ? await Urun.findOne({ tenantId: job.tenantId, $or: filters }).select("_id").lean() : null;
-            if (!product) { unmatched++; if (unmatchedProducts.length < 100) unmatchedProducts.push({ externalProductId, externalSku, externalBarcode, name: String(external.name || external.fullName || "") }); processed++; continue; }
+            let product = filters.length ? await Urun.findOne({ tenantId: job.tenantId, $or: filters }) : null;
+            const name = String(external.name || external.fullName || external.title || `IdeaSoft Ürün ${externalProductId}`).trim().slice(0, 200);
+            if (!product) {
+                if (!externalSku && !externalBarcode) { unmatched++; if (unmatchedProducts.length < 100) unmatchedProducts.push({ externalProductId, externalSku, externalBarcode, name }); processed++; continue; }
+                const kod = (externalSku || externalBarcode || `IDEA-${externalProductId}`).toUpperCase().slice(0, 60);
+                const satisFiyati = Math.max(0, Number(external.price1 ?? external.salePrice ?? external.price ?? 0) || 0);
+                const kdv = Math.max(0, Number(external.taxRate ?? external.vatRate ?? external.tax ?? 20) || 0);
+                try {
+                    product = await Urun.findOneAndUpdate({ tenantId: job.tenantId, kod }, { $setOnInsert: { tenantId: job.tenantId, kod, barkod: externalBarcode, ad: name, satisFiyati, perakendeFiyati: satisFiyati, kdv, notlar: `IdeaSoft ürünü #${externalProductId}` } }, { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true });
+                    created++;
+                } catch (error) { unmatched++; if (unmatchedProducts.length < 100) unmatchedProducts.push({ externalProductId, externalSku, externalBarcode, name }); processed++; continue; }
+            }
             let mapping = await MarketplaceProductMapping.findOne({ tenantId: job.tenantId, storeConnectionId: connection._id, externalProductId });
             if (!mapping && product) mapping = await MarketplaceProductMapping.findOne({ tenantId: job.tenantId, storeConnectionId: connection._id, productId: product._id });
             if (!mapping) mapping = new MarketplaceProductMapping({ tenantId: job.tenantId, provider: connection.provider, storeConnectionId: connection._id, connectionId: connection._id, externalProductId });
@@ -134,7 +144,7 @@ async function urunleriAl(job, connection, adapter, { limit = 100, maxPages = 10
         }
         if (products.length < limit) break;
     }
-    return { processed, success, unmatched, unmatchedProducts, errors: 0 };
+    return { processed, success, created, unmatched, unmatchedProducts, errors: 0 };
 }
 
 async function ideasoftPilotTest({ tenantId, connection, userId }) {

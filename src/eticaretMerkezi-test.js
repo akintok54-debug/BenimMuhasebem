@@ -200,10 +200,10 @@ test("IdeaSoft tenant kontrolü varsayılan AKN tenantını kabul eder ve diğer
     }
 });
 
-test("IdeaSoft eşleşmeyen ürünleri otomatik ERP ürününe dönüştürmez", () => {
+test("IdeaSoft eşleşmeyen ürünleri barkod/SKU ile otomatik ERP ürününe dönüştürür", () => {
     const sync = read("src/services/eticaretSyncServisi.js");
     const pullBlock = sync.slice(sync.indexOf("async function urunleriAl"), sync.indexOf("async function ideasoftPilotTest"));
-    assert.doesNotMatch(pullBlock, /Urun\.create/);
+    assert.match(pullBlock, /Urun\.findOneAndUpdate/);
     assert.match(pullBlock, /unmatchedProducts/);
     assert.match(sync, /EticaretSiparis\.findOne\(\{ tenantId: job\.tenantId/);
     assert.match(sync, /Siparis\.findOneAndUpdate\(\{ tenantId: job\.tenantId/);
