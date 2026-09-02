@@ -5,6 +5,23 @@ const OzelFiyat = require("../models/OzelFiyat");
 const Depo = require("../models/Depo");
 const Stok = require("../models/Stok");
 const StokHareket = require("../models/StokHareket");
+const MarketplaceProductMapping = require("../models/MarketplaceProductMapping");
+const IntegrationConnection = require("../models/IntegrationConnection");
+const { marketplaceAdapter } = require("../integrations/marketplace/adapterFactory");
+
+// Ürün pasife alındığında eşleştirilmiş pazaryeri kaydına stok=0 gönderir; başarısızlık ürün güncellemesini engellemez.
+async function pazaryeriUrunPasifBildir(tId, urunId) {
+    try {
+        const mappings = await MarketplaceProductMapping.find({ tenantId: tId, productId: urunId }).lean();
+        for (const mapping of mappings) {
+            const connection = await IntegrationConnection.findOne({ _id: mapping.storeConnectionId, tenantId: tId, active: true }).select("+encryptedCredentials");
+            if (!connection) continue;
+            const adapter = marketplaceAdapter(connection);
+            if (connection.provider === "IDEASOFT" && mapping.externalProductId) await adapter.updateStock([{ externalProductId: mapping.externalProductId, quantity: 0 }]);
+            else if (mapping.externalBarcode) await adapter.updateStock([{ barcode: mapping.externalBarcode, quantity: 0 }]);
+        }
+    } catch (error) { console.error("PAZARYERI_URUN_PASIF_BILDIRIM_HATASI", { name: error.name, message: error.message }); }
+}
 
 const SAYISAL_ALANLAR = ["kdv", "alisFiyati", "satisFiyati", "bayiFiyati", "perakendeFiyati", "iskonto", "minimumStok", "kritikStok"];
 const TOPLU_ALANLAR = ["kod", "barkod", "ad", "kategori", "marka", "model", "uyumluluk", "birim", "kdv", "alisFiyati", "satisFiyati", "bayiFiyati", "perakendeFiyati", "iskonto", "paraBirimi", "gorsel", "minimumStok", "kritikStok", "aktif", "notlar"];
@@ -383,6 +400,7 @@ async function guncelle(req, res, next) {
         sayilariDogrula(req.body || {});
         await benzersizAlanlariDogrula(tenantId(req), req.body || {}, urun._id);
 
+        const oncekiAktif = urun.aktif;
         for (const alan of alanlar) {
             if (req.body[alan] !== undefined) {
                 if (alan === "kod") urun[alan] = metin(req.body[alan]).toUpperCase();
@@ -398,6 +416,7 @@ async function guncelle(req, res, next) {
         }
 
         await urun.save();
+        if (oncekiAktif !== false && urun.aktif === false) await pazaryeriUrunPasifBildir(tenantId(req), urun._id);
 
         res.json({
             basarili: true,

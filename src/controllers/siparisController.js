@@ -8,6 +8,20 @@ const Musteri = require("../models/Musteri");
 const Depo = require("../models/Depo");
 const Urun = require("../models/Urun");
 const CariHareket = require("../models/CariHareket");
+const EticaretSiparis = require("../models/EticaretSiparis");
+const IntegrationConnection = require("../models/IntegrationConnection");
+const { marketplaceAdapter } = require("../integrations/marketplace/adapterFactory");
+
+// ERP siparişi iptal edildiğinde kaynak pazaryeri siparişini de iptal olarak işaretler; başarısızlık ERP iptalini engellemez.
+async function pazaryeriSiparisIptaliniBildir(tId, siparisId) {
+    try {
+        const eticaretSiparis = await EticaretSiparis.findOne({ tenantId: tId, erpSiparisId: siparisId });
+        if (!eticaretSiparis || eticaretSiparis.platform !== "IDEASOFT") return;
+        const connection = await IntegrationConnection.findOne({ _id: eticaretSiparis.connectionId, tenantId: tId, active: true }).select("+encryptedCredentials");
+        if (!connection) return;
+        await marketplaceAdapter(connection).updateOrderStatus(eticaretSiparis.externalOrderId, "cancelled");
+    } catch (error) { console.error("PAZARYERI_SIPARIS_IPTAL_BILDIRIM_HATASI", { name: error.name, message: error.message }); }
+}
 
 function tenantId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
@@ -48,11 +62,14 @@ async function guncelle(req, res, next) {
         if(!siparis) return res.status(404).json({basarili:false,mesaj:"Sipariş bulunamadı."});
         if(siparis.satisId || siparis.durum==="TAMAMLANDI") return res.status(409).json({basarili:false,mesaj:"Satışa dönüşmüş sipariş değiştirilemez."});
         if(!Array.isArray(body.kalemler)||!body.kalemler.length) return res.status(400).json({basarili:false,mesaj:"En az bir sipariş kalemi gerekir."});
+        const oncekiDurum=siparis.durum;
         const kalemler=[]; let araToplam=0,toplamKdv=0,genelToplam=0;
         for(const item of body.kalemler){const urun=await Urun.findOne({_id:item.urunId,tenantId:tId});if(!urun)return res.status(404).json({basarili:false,mesaj:"Ürün bulunamadı."});const miktar=Number(item.miktar||0),birimFiyat=Number(item.birimFiyat??urun.satisFiyati),kdv=Number(item.kdv??urun.kdv),iskonto=Number(item.iskonto||0);if(miktar<=0)return res.status(400).json({basarili:false,mesaj:"Miktar geçersiz."});const brut=miktar*birimFiyat,kalemAra=brut-(brut*iskonto/100),kdvTutari=kalemAra*kdv/100;kalemler.push({urunId:urun._id,miktar,birimFiyat,kdv,iskonto,araToplam:kalemAra,kdvTutari,toplam:kalemAra+kdvTutari});araToplam+=kalemAra;toplamKdv+=kdvTutari;genelToplam+=kalemAra+kdvTutari;}
         siparis.siparisNo=String(body.siparisNo||siparis.siparisNo).trim().toUpperCase();siparis.tarih=body.tarih||siparis.tarih;siparis.depoId=body.depoId||siparis.depoId;siparis.kalemler=kalemler;siparis.araToplam=araToplam;siparis.toplamKdv=toplamKdv;siparis.genelToplam=genelToplam;siparis.notlar=body.notlar??siparis.notlar;siparis.durum=body.durum||siparis.durum;
         ["paraBirimi", "teslimTarihi", "sevkAdresi", "odemeKosullari"].forEach(k => { if (body[k] !== undefined) siparis[k] = body[k] || null; });
-        await siparis.save();res.json({basarili:true,siparis});
+        await siparis.save();
+        if (siparis.durum==="IPTAL" && oncekiDurum!=="IPTAL") await pazaryeriSiparisIptaliniBildir(tId, siparis._id);
+        res.json({basarili:true,siparis});
     }catch(error){next(error);}
 }
 
