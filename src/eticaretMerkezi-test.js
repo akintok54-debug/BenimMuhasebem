@@ -171,7 +171,7 @@ test("IdeaSoft token ağ hatası kontrollü ve yeniden denenebilir servis hatas�
 });
 
 test("IdeaSoft tenant izolasyonu oturum tenantıyla korunur ve AKN rollout kimliğiyle sınırlıdır", () => {
-    const controller = read("src/controllers/eticaretMerkeziController.js"), routes = read("src/routes/eticaretRotasi.js");
+    const controller = read("src/controllers/eticaretMerkeziController.js"), routes = read("src/routes/eticaretRotasi.js"), uygulama = read("src/uygulama.js");
     assert.match(controller, /IDEASOFT_AKN_TENANT_ID/);
     assert.match(controller, /req\.user\?\.tenantId/);
     assert.match(controller, /IDEASOFT_AKN_TENANT_ID = "6a8dc53a3ff8c8a32ff9545b"/);
@@ -179,7 +179,8 @@ test("IdeaSoft tenant izolasyonu oturum tenantıyla korunur ve AKN rollout kimli
     assert.match(controller, /select\("\+encryptedCredentials"\)/);
     assert.match(controller, /pilotStatus !== "SUCCESS"/);
     assert.match(routes, /ideasoft\/pilot-test/);
-    assert.match(routes, /ideasoft\/oauth\/callback/);
+    assert.match(controller, /api\/integrations\/ideasoft\/callback/);
+    assert.match(uygulama, /\/api\/integrations\/ideasoft\/callback/);
 });
 
 test("IdeaSoft tenant kontrolü varsayılan AKN tenantını kabul eder ve diğer tenantı reddeder", () => {

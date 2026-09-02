@@ -117,6 +117,10 @@ const eticaretRotasi = require("./routes/eticaretRotasi");
 const whatsappRotasi = require("./routes/whatsappRotasi");
 const cronRotasi = require("./routes/cronRotasi");
 
+// IdeaSoft'ta kayıtlı redirect_uri ile birebir eşleşmesi zorunlu; IdeaSoft taraycıyı cross-site
+// yönlendirdiği için SameSite=Strict oturum çerezi gönderilmez, bu yüzden kimlikKontrol'den bağımsızdır.
+uygulama.get("/api/integrations/ideasoft/callback", require("./controllers/eticaretMerkeziController").ideasoftOauthCallback);
+
 uygulama.use("/api/tenant/eticaret", eticaretRotasi);
 uygulama.use("/api/tenant/whatsapp", whatsappRotasi);
 uygulama.use("/api/cron", cronRotasi);

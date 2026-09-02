@@ -9,10 +9,6 @@ const tekIslemKontrol = require("../middleware/tekIslemKontrol");
 
 const router = express.Router();
 
-// IdeaSoft, yetkilendirme sonrası tarayıcıyı cross-site yönlendirir; SameSite=Strict oturum çerezi bu istekte gönderilmez.
-// Bu yüzden bu rota kimlikKontrol/tenantKontrol'den önce tanımlanır ve güvenliği imzalı state JWT'sinden alır.
-router.get("/ideasoft/oauth/callback", merkez.ideasoftOauthCallback);
-
 router.use(kimlikKontrol);
 router.use(tenantKontrol);
 router.get("/dashboard", yetkiKontrol("ecommerce.view"), merkez.dashboard);

@@ -37,7 +37,7 @@ function ideasoftTenantKontrol(tenantId) {
     // yalnızca kontrollü deployment override'ı olarak kullanılır.
     if (!mongoose.Types.ObjectId.isValid(allowed) || current !== allowed) throw Object.assign(new Error("IdeaSoft entegrasyonu bu tenant için etkin değil."), { code: "INTEGRATION_NOT_CONFIGURED", status: 409 });
 }
-function ideasoftRedirectUri() { return `${String(process.env.PUBLIC_APP_URL || "https://www.benimmuhasebe.com").replace(/\/$/, "")}/api/tenant/eticaret/ideasoft/oauth/callback`; }
+function ideasoftRedirectUri() { return `${String(process.env.PUBLIC_APP_URL || "https://www.benimmuhasebe.com").replace(/\/$/, "")}/api/integrations/ideasoft/callback`; }
 async function credentialsBirleştir(connection, incoming) { const current = connection.encryptedCredentials ? credentialsOku(connection) : {}; return { ...current, ...Object.fromEntries(Object.entries(incoming || {}).filter(([, value]) => value !== undefined && value !== "")) }; }
 async function ideasoftTokenSakla(connection, credentials, tokenData) { const merged = { ...credentials, accessToken: tokenData.access_token, refreshToken: tokenData.refresh_token || credentials.refreshToken, tokenType: tokenData.token_type || "bearer", tokenExpiresAt: new Date(Date.now() + Math.max(60, Number(tokenData.expires_in || 86400)) * 1000).toISOString() }; await IntegrationConnection.updateOne({ _id: connection._id, tenantId: connection.tenantId }, { $set: { encryptedCredentials: sifrele(JSON.stringify(merged)) } }); return merged; }
 
