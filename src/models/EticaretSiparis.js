@@ -56,7 +56,7 @@ const EticaretSiparisSchema = new mongoose.Schema(
                     urunId: {
                         type: mongoose.Schema.Types.ObjectId,
                         ref: "Urun",
-                        required: true
+                        default: null
                     },
 
                     miktar: {
@@ -88,6 +88,7 @@ const EticaretSiparisSchema = new mongoose.Schema(
             type: String,
             enum: [
                 "ALINDI",
+                "ESLESME_BEKLIYOR",
                 "ISLENIYOR",
                 "SIPARISE_DONUSTU",
                 "TAMAMLANDI",

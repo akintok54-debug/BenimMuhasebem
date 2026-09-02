@@ -3,6 +3,7 @@
 const uygulama = require("./uygulama");
 const veritabaniBaglan = require("./database/veritabani");
 const { productionGuvenlikDogrula } = require("./services/productionGuvenlikServisi");
+const { ideasoftOtomatikSenkronizasyonBaslat } = require("./services/eticaretSyncServisi");
 
 const PORT = Number(process.env.PORT) || 5000;
 const HOST = "127.0.0.1";
@@ -17,6 +18,7 @@ async function baslat() {
         console.log("MongoDB bağlantısı yapılıyor...");
         await veritabaniBaglan();
         console.log("MongoDB bağlantısı başarılı.");
+        ideasoftOtomatikSenkronizasyonBaslat();
 
         const server = uygulama.listen(PORT, HOST, () => {
             console.log("");

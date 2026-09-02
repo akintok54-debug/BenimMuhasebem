@@ -23,6 +23,23 @@ function yanitSatirlari(value, keys = []) {
     for (const key of [...keys, "items", "data", "content", "results"]) if (Array.isArray(value?.[key])) return value[key];
     return [];
 }
+function ilkDeger(...values) { return values.find(value => value !== undefined && value !== null && String(value).trim() !== ""); }
+function ideasoftSiparisSatirlariniNormalizeEt(order) {
+    const rows = yanitSatirlari(order, ["orderItems", "products", "lines"]);
+    return rows.map(line => {
+        const product = line.product || line.productInfo || {}, variant = line.variant || product.variant || {};
+        return {
+            raw: line,
+            externalSku: String(ilkDeger(line.merchantSku, line.productSku, line.stockCode, line.sku, product.stockCode, product.sku, product.productCode, variant.stockCode, variant.sku) || "").trim(),
+            externalBarcode: String(ilkDeger(line.barcode, line.productBarcode, product.barcode, product.ean, variant.barcode) || "").trim(),
+            externalProductId: String(ilkDeger(line.productId, product.id, variant.productId) || "").trim(),
+            miktar: Math.max(0, Number(ilkDeger(line.quantity, line.productQuantity, line.amountQuantity, 1)) || 0),
+            birimFiyat: Math.max(0, Number(ilkDeger(line.unitPrice, line.productPrice, line.price, line.salePrice, line.amount, product.price1, 0)) || 0),
+            iskonto: Math.max(0, Number(ilkDeger(line.discount, line.productDiscount, line.discountAmount, 0)) || 0),
+            vergi: Math.max(0, Number(ilkDeger(line.taxRate, line.vatRate, line.tax, line.productTax, product.tax, 0)) || 0)
+        };
+    }).filter(line => line.miktar > 0);
+}
 async function tekrarDene(fn) {
     let sonHata;
     for (let deneme = 0; deneme <= BEKLEME_MS.length; deneme++) {
@@ -68,32 +85,36 @@ async function urunGonder(job, connection, adapter) {
 }
 async function siparisleriAl(job, connection, adapter) {
     const options = arguments[3] || {}, endDate = options.endDate || Date.now(), startDate = options.startDate || endDate - 14 * 86400000, response = await tekrarDene(() => adapter.pullOrders({ startDate, endDate, size: options.limit || 200, limit: options.limit || 200 })), packages = yanitSatirlari(response, ["orders"]);
-    let success = 0, errors = 0, duplicates = 0;
+    let success = 0, errors = 0, duplicates = 0, pending = 0; const errorDetails = [];
     for (const pkg of packages) {
         const externalOrderId = String(pkg.orderNumber || pkg.id || ""); if (!externalOrderId) { errors++; continue; }
-        if (await EticaretSiparis.exists({ tenantId: job.tenantId, platform: connection.provider, externalOrderId })) { duplicates++; continue; }
+        const existingOrder = await EticaretSiparis.findOne({ tenantId: job.tenantId, platform: connection.provider, externalOrderId });
+        if (existingOrder && existingOrder.durum !== "ESLESME_BEKLIYOR") { duplicates++; continue; }
         const lines = [], missing = [];
-        for (const line of pkg.lines || pkg.orderItems || []) { const barcode = String(line.barcode || line.productBarcode || ""), sku = String(line.merchantSku || line.productSku || ""), externalFilters = [...(barcode ? [{ externalBarcode: barcode }] : []), ...(sku ? [{ externalSku: sku }] : [])], productFilters = [...(barcode ? [{ barkod: barcode }] : []), ...(sku ? [{ kod: sku.toUpperCase() }] : [])]; if (!externalFilters.length) { missing.push(String(line.id || "BARKOD_SKU_YOK")); continue; } const mapping = await MarketplaceProductMapping.findOne({ tenantId: job.tenantId, storeConnectionId: connection._id, $or: externalFilters }).lean(), product = mapping?.productId ? await Urun.findOne({ _id: mapping.productId, tenantId: job.tenantId }).lean() : await Urun.findOne({ tenantId: job.tenantId, $or: productFilters }).lean(); if (!product) { missing.push(barcode || sku || String(line.id || "")); continue; } lines.push({ urunId: product._id, miktar: Number(line.quantity || line.productQuantity || 1), birimFiyat: Number(line.price || line.amount || line.productPrice || 0), externalSku: sku, externalBarcode: barcode, iskonto: Number(line.discount || line.productDiscount || 0), vergi: Number(line.vatBaseAmount || line.productTax || 0) }); }
-        if (!lines.length || missing.length) { errors++; continue; }
+        const normalizedLines = connection.provider === "IDEASOFT" ? ideasoftSiparisSatirlariniNormalizeEt(pkg) : ideasoftSiparisSatirlariniNormalizeEt({ lines: pkg.lines || pkg.orderItems || [] });
+        for (const line of normalizedLines) { const barcode = line.externalBarcode, sku = line.externalSku, externalProductId = line.externalProductId, externalFilters = [...(externalProductId ? [{ externalProductId }] : []), ...(barcode ? [{ externalBarcode: barcode }] : []), ...(sku ? [{ externalSku: sku }] : [])], productFilters = [...(barcode ? [{ barkod: barcode }] : []), ...(sku ? [{ kod: sku.toUpperCase() }] : [])]; if (!externalFilters.length && !productFilters.length) { missing.push(String(line.raw?.id || "BARKOD_SKU_YOK")); lines.push({ ...line, urunId: null }); continue; } const mapping = externalFilters.length ? await MarketplaceProductMapping.findOne({ tenantId: job.tenantId, storeConnectionId: connection._id, $or: externalFilters }).lean() : null, product = mapping?.productId ? await Urun.findOne({ _id: mapping.productId, tenantId: job.tenantId }).lean() : productFilters.length ? await Urun.findOne({ tenantId: job.tenantId, $or: productFilters }).lean() : null; if (!product) { missing.push(barcode || sku || externalProductId || String(line.raw?.id || "")); lines.push({ ...line, urunId: null }); continue; } lines.push({ urunId: product._id, miktar: line.miktar, birimFiyat: line.birimFiyat, externalSku: sku, externalBarcode: barcode, iskonto: line.iskonto, vergi: line.vergi }); }
+        const firstName = pkg.customerFirstName || pkg.customerFirstname || pkg.member?.firstName || pkg.member?.firstname || "", lastName = pkg.customerLastName || pkg.customerSurname || pkg.member?.lastName || pkg.member?.surname || "", email = String(pkg.customerEmail || pkg.member?.email || "").trim().toLowerCase(), phone = String(pkg.customerPhone || pkg.member?.phone || pkg.shipmentAddress?.phone || pkg.shippingAddress?.mobilePhoneNumber || "").trim(), taxNo = String(pkg.invoiceAddress?.taxNumber || pkg.billingAddress?.taxNumber || "").trim(), currencyRaw = pkg.currency?.code || pkg.currency?.abbr || pkg.currency || pkg.currencyCode || "TRY", currency = currencyRaw === "TL" ? "TRY" : String(currencyRaw).toUpperCase(), orderDate = pkg.orderDate || pkg.createdAt || new Date(), total = Number(ilkDeger(pkg.generalAmount, pkg.totalPrice, pkg.totalAmount, pkg.total, lines.reduce((n,x)=>n+x.miktar*x.birimFiyat,0))) || 0;
+        const publicOrder = { tenantId: job.tenantId, connectionId: connection._id, platform: connection.provider, platformSiparisNo: externalOrderId, externalOrderId, packageId: String(pkg.id || ""), siparisTarihi: new Date(orderDate), paraBirimi: ["TRY","USD","EUR"].includes(currency) ? currency : "TRY", musteriBilgisi: { adSoyad: [firstName,lastName].filter(Boolean).join(" "), email, telefon: phone, vergiNo: taxNo }, teslimatAdresi: pkg.shipmentAddress || pkg.shippingAddress || {}, kargo: { firma: pkg.cargoProviderName || pkg.shippingCompany?.name || pkg.shippingCompany || "", takipNo: String(pkg.cargoTrackingNumber || pkg.cargoTrackingCode || ""), paketNo: String(pkg.id || ""), desi: Number(pkg.dimensionalWeight || 0), durum: pkg.status || "BEKLIYOR" }, urunler: lines.map(({ raw, externalProductId, ...line }) => line), toplam: total, hamVeri: pkg };
+        if (!normalizedLines.length || missing.length) { await EticaretSiparis.findOneAndUpdate({ tenantId: job.tenantId, platform: connection.provider, externalOrderId }, { $set: { ...publicOrder, durum: "ESLESME_BEKLIYOR" } }, { upsert: true, new: true, runValidators: true }); errors++; pending++; errorDetails.push({ externalOrderId, code: normalizedLines.length ? "PRODUCT_MAPPING_REQUIRED" : "ORDER_LINES_MISSING", missing: missing.slice(0, 20) }); continue; }
         if (connection.provider !== "IDEASOFT") {
             try { const total = lines.reduce((n,x)=>n+x.miktar*x.birimFiyat,0), order = await EticaretSiparis.create({ tenantId: job.tenantId, connectionId: connection._id, platform: connection.provider, platformSiparisNo: externalOrderId, externalOrderId, packageId: String(pkg.id || ""), siparisTarihi: pkg.orderDate ? new Date(pkg.orderDate) : new Date(), paraBirimi: pkg.currencyCode || "TRY", musteriBilgisi: { adSoyad: [pkg.customerFirstName,pkg.customerLastName].filter(Boolean).join(" "), email: pkg.customerEmail || "", telefon: pkg.shipmentAddress?.phone || "", vergiNo: pkg.invoiceAddress?.taxNumber || pkg.invoiceAddress?.identityNumber || "" }, teslimatAdresi: pkg.shipmentAddress || {}, kargo: { firma: pkg.cargoProviderName || "", takipNo: String(pkg.cargoTrackingNumber || ""), paketNo: String(pkg.id || ""), desi: Number(pkg.dimensionalWeight || 0), durum: pkg.status || "BEKLIYOR" }, urunler: lines, toplam: total, durum: ["Cancelled","UnSupplied"].includes(pkg.status) ? "IPTAL" : "ALINDI", hamVeri: pkg }); await Promise.all(lines.map(line => MarketplaceProductMapping.updateOne({ tenantId: job.tenantId, storeConnectionId: connection._id, productId: line.urunId }, { $inc: { reservedStock: line.miktar } }))); if (order) success++; }
             catch (error) { if (error.code !== 11000) errors++; }
             continue;
         }
         try {
-            const firstName = pkg.customerFirstName || pkg.customerFirstname || "", lastName = pkg.customerLastName || pkg.customerSurname || "", email = String(pkg.customerEmail || "").trim().toLowerCase(), phone = String(pkg.customerPhone || pkg.shipmentAddress?.phone || pkg.shippingAddress?.mobilePhoneNumber || "").trim(), taxNo = String(pkg.invoiceAddress?.taxNumber || pkg.billingAddress?.taxNumber || "").trim(), customerFilters = [...(taxNo ? [{ vergiNo: taxNo }] : []), ...(email ? [{ email }] : []), ...(phone ? [{ telefon: phone }] : [])];
+            const customerFilters = [...(taxNo ? [{ vergiNo: taxNo }] : []), ...(email ? [{ email }] : []), ...(phone ? [{ telefon: phone }] : [])];
             let customer = customerFilters.length ? await Musteri.findOne({ tenantId: job.tenantId, $or: customerFilters }) : null;
             if (!customer) { const code = `IDEA-${String(pkg.member?.id || externalOrderId).replace(/[^a-z0-9]/gi, "").slice(-24)}`.toUpperCase(); customer = await Musteri.findOneAndUpdate({ tenantId: job.tenantId, kod: code }, { $setOnInsert: { tenantId: job.tenantId, kod: code, adSoyad: [firstName, lastName].filter(Boolean).join(" ") || `IdeaSoft Müşteri ${externalOrderId}`, telefon: phone, email, vergiNo: taxNo, adres: pkg.shippingAddress?.address || "", il: pkg.shippingAddress?.locationName || "", ilce: pkg.shippingAddress?.district || "", postaKodu: pkg.shippingAddress?.zipCode || "", grup: "IdeaSoft" } }, { upsert: true, new: true, runValidators: true }); }
-            const depot = await Depo.findOne({ tenantId: job.tenantId, aktif: true }).sort({ createdAt: 1 }).lean(); if (!depot) { errors++; continue; }
-            const total = lines.reduce((n,x)=>n+x.miktar*x.birimFiyat,0), currency = (pkg.currency || pkg.currencyCode || "TRY") === "TL" ? "TRY" : (pkg.currency || pkg.currencyCode || "TRY"), orderDate = pkg.orderDate || pkg.createdAt || new Date(), erpNo = `IDEASOFT-${externalOrderId}`.toUpperCase();
+            const depot = await Depo.findOne({ tenantId: job.tenantId, aktif: true }).sort({ createdAt: 1 }).lean(); if (!depot) { await EticaretSiparis.findOneAndUpdate({ tenantId: job.tenantId, platform: connection.provider, externalOrderId }, { $set: { ...publicOrder, durum: "ESLESME_BEKLIYOR" } }, { upsert: true, new: true, runValidators: true }); errors++; pending++; errorDetails.push({ externalOrderId, code: "ACTIVE_WAREHOUSE_REQUIRED", message: "ERP siparişine aktarım için aktif depo gerekli." }); continue; }
+            const erpNo = `IDEASOFT-${externalOrderId}`.toUpperCase();
             const erpLines = lines.map(x => { const brut = x.miktar * x.birimFiyat, rate = Math.max(0, Number(x.vergi || 0)), net = rate ? brut / (1 + rate / 100) : brut; return { urunId: x.urunId, miktar: x.miktar, birimFiyat: x.birimFiyat, kdv: rate, iskonto: 0, araToplam: net, kdvTutari: brut - net, toplam: brut }; });
             const erpOrder = await Siparis.findOneAndUpdate({ tenantId: job.tenantId, siparisNo: erpNo }, { $setOnInsert: { tenantId: job.tenantId, siparisNo: erpNo, tarih: orderDate, musteriId: customer._id, depoId: depot._id, kalemler: erpLines, araToplam: erpLines.reduce((n,x)=>n+x.araToplam,0), toplamKdv: erpLines.reduce((n,x)=>n+x.kdvTutari,0), genelToplam: total, paraBirimi: ["TRY","USD","EUR"].includes(currency) ? currency : "TRY", sevkAdresi: [pkg.shippingAddress?.address, pkg.shippingAddress?.district, pkg.shippingAddress?.locationName].filter(Boolean).join(" · "), durum: pkg.status === "cancelled" ? "IPTAL" : "ONAYLANDI", notlar: `IdeaSoft siparişi ${externalOrderId}` } }, { upsert: true, new: true, runValidators: true });
-            const order = await EticaretSiparis.create({ tenantId: job.tenantId, connectionId: connection._id, platform: connection.provider, platformSiparisNo: externalOrderId, externalOrderId, packageId: String(pkg.id || ""), siparisTarihi: new Date(orderDate), paraBirimi: ["TRY","USD","EUR"].includes(currency) ? currency : "TRY", musteriId: customer._id, erpSiparisId: erpOrder._id, musteriBilgisi: { adSoyad: [firstName,lastName].filter(Boolean).join(" "), email, telefon: phone, vergiNo: taxNo }, teslimatAdresi: pkg.shipmentAddress || pkg.shippingAddress || {}, kargo: { firma: pkg.cargoProviderName || pkg.shippingCompany?.name || pkg.shippingCompany || "", takipNo: String(pkg.cargoTrackingNumber || pkg.cargoTrackingCode || ""), paketNo: String(pkg.id || ""), desi: Number(pkg.dimensionalWeight || 0), durum: pkg.status || "BEKLIYOR" }, urunler: lines, toplam: total, durum: ["Cancelled","UnSupplied","cancelled","refunded"].includes(pkg.status) ? "IPTAL" : "SIPARISE_DONUSTU", hamVeri: pkg });
+            const order = await EticaretSiparis.findOneAndUpdate({ tenantId: job.tenantId, platform: connection.provider, externalOrderId }, { $set: { ...publicOrder, musteriId: customer._id, erpSiparisId: erpOrder._id, durum: ["Cancelled","UnSupplied","cancelled","refunded"].includes(pkg.status) ? "IPTAL" : "SIPARISE_DONUSTU" } }, { upsert: true, new: true, runValidators: true });
             await Promise.all(lines.map(line => MarketplaceProductMapping.updateOne({ tenantId: job.tenantId, storeConnectionId: connection._id, productId: line.urunId }, { $inc: { reservedStock: line.miktar } }))); if (order) success++;
         }
-        catch (error) { if (error.code !== 11000) errors++; }
+        catch (error) { if (error.code !== 11000) { await EticaretSiparis.findOneAndUpdate({ tenantId: job.tenantId, platform: connection.provider, externalOrderId }, { $set: { ...publicOrder, durum: "ESLESME_BEKLIYOR" } }, { upsert: true, new: true, runValidators: true }).catch(() => {}); errors++; pending++; errorDetails.push({ externalOrderId, code: error.code || "ORDER_IMPORT_FAILED", message: error.message }); } }
     }
-    return { processed: packages.length, success, errors, duplicates };
+    return { processed: packages.length, success, errors, duplicates, pending, errorDetails };
 }
 
 async function urunleriAl(job, connection, adapter, { limit = 100, maxPages = 100 } = {}) {
@@ -102,7 +123,7 @@ async function urunleriAl(job, connection, adapter, { limit = 100, maxPages = 10
         const response = await tekrarDene(() => adapter.pullProducts({ limit, page })), products = yanitSatirlari(response, ["products"]);
         for (const external of products) {
             const externalProductId = String(external.id || ""); if (!externalProductId) continue;
-            const externalSku = String(external.sku || "").trim(), externalBarcode = String(external.barcode || "").trim(), filters = [...(externalBarcode ? [{ barkod: externalBarcode }] : []), ...(externalSku ? [{ kod: externalSku.toUpperCase() }] : [])];
+            const externalSku = String(external.sku || external.stockCode || external.productCode || "").trim(), externalBarcode = String(external.barcode || external.ean || "").trim(), filters = [...(externalBarcode ? [{ barkod: externalBarcode }] : []), ...(externalSku ? [{ kod: externalSku.toUpperCase() }] : [])];
             const product = filters.length ? await Urun.findOne({ tenantId: job.tenantId, $or: filters }).select("_id").lean() : null;
             if (!product) { unmatched++; if (unmatchedProducts.length < 100) unmatchedProducts.push({ externalProductId, externalSku, externalBarcode, name: String(external.name || external.fullName || "") }); processed++; continue; }
             let mapping = await MarketplaceProductMapping.findOne({ tenantId: job.tenantId, storeConnectionId: connection._id, externalProductId });
@@ -151,17 +172,34 @@ async function isiCalistir(jobId) {
         else if (job.type === "QUESTION_PULL") sonuc = await sorulariAl(job, connection, adapter);
         else if (job.type === "PRODUCT_PULL") sonuc = connection.provider === "IDEASOFT" ? await urunleriAl(job, connection, adapter) : (() => { throw Object.assign(new Error("Bu sağlayıcı için ürün çekme akışı yapılandırılmadı."), { code: "PROVIDER_METHOD_NOT_IMPLEMENTED", status: 501 }); })();
         else throw Object.assign(new Error(`${job.type} için doğrulanmış sağlayıcı akışı henüz yapılandırılmadı.`), { code: "PROVIDER_METHOD_NOT_IMPLEMENTED", status: 501 });
-        job.processedCount = sonuc.processed || 0; job.successCount = sonuc.success || 0; job.errorCount = sonuc.errors || 0; job.status = sonuc.errors ? (sonuc.success ? "PARTIAL" : "FAILED") : "SUCCESS";
-        await IntegrationConnection.updateOne({ _id: connection._id, tenantId: job.tenantId }, { $set: { lastSuccessfulSyncAt: new Date(), lastError: "" } });
+        job.processedCount = sonuc.processed || 0; job.successCount = sonuc.success || 0; job.errorCount = sonuc.errors || 0; job.errors = guvenliDetay(sonuc.errorDetails || []); job.status = sonuc.errors ? (sonuc.success ? "PARTIAL" : "FAILED") : "SUCCESS";
+        if (job.status !== "FAILED") await IntegrationConnection.updateOne({ _id: connection._id, tenantId: job.tenantId }, { $set: { lastSuccessfulSyncAt: new Date(), lastError: "" } });
     } catch (error) {
         job.status = "FAILED"; job.errorCount = 1; job.errors = [{ code: error.code || "SYNC_FAILED", message: error.message }];
         await IntegrationErrorKaydi.create({ tenantId: job.tenantId, connectionId: job.connectionId, provider: job.provider, operation: job.type, entityType: "SYNC_JOB", entityId: String(job._id), errorCode: error.code || "SYNC_FAILED", errorMessage: error.message, technicalDetails: guvenliDetay(error.details || {}), retryable: Boolean(error.retryable) });
         await IntegrationConnection.updateOne({ _id: job.connectionId, tenantId: job.tenantId }, { $set: { lastErrorAt: new Date(), lastError: error.message } });
     } finally { job.finishedAt = new Date(); await job.save(); }
 }
-async function sirayaAl({ tenantId, connection, type, userId }) {
+async function sirayaAl({ tenantId, connection, type, userId, hemenCalistir = false }) {
+    const activeJob = await IntegrationSyncJob.findOne({ tenantId, connectionId: connection._id, type, status: { $in: ["QUEUED", "RUNNING"] } }).sort({ createdAt: -1 });
+    if (activeJob) { if (hemenCalistir && activeJob.status === "QUEUED") await isiCalistir(activeJob._id); return IntegrationSyncJob.findById(activeJob._id); }
     const job = await IntegrationSyncJob.create({ tenantId, provider: connection.provider, connectionId: connection._id, type, createdBy: userId || null });
+    if (hemenCalistir) { await isiCalistir(job._id); return IntegrationSyncJob.findById(job._id); }
     setImmediate(() => isiCalistir(job._id).catch(error => console.error("ETICARET_SYNC_HATASI", { jobId: String(job._id), message: error.message })));
     return job;
 }
-module.exports = { sirayaAl, isiCalistir, tekrarDene, guvenliDetay, stokFiyatGonder, urunGonder, siparisleriAl, sorulariAl, urunleriAl, ideasoftPilotTest, yanitSatirlari };
+async function ideasoftSiparisleriniOtomatikSirayaAl() {
+    const allowedTenantId = String(process.env.IDEASOFT_AKN_TENANT_ID || "6a8dc53a3ff8c8a32ff9545b").trim();
+    const connections = await IntegrationConnection.find({ tenantId: allowedTenantId, provider: "IDEASOFT", type: "MARKETPLACE", active: true, pilotStatus: { $in: ["SUCCESS", "PARTIAL"] } }).select("tenantId provider").lean();
+    for (const connection of connections) await sirayaAl({ tenantId: connection.tenantId, connection, type: "ORDER_PULL", userId: null, hemenCalistir: Boolean(process.env.VERCEL) });
+    return connections.length;
+}
+function ideasoftOtomatikSenkronizasyonBaslat() {
+    if (String(process.env.IDEASOFT_AUTO_SYNC || "true").toLowerCase() === "false") return null;
+    const intervalMs = Math.max(60000, Math.min(3600000, Number(process.env.IDEASOFT_ORDER_SYNC_INTERVAL_MS || 300000) || 300000));
+    const run = () => ideasoftSiparisleriniOtomatikSirayaAl().catch(error => console.error("IDEASOFT_OTOMATIK_SIPARIS_HATASI", { name: error.name, message: error.message }));
+    const firstRun = setTimeout(run, 10000); firstRun.unref?.();
+    const timer = setInterval(run, intervalMs); timer.unref?.();
+    return timer;
+}
+module.exports = { sirayaAl, isiCalistir, tekrarDene, guvenliDetay, stokFiyatGonder, urunGonder, siparisleriAl, sorulariAl, urunleriAl, ideasoftPilotTest, yanitSatirlari, ideasoftSiparisSatirlariniNormalizeEt, ideasoftSiparisleriniOtomatikSirayaAl, ideasoftOtomatikSenkronizasyonBaslat };

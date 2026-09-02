@@ -14,5 +14,8 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/api", "destination": "/api" }
+  ],
+  "crons": [
+    { "path": "/api/cron/ideasoft-siparisleri", "schedule": "0 3 * * *" }
   ]
 }

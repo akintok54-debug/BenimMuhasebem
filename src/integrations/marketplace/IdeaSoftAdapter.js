@@ -12,6 +12,8 @@ function domainUrl(value) {
     try { url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`); }
     catch { throw new IntegrationError("VALIDATION_ERROR", "IdeaSoft mağaza domaini geçersiz.", { status: 400 }); }
     if (url.protocol !== "https:" || url.username || url.password || url.port) throw new IntegrationError("VALIDATION_ERROR", "IdeaSoft mağaza domaini HTTPS olmalıdır.", { status: 400 });
+    const hostname = url.hostname.toLowerCase();
+    if (!hostname.endsWith(".myideasoft.com") || hostname === ".myideasoft.com") throw new IntegrationError("VALIDATION_ERROR", "IdeaSoft mağaza domaini *.myideasoft.com uzantılı olmalıdır.", { status: 400 });
     url.pathname = "/"; url.search = ""; url.hash = "";
     return url;
 }
@@ -50,7 +52,10 @@ class IdeaSoftAdapter extends MarketplaceAdapter {
     }
     async tokenRequest(params) {
         await this.assertPublicStore();
-        const url = new URL("/oauth/v2/token", this.storeUrl), response = await fetch(url, { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams(params), redirect: "error", signal: AbortSignal.timeout(20000) });
+        const url = new URL("/oauth/v2/token", this.storeUrl);
+        let response;
+        try { response = await fetch(url, { method: "POST", headers: { Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams(params), redirect: "error", signal: AbortSignal.timeout(20000) }); }
+        catch (error) { throw new IntegrationError("PROVIDER_UNAVAILABLE", "IdeaSoft yetkilendirme servisine ulaşılamadı.", { status: 503, retryable: true, details: { name: error.name } }); }
         const text = await response.text(); let data = {}; try { data = text ? JSON.parse(text) : {}; } catch { data = {}; }
         if (!response.ok || !data.access_token) throw new IntegrationError([400, 401, 403].includes(response.status) ? "INVALID_CREDENTIALS" : "PROVIDER_ERROR", [400, 401, 403].includes(response.status) ? "IdeaSoft yetkilendirmesi başarısız." : `IdeaSoft token isteği başarısız (${response.status}).`, { status: [400, 401, 403].includes(response.status) ? 401 : 502, retryable: response.status === 429 || response.status >= 500, details: { httpStatus: response.status, providerError: data.error || "" } });
         return data;

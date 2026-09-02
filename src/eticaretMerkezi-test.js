@@ -18,7 +18,7 @@ const MarketplaceAdapter = require("./integrations/marketplace/MarketplaceAdapte
 const TrendyolAdapter = require("./integrations/marketplace/TrendyolAdapter");
 const IdeaSoftAdapter = require("./integrations/marketplace/IdeaSoftAdapter");
 const { domainUrl } = require("./integrations/marketplace/IdeaSoftAdapter");
-const { guvenliDetay, tekrarDene } = require("./services/eticaretSyncServisi");
+const { guvenliDetay, tekrarDene, ideasoftSiparisSatirlariniNormalizeEt } = require("./services/eticaretSyncServisi");
 
 function uniqueIndex(Model, keys) { return Model.schema.indexes().some(([fields, options]) => keys.every(key => fields[key] === 1) && options.unique); }
 
@@ -37,6 +37,28 @@ test("API secret varsayılan sorguda seçilmez ve JSON response'tan çıkarılı
     assert.equal(IntegrationConnection.schema.path("encryptedCredentials").options.select, false);
     const doc = new IntegrationConnection({ tenantId: "507f1f77bcf86cd799439011", provider: "TRENDYOL", storeName: "Mağaza", encryptedCredentials: "secret" });
     assert.equal(doc.toJSON().encryptedCredentials, undefined);
+});
+
+test("IdeaSoft cron tetikleyicisi CRON_SECRET olmadan devre dışıdır ve sabit zamanlı karşılaştırma kullanır", () => {
+    const source = read("src/routes/cronRotasi.js");
+    assert.match(source, /CRON_SECRET/);
+    assert.match(source, /timingSafeEqual/);
+    assert.match(source, /if \(!secret\) return res\.status\(404\)/);
+    assert.match(source, /ideasoftSiparisleriniOtomatikSirayaAl/);
+});
+
+test("IdeaSoft cron rotası uygulamaya bağlanır ve Vercel cron zamanlaması tanımlanır", () => {
+    const uygulamaSource = read("src/uygulama.js");
+    assert.match(uygulamaSource, /require\("\.\/routes\/cronRotasi"\)/);
+    assert.match(uygulamaSource, /uygulama\.use\("\/api\/cron", cronRotasi\)/);
+    const vercelConfig = JSON.parse(read("vercel.json"));
+    assert.ok(Array.isArray(vercelConfig.crons) && vercelConfig.crons.some(x => x.path === "/api/cron/ideasoft-siparisleri"));
+});
+
+test("IdeaSoft cron hata loglaması ham hata nesnesini değil yalnızca ad/mesaj alanlarını yazar", () => {
+    const source = read("src/routes/cronRotasi.js");
+    assert.match(source, /console\.error\("IDEASOFT_CRON_SIPARIS_HATASI", \{ name: error\.name, message: error\.message \}\)/);
+    assert.doesNotMatch(source, /error\.stack/);
 });
 
 test("Aynı marketplace siparişi tenant + provider + external ID ile tekildir", () => {
@@ -105,7 +127,10 @@ test("Marketplace adapter sözleşmesi istenen operasyonları taşır", () => {
 
 test("IdeaSoft adapter yalnız resmi HTTPS mağaza domainini ve doğrulanmış Admin API yollarını kullanır", async () => {
     assert.equal(domainUrl("akn-motosiklet.myideasoft.com").toString(), "https://akn-motosiklet.myideasoft.com/");
+    assert.equal(domainUrl("idearm25.shops.myideasoft.com").toString(), "https://idearm25.shops.myideasoft.com/");
     assert.throws(() => domainUrl("http://localhost:5000"), /HTTPS/);
+    assert.throws(() => domainUrl("https://example.com"), /myideasoft\.com/);
+    assert.throws(() => domainUrl("https://myideasoft.com.evil.example"), /myideasoft\.com/);
     const calls = [];
     const adapter = new IdeaSoftAdapter({ provider: "IDEASOFT", apiBaseUrl: "https://akn-motosiklet.myideasoft.com", active: true }, { clientId: "client", clientSecret: "secret", accessToken: "token" });
     adapter.request = async (url, options = {}) => { calls.push({ url, options }); return []; };
@@ -122,6 +147,27 @@ test("IdeaSoft stok ve fiyat güncellemesi resmi Product GET/PUT kaynağını ku
     assert.deepEqual(calls.map(x => [x.url, x.options.method || "GET"]), [["/admin-api/products/123", "GET"], ["/admin-api/products/123", "PUT"], ["/admin-api/products/123", "GET"], ["/admin-api/products/123", "PUT"]]);
     assert.equal(calls[1].options.body.stockAmount, 7);
     assert.equal(calls[3].options.body.price1, 15.5);
+});
+
+test("IdeaSoft sipariş satırları stockCode ve iç içe ürün alanlarından normalize edilir", () => {
+    const rows = ideasoftSiparisSatirlariniNormalizeEt({ orderItems: [{ quantity: 2, productPrice: 149.9, taxRate: 20, product: { id: 44, stockCode: "AKN-44", barcode: "8690000044" } }] });
+    assert.equal(rows.length, 1);
+    assert.deepEqual({ sku: rows[0].externalSku, barcode: rows[0].externalBarcode, productId: rows[0].externalProductId, miktar: rows[0].miktar, fiyat: rows[0].birimFiyat, vergi: rows[0].vergi }, { sku: "AKN-44", barcode: "8690000044", productId: "44", miktar: 2, fiyat: 149.9, vergi: 20 });
+});
+
+test("Eşleşmeyen IdeaSoft siparişi görünür bekleyen kayıt olarak saklanabilir", () => {
+    assert.ok(EticaretSiparis.schema.path("durum").enumValues.includes("ESLESME_BEKLIYOR"));
+    assert.equal(Boolean(EticaretSiparis.schema.path("urunler").schema.path("urunId").options.required), false);
+});
+
+test("IdeaSoft token ağ hatası kontrollü ve yeniden denenebilir servis hatasına dönüşür", async () => {
+    const adapter = new IdeaSoftAdapter({ provider: "IDEASOFT", apiBaseUrl: "https://akn-motosiklet.myideasoft.com", active: true }, { clientId: "client", clientSecret: "secret" });
+    adapter.assertPublicStore = async () => {};
+    const originalFetch = global.fetch;
+    global.fetch = async () => { throw Object.assign(new Error("socket closed"), { name: "TypeError" }); };
+    try {
+        await assert.rejects(adapter.tokenRequest({ grant_type: "client_credentials" }), error => error.code === "PROVIDER_UNAVAILABLE" && error.status === 503 && error.retryable === true);
+    } finally { global.fetch = originalFetch; }
 });
 
 test("IdeaSoft tenant izolasyonu oturum tenantıyla korunur ve AKN rollout kimliğiyle sınırlıdır", () => {
@@ -158,7 +204,7 @@ test("IdeaSoft eşleşmeyen ürünleri otomatik ERP ürününe dönüştürmez",
     const pullBlock = sync.slice(sync.indexOf("async function urunleriAl"), sync.indexOf("async function ideasoftPilotTest"));
     assert.doesNotMatch(pullBlock, /Urun\.create/);
     assert.match(pullBlock, /unmatchedProducts/);
-    assert.match(sync, /EticaretSiparis\.exists\(\{ tenantId: job\.tenantId/);
+    assert.match(sync, /EticaretSiparis\.findOne\(\{ tenantId: job\.tenantId/);
     assert.match(sync, /Siparis\.findOneAndUpdate\(\{ tenantId: job\.tenantId/);
     assert.ok(MarketplaceProductMapping.schema.path("connectionId"));
 });
@@ -200,4 +246,15 @@ test("Profesyonel entegrasyon UI modal, sipariş drawer, e-belge, finans ve hata
     const js = read("public/erp/erp.js");
     for (const metin of ["Bağlantıyı Test Et", "ecommerce-provider-grid", "ecommerce-account-card", "ecommerce-drawer", "Masraf Olarak Kaydet", "Tedarikçiye Bağla", "Cari Hesaba İşle", "Brüt Satış", "Net Hakediş", "Tekrar Dene", "Teknik detaylar güvenlik nedeniyle ana listede gösterilmez"]) assert.match(js, new RegExp(metin));
     assert.match(js, /API Secret<input name="apiSecret" type="password"/);
+});
+
+test("IdeaSoft siparişleri manuel ve otomatik olarak çekilir", () => {
+    const js = read("public/erp/erp.js"), sync = read("src/services/eticaretSyncServisi.js"), server = read("src/sunucu.js");
+    assert.match(js, /Siparişleri Şimdi Çek/);
+    assert.match(js, /type:"ORDER_PULL"/);
+    assert.match(js, /eticaretSonOtomatikSiparisCekme/);
+    assert.match(js, /Ürün Eşleşmesi Bekliyor/);
+    assert.match(sync, /IDEASOFT_ORDER_SYNC_INTERVAL_MS/);
+    assert.match(sync, /ideasoftSiparisleriniOtomatikSirayaAl/);
+    assert.match(server, /ideasoftOtomatikSenkronizasyonBaslat\(\)/);
 });

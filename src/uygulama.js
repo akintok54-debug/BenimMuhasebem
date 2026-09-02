@@ -115,9 +115,11 @@ uygulama.use("/api/tenant/raporlar", raporRotasi);
 
 const eticaretRotasi = require("./routes/eticaretRotasi");
 const whatsappRotasi = require("./routes/whatsappRotasi");
+const cronRotasi = require("./routes/cronRotasi");
 
 uygulama.use("/api/tenant/eticaret", eticaretRotasi);
 uygulama.use("/api/tenant/whatsapp", whatsappRotasi);
+uygulama.use("/api/cron", cronRotasi);
 
 const finansRotasi = require("./routes/finansRotasi");
 uygulama.use("/api/tenant/finans", finansRotasi);
