@@ -3979,6 +3979,19 @@
         if (mevcut && tur === "alis") { const belgeOdemesi = Number(mevcut.belgeOdemeTutari || 0), toplam = Number(mevcut.genelToplam || 0); overlay.querySelector('[name="odenenTutar"]').value = belgeOdemesi; overlay.querySelector('[name="odemeDurumu"]').value = belgeOdemesi <= 0 ? "ACIK" : belgeOdemesi >= toplam ? "ODENDI" : "KISMI"; }
         const kapat = () => overlay.remove(); overlay.querySelector(".erp-modal-close").onclick = kapat; overlay.querySelector("[data-kapat]").onclick = kapat;
         const tbody = overlay.querySelector("#tedKalemler");
+        const urunArama = document.createElement("input");
+        urunArama.className = "erp-input belge-urun-arama";
+        urunArama.placeholder = "Ürün ara: isim, kod veya barkod...";
+        tbody.closest(".table-scroll")?.before(urunArama);
+        const urunSonuclari = document.createElement("div");
+        urunSonuclari.className = "belge-urun-sonuclari";
+        urunArama.after(urunSonuclari);
+        const urunSonuclariniGoster = () => {
+            const aranan = urunArama.value.trim().toLocaleLowerCase("tr-TR");
+            const bulunanlar = aranan ? urunler.filter(x => `${x.kod || ""} ${x.ad || ""} ${x.barkod || ""}`.toLocaleLowerCase("tr-TR").includes(aranan)).slice(0, 12) : [];
+            urunSonuclari.innerHTML = bulunanlar.map(x => `<button type="button" class="belge-urun-sonuc" data-ted-urun="${x._id}"><span><b>${escapeHtml(x.ad)}</b><small>${escapeHtml(x.kod || x.barkod || "")} · ${para(Number(x.alisFiyati || 0))}</small></span><strong>Ekle</strong></button>`).join("");
+        };
+        urunArama.addEventListener("input", urunSonuclariniGoster);
         const toplamHesaplaGecikmeli = () => setTimeout(() => typeof toplamHesapla === "function" && toplamHesapla());
         const bagla = (kok = tbody) => kok.querySelectorAll(".tedarikci-kalem").forEach(row => {
             if (row.dataset.bagli === "1") return; row.dataset.bagli = "1";
@@ -3991,6 +4004,24 @@
                 toplamHesaplaGecikmeli();
             };
         });
+        urunSonuclari.addEventListener("click", event => {
+            const button = event.target.closest("[data-ted-urun]");
+            if (!button) return;
+            const hedefUrun = urunler.find(x => String(x._id) === String(button.dataset.tedUrun));
+            if (!hedefUrun) return;
+            let hedef = [...tbody.querySelectorAll(".tedarikci-kalem")].find(row => !row.querySelector('[name="urunId"]').value);
+            if (!hedef) {
+                tbody.insertAdjacentHTML("beforeend", tedarikciKalemSatiri(urunler));
+                hedef = tbody.lastElementChild;
+                bagla();
+            }
+            const select = hedef.querySelector('[name="urunId"]');
+            select.value = hedefUrun._id;
+            select.dispatchEvent(new Event("change"));
+            urunArama.value = "";
+            urunSonuclari.innerHTML = "";
+        });
+        urunArama.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); urunSonuclari.querySelector("[data-ted-urun]")?.click(); } });
         bagla();
         overlay.querySelector("#tedKalemEkle").onclick = event => {
             event.preventDefault();
