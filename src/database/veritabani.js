@@ -15,7 +15,9 @@ async function veritabaniBaglan() {
     // Üretimde autoIndex kapalıdır; işlem tekilleştirme indeksi güvenlik kuralıdır
     // ve boş/yeni koleksiyonda başlangıçta açıkça kurulmalıdır.
     await require("../models/IslemKaydi").createIndexes();
-    await require("../models/Urun").createIndexes();
+    const Urun = require("../models/Urun");
+    try { await Urun.collection.dropIndex("tenantId_1_barkod_1"); } catch (error) { if (error.codeName !== "IndexNotFound") throw error; }
+    await Urun.createIndexes();
 
     console.log("MongoDB bağlantısı başarılı.");
 }
