@@ -2048,6 +2048,32 @@ button, a, [role="button"] { touch-action: manipulation; }
     }
 
     .erp-modal-footer > * { flex: 1 1 auto; }
+
+    #musteriIslemOverlay .erp-modal,
+    #sahaModal .erp-modal {
+        width: 100% !important;
+        max-width: none !important;
+    }
+
+    #musteriIslemOverlay .table-scroll,
+    #sahaModal .table-scroll {
+        display: block;
+        flex: 0 0 auto;
+        min-height: 108px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    #musteriIslemOverlay table,
+    #sahaModal table {
+        min-width: 680px;
+    }
+
+    #musteriIslemOverlay .erp-modal-footer,
+    #sahaModal .erp-modal-footer {
+        position: sticky;
+        bottom: 0;
+    }
 }
 
 @media (max-width: 480px) {
