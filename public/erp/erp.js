@@ -274,7 +274,6 @@
                     <button
                         type="button"
                         class="erp-modal-close"
-                        id="dashboardDetayKapat"
                     >
                         ×
                     </button>
@@ -319,8 +318,8 @@
                 "/api/tenant/finans/para-hareketleri?hesapTipi=KASA"
             );
 
-            const hareketler =
-                Array.isArray(data.hareketler)
+                const hareketler =
+                    Array.isArray(data.hareketler)
                     ? data.hareketler
                     : [];
 
@@ -2225,6 +2224,21 @@
         overlay.innerHTML = `<div class="erp-modal ${perakende ? "retail-sale-modal" : ""}" style="max-width:1100px;width:98%"><div class="erp-modal-header"><div><h2>${perakende ? "Perakende Satış" : mevcut ? `${ayar.baslik} - Düzenle` : ayar.baslik}</h2><p>${perakende ? "Müşteri seçmeden hızlı kasa satışı · Perakende fiyatları" : `${escapeHtml(musteri.kod)} · ${escapeHtml(musteri.unvan || musteri.adSoyad)} · Bakiye ${para(musteri.bakiye)}`}</p></div><button type="button" class="erp-modal-close">×</button></div><form id="musteriBelgeForm"><div class="erp-form-grid"><label>${ayar.no}<input name="no" value="${escapeHtml(no)}" required></label><label>Tarih<input name="tarih" type="date" value="${belgeTarihi}" required></label>${surecAlanlari}</div><div class="panel-heading" style="margin-top:16px"><div><h3>${perakende ? "Perakende Sepeti" : "Belge Kalemleri"}</h3><p>Ürünleri aynı tabloya satır olarak ekleyin.</p></div><div>${["satis", "teklif", "siparis"].includes(tur) && !mevcut ? '<button type="button" id="hizliSatisUrunEkle" class="erp-small-button">+ Yeni Ürün Aç</button> ' : ""}<button type="button" id="kalemEkle" class="erp-primary-button">+ Kalem Ekle</button></div></div><div class="table-scroll"><table><thead><tr><th>Ürün</th><th>Miktar</th><th>Birim Fiyat</th><th>KDV %</th><th>İskonto %</th><th></th></tr></thead><tbody id="belgeKalemler">${ilkSatirlar}</tbody></table></div>${toplamKutusuHtml}${odemeHtml}<label style="display:block;margin-top:12px">Notlar<textarea name="notlar" style="width:100%">${escapeHtml(mevcut?.notlar || (perakende ? "Perakende satış" : ""))}</textarea></label><div id="belgeMesaj"></div><div class="erp-modal-footer"><button type="button" class="erp-small-button secondary" data-kapat>Vazgeç</button><button type="submit" class="erp-primary-button">${perakende ? "Perakende Satışı Tamamla" : mevcut ? "Değişiklikleri Kaydet" : tur === "iade" ? "İadeyi Kaydet" : "Kaydet"}</button></div></form></div>`;
         document.body.appendChild(overlay);
         const kalemlerEl = document.getElementById("belgeKalemler");
+        const urunArama = document.createElement("input");
+        urunArama.id = "belgeUrunAra";
+        urunArama.className = "erp-input belge-urun-arama";
+        urunArama.placeholder = "Ürün ara: isim, kod veya barkod...";
+        kalemlerEl.closest(".table-scroll")?.before(urunArama);
+        const urunSecenekleriniFiltrele = () => {
+            const aranan = urunArama.value.trim().toLocaleLowerCase("tr-TR");
+            kalemlerEl.querySelectorAll("select[name=urunId]").forEach(select => {
+                const secili = select.value;
+                [...select.options].forEach(option => {
+                    option.hidden = Boolean(aranan) && option.value !== secili && !option.textContent.toLocaleLowerCase("tr-TR").includes(aranan);
+                });
+            });
+        };
+        urunArama.addEventListener("input", urunSecenekleriniFiltrele);
         const kdvDahilModu = () => overlay.querySelector("#kdvDahilModu")?.checked || false;
         const belgeKalemleriHesapla = () => [...kalemlerEl.querySelectorAll(".belge-kalem")].map(x => { const miktar = Number(x.querySelector("[name=miktar]").value || 0), fiyat = Number(x.querySelector("[name=birimFiyat]").value || 0), kdv = Number(x.querySelector("[name=kdv]").value || 0), iskonto = Number(x.querySelector("[name=iskonto]").value || 0); if (kdvDahilModu()) { const brut = miktar * fiyat * (1 - iskonto / 100), ara = brut / (1 + kdv / 100); return { ara, kdvTutari: brut - ara }; } const ara = miktar * fiyat * (1 - iskonto / 100); return { ara, kdvTutari: ara * kdv / 100 }; });
         const belgeToplami = () => belgeKalemleriHesapla().reduce((n, x) => n + x.ara + x.kdvTutari, 0);
