@@ -969,6 +969,8 @@ th {
 #salesAraToplam, #salesKdvToplam { font-size:16px !important; }
 .sales-target-row { display:flex; gap:6px; }
 .sales-target-row input { flex:1; }
+.kdv-mode-toggle { display:flex; align-items:center; gap:8px; font-weight:600; }
+.kdv-mode-toggle input { width:auto; }
 .retail-sale-modal .erp-modal-header { border-bottom-color:#86efac; background:linear-gradient(135deg,#ecfdf5,#fff); }
 .retail-payment-box { border-color:#86efac; background:#ecfdf5; }
 .retail-payment-box>div strong { color:#047857; }
