@@ -2229,6 +2229,9 @@
         urunArama.className = "erp-input belge-urun-arama";
         urunArama.placeholder = "Ürün ara: isim, kod veya barkod...";
         kalemlerEl.closest(".table-scroll")?.before(urunArama);
+        const urunSonuclari = document.createElement("div");
+        urunSonuclari.className = "belge-urun-sonuclari";
+        urunArama.after(urunSonuclari);
         const urunSecenekleriniFiltrele = () => {
             const aranan = urunArama.value.trim().toLocaleLowerCase("tr-TR");
             kalemlerEl.querySelectorAll("select[name=urunId]").forEach(select => {
@@ -2237,7 +2240,27 @@
                     option.hidden = Boolean(aranan) && option.value !== secili && !option.textContent.toLocaleLowerCase("tr-TR").includes(aranan);
                 });
             });
+            const bulunanlar = aranan ? urunler.filter(x => `${x.kod || ""} ${x.ad || ""} ${x.barkod || ""}`.toLocaleLowerCase("tr-TR").includes(aranan)).slice(0, 12) : [];
+            urunSonuclari.innerHTML = bulunanlar.map(x => `<button type="button" class="belge-urun-sonuc" data-belge-urun="${x._id}"><span><b>${escapeHtml(x.ad)}</b><small>${escapeHtml(x.kod || x.barkod || "")} · ${urunParasi(urunFiyati(x), x.paraBirimi)}</small></span><strong>Ekle</strong></button>`).join("");
         };
+        urunSonuclari.addEventListener("click", event => {
+            const button = event.target.closest("[data-belge-urun]");
+            if (!button) return;
+            const hedefUrun = urunler.find(x => String(x._id) === String(button.dataset.belgeUrun));
+            if (!hedefUrun) return;
+            let hedef = [...kalemlerEl.querySelectorAll(".belge-kalem")].find(row => !row.querySelector("select[name=urunId]").value);
+            if (!hedef) {
+                kalemlerEl.insertAdjacentHTML("beforeend", satirHtml({ urunId: hedefUrun._id }));
+                hedef = kalemlerEl.lastElementChild;
+                bagla(hedef);
+            }
+            const select = hedef.querySelector("select[name=urunId]");
+            select.value = hedefUrun._id;
+            select.dispatchEvent(new Event("change"));
+            urunArama.value = "";
+            urunSonuclari.innerHTML = "";
+        });
+        urunArama.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); urunSonuclari.querySelector("[data-belge-urun]")?.click(); } });
         urunArama.addEventListener("input", urunSecenekleriniFiltrele);
         const kdvDahilModu = () => overlay.querySelector("#kdvDahilModu")?.checked || false;
         const belgeKalemleriHesapla = () => [...kalemlerEl.querySelectorAll(".belge-kalem")].map(x => { const miktar = Number(x.querySelector("[name=miktar]").value || 0), fiyat = Number(x.querySelector("[name=birimFiyat]").value || 0), kdv = Number(x.querySelector("[name=kdv]").value || 0), iskonto = Number(x.querySelector("[name=iskonto]").value || 0); if (kdvDahilModu()) { const brut = miktar * fiyat * (1 - iskonto / 100), ara = brut / (1 + kdv / 100); return { ara, kdvTutari: brut - ara }; } const ara = miktar * fiyat * (1 - iskonto / 100); return { ara, kdvTutari: ara * kdv / 100 }; });
