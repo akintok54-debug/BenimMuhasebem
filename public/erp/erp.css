@@ -2093,3 +2093,28 @@ button, a, [role="button"] { touch-action: manipulation; }
         grid-template-columns: 1fr !important;
     }
 }
+
+@media (max-width: 768px) {
+    .erp-modal form {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .erp-modal .table-scroll {
+        display: block;
+        flex: 0 0 auto;
+        min-height: 112px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .erp-modal .table-scroll table {
+        min-width: 680px;
+    }
+
+    .erp-modal .erp-modal-footer {
+        position: sticky;
+        bottom: 0;
+        z-index: 3;
+    }
+}
