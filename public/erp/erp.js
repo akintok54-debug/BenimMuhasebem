@@ -3355,7 +3355,7 @@
                                     </thead>
                                     <tbody>
                                         ${sonuc.map(m => `
-                                            <tr>
+                                            <tr data-v2-musteri="${m._id}" style="cursor:pointer">
                                                 <td><strong>${escapeHtml(m.kod || "-")}</strong></td>
                                                 <td>${escapeHtml(m.unvan || m.adSoyad || "-")}</td>
                                                 <td>${escapeHtml(m.telefon || m.whatsapp || "-")}</td>

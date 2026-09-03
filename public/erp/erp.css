@@ -1405,6 +1405,7 @@ th {
 .erp-modal {
     width: min(1000px, 100%);
     max-height: calc(100vh - 40px);
+    max-height: calc(100dvh - 40px);
     background: #ffffff;
     border-radius: 18px;
     box-shadow: 0 25px 80px rgba(15, 23, 42, 0.30);
@@ -1590,6 +1591,8 @@ th {
     .erp-modal-overlay {
         padding: 8px;
         align-items: stretch;
+        height: 100vh;
+        height: 100dvh;
     }
 
     .erp-modal {
