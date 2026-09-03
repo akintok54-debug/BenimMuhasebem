@@ -1034,6 +1034,7 @@ th {
 .barcode-entry-row { display:flex; gap:8px; align-items:center; width:100%; margin-bottom:14px; }
 .barcode-entry-row input { flex:1; }
 .barcode-count-entry { display:block; width:100%; max-width:none; margin:8px 0; }
+.barcode-sales-entry, .barcode-sales-camera { display:block; width:100%; max-width:none; margin-top:8px; }
 .barcode-camera-overlay { position:fixed; inset:0; z-index:10002; display:flex; align-items:center; justify-content:center; padding:18px; background:rgba(15,23,42,.88); }
 .barcode-camera-box { position:relative; width:min(560px,100%); padding:18px; border-radius:16px; background:#fff; text-align:center; }
 .barcode-camera-box video { width:100%; max-height:60vh; border-radius:10px; background:#0f172a; object-fit:cover; }
