@@ -105,6 +105,15 @@ const UrunSchema = new mongoose.Schema(
             default: ""
         },
 
+        ekGorseller: {
+            type: [String],
+            default: [],
+            validate: {
+                validator: value => !Array.isArray(value) || value.length <= 2,
+                message: "En fazla 2 ek görsel eklenebilir."
+            }
+        },
+
         minimumStok: {
             type: Number,
             default: 0,

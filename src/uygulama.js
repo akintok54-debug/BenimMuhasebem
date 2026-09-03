@@ -30,7 +30,16 @@ uygulama.get(["/", "/giris", "/login"], (req, res) => {
     res.redirect(302, "/erp/login.html");
 });
 
-uygulama.use(helmet({ crossOriginResourcePolicy: { policy: "same-origin" } }));
+// Ürün görselleri Excel/entegrasyon ile dış HTTPS adreslerinden geldiği için img-src'ye https: eklenir.
+uygulama.use(helmet({
+    crossOriginResourcePolicy: { policy: "same-origin" },
+    contentSecurityPolicy: {
+        directives: {
+            ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+            "img-src": ["'self'", "data:", "https:"]
+        }
+    }
+}));
 uygulama.use(istekKimligi);
 uygulama.use(auditMiddleware);
 const corsIzinleri = new Set([

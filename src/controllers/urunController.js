@@ -187,6 +187,7 @@ function urunOlusturmaVerisi(tId, body) {
         iskonto: Number(body.iskonto || 0),
         paraBirimi: paraBirimiDogrula(body.paraBirimi),
         gorsel: gorselDogrula(body.gorsel),
+        ekGorseller: (Array.isArray(body.ekGorseller) ? body.ekGorseller : []).filter(Boolean).map(gorselDogrula).slice(0, 2),
         minimumStok: Number(body.minimumStok || 0),
         kritikStok: Number(body.kritikStok || 0),
         aktif: body.aktif !== false,
@@ -394,7 +395,8 @@ async function guncelle(req, res, next) {
             "minimumStok",
             "kritikStok",
             "aktif",
-            "notlar"
+            "notlar",
+            "ekGorseller"
         ];
 
         sayilariDogrula(req.body || {});
@@ -405,6 +407,7 @@ async function guncelle(req, res, next) {
             if (req.body[alan] !== undefined) {
                 if (alan === "kod") urun[alan] = metin(req.body[alan]).toUpperCase();
                 else if (alan === "gorsel") urun[alan] = gorselDogrula(req.body[alan]);
+                else if (alan === "ekGorseller") urun[alan] = (Array.isArray(req.body[alan]) ? req.body[alan] : []).filter(Boolean).map(gorselDogrula).slice(0, 2);
                 else if (alan === "paraBirimi") urun[alan] = paraBirimiDogrula(req.body[alan]);
                 else if (SAYISAL_ALANLAR.includes(alan)) urun[alan] = Number(req.body[alan]);
                 else urun[alan] = req.body[alan];
