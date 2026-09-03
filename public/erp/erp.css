@@ -1029,6 +1029,16 @@ th {
 .sales-reps { display:grid; gap:10px; }.sales-reps article { position:relative; display:grid; grid-template-columns:42px 1fr auto; gap:12px; align-items:center; padding:12px; border:1px solid #e2e8f0; border-radius:14px; overflow:hidden; }.sales-reps article>span { position:absolute; bottom:0; left:0; height:3px; width:var(--score); background:linear-gradient(90deg,#2563eb,#06b6d4); }.sales-reps small { display:block; color:#64748b; }.sales-rep-avatar { display:grid; place-items:center; width:42px; height:42px; border-radius:13px; color:#fff; background:linear-gradient(135deg,#2563eb,#7c3aed); font-weight:900; }
 .sales-summary>div { display:flex; justify-content:space-between; padding:12px 0; border-bottom:1px solid #eef2f7; }.sales-customer-picker { max-width:720px; width:95%; }.sales-customer-list { display:grid; gap:8px; max-height:55vh; overflow:auto; margin-top:12px; }.sales-customer-list button { display:flex; justify-content:space-between; align-items:center; text-align:left; background:#fff; color:#0f172a; border:1px solid #e2e8f0; }.sales-customer-list small { display:block; color:#64748b; margin-top:4px; }
 .belge-urun-arama { display:block; width:calc(100% - 40px); max-width:none; margin:12px 20px 0; }
+.belge-barkod-arama { display:block; width:calc(100% - 40px); max-width:none; margin:8px 20px 0; }
+.barkod-kamera-button { display:block; width:calc(100% - 40px); margin:8px 20px 0; }
+.barcode-entry-row { display:flex; gap:8px; align-items:center; width:100%; margin-bottom:14px; }
+.barcode-entry-row input { flex:1; }
+.barcode-count-entry { display:block; width:100%; max-width:none; margin:8px 0; }
+.barcode-camera-overlay { position:fixed; inset:0; z-index:10002; display:flex; align-items:center; justify-content:center; padding:18px; background:rgba(15,23,42,.88); }
+.barcode-camera-box { position:relative; width:min(560px,100%); padding:18px; border-radius:16px; background:#fff; text-align:center; }
+.barcode-camera-box video { width:100%; max-height:60vh; border-radius:10px; background:#0f172a; object-fit:cover; }
+.barcode-camera-box p { margin:10px 0 0; color:#475569; }
+.barcode-camera-box .erp-modal-close { position:absolute; top:8px; right:8px; z-index:1; }
 .belge-urun-sonuclari { display:grid; gap:6px; width:calc(100% - 40px); margin:6px 20px 0; max-height:220px; overflow:auto; }
 .belge-urun-sonuc { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:46px; padding:8px 12px; border:1px solid #dbe3ee; border-radius:9px; background:#fff; color:#172033; text-align:left; cursor:pointer; }
 .belge-urun-sonuc:hover { border-color:#2563eb; background:#eff6ff; }

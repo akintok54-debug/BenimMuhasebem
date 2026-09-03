@@ -59,6 +59,22 @@ test("Ürün modeli TRY, USD ve EUR para birimlerini destekler", () => {
     assert.deepEqual(Urun.schema.path("paraBirimi").enumValues, ["TRY", "USD", "EUR"]);
 });
 
+test("Ürün barkodu tenant içinde dolu değerler için unique partial index kullanır", () => {
+    const index = Urun.schema.indexes().find(([fields]) => fields.tenantId === 1 && fields.barkod === 1);
+    assert.equal(index?.[1]?.unique, true);
+    assert.deepEqual(index?.[1]?.partialFilterExpression, { barkod: { $type: "string", $gt: "" } });
+});
+
+test("Satış ve tedarikçi alış formları barkod okutma alanını destekler", () => {
+    const js = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
+    assert.match(js, /Barkod okutun veya elle girin/);
+    assert.match(js, /data-belge-urun/);
+    assert.match(js, /data-ted-urun/);
+    assert.match(js, /Barkod okutun veya elle girin/);
+    assert.match(js, /barkodKamerasiAc/);
+    assert.match(js, /barkod-etiket/);
+});
+
 test("Ürün Excel arayüzü farklı pazar yeri kolonlarını ve alıştan yeni ürün açmayı destekler", () => {
     const js = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
     const html = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "index.html"), "utf8");

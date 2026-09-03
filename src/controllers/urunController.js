@@ -1,4 +1,5 @@
 ﻿const mongoose = require("mongoose");
+const bwipjs = require("bwip-js");
 const Urun = require("../models/Urun");
 const UrunKategori = require("../models/UrunKategori");
 const OzelFiyat = require("../models/OzelFiyat");
@@ -275,6 +276,26 @@ async function listele(req, res, next) {
     }
 }
 
+async function barkodlaBul(req, res, next) {
+    try {
+        const barkod = metin(req.query.barkod || req.params.barkod);
+        if (!barkod) return res.status(400).json({ basarili: false, mesaj: "Barkod girilmelidir." });
+        const urun = await Urun.findOne({ tenantId: tenantId(req), barkod, aktif: true }).lean();
+        if (!urun) return res.status(404).json({ basarili: false, mesaj: "Bu barkoda ait aktif ürün bulunamadı." });
+        res.json({ basarili: true, urun });
+    } catch (error) { next(error); }
+}
+
+async function barkodEtiketi(req, res, next) {
+    try {
+        const urun = await Urun.findOne({ _id: req.params.id, tenantId: tenantId(req), aktif: true }).lean();
+        if (!urun) return res.status(404).json({ basarili: false, mesaj: "Ürün bulunamadı." });
+        if (!urun.barkod) return res.status(400).json({ basarili: false, mesaj: "Üründe barkod tanımlı değil." });
+        const barkodSvg = bwipjs.toSVG({ bcid: "code128", text: urun.barkod, scale: 3, height: 12, includetext: true, textxalign: "center" });
+        res.json({ basarili: true, etiket: { barkodSvg, barkod: urun.barkod, ad: urun.ad, kod: urun.kod, fiyat: Number(urun.satisFiyati || 0), paraBirimi: urun.paraBirimi || "TRY" } });
+    } catch (error) { next(error); }
+}
+
 async function detay(req, res, next) {
     try {
         const urun = await Urun.findOne({
@@ -526,6 +547,8 @@ module.exports = {
     kategoriOlustur,
     kategoriSil,
     listele,
+    barkodlaBul,
+    barkodEtiketi,
     detay,
     olustur,
     hizliSatisUrunuOlustur,

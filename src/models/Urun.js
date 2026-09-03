@@ -147,10 +147,10 @@ UrunSchema.index(
     { unique: true }
 );
 
-UrunSchema.index({
-    tenantId: 1,
-    barkod: 1
-});
+UrunSchema.index(
+    { tenantId: 1, barkod: 1 },
+    { unique: true, partialFilterExpression: { barkod: { $type: "string", $gt: "" } } }
+);
 
 UrunSchema.index({
     tenantId: 1,

@@ -12,6 +12,8 @@ router.use(tenantKontrol);
 router.use(yetkiKontrol("stock.read"));
 
 router.get("/kategoriler", controller.kategorileriListele);
+router.get("/barkod/:barkod", controller.barkodlaBul);
+router.get("/:id/barkod-etiket", controller.barkodEtiketi);
 router.post("/kategoriler", yetkiKontrol("stock.write"), controller.kategoriOlustur);
 router.delete("/kategoriler", yetkiKontrol("stock.write"), controller.kategoriSil);
 router.delete("/kategoriler/:id", yetkiKontrol("stock.write"), controller.kategoriSil);
