@@ -2247,14 +2247,16 @@
                 });
             });
             const bulunanlar = aranan ? urunler.filter(x => `${x.kod || ""} ${x.ad || ""} ${x.barkod || ""}`.toLocaleLowerCase("tr-TR").includes(aranan)).slice(0, 12) : [];
-            urunSonuclari.innerHTML = bulunanlar.map(x => `<button type="button" class="belge-urun-sonuc" data-belge-urun="${x._id}"><span><b>${escapeHtml(x.ad)}</b><small>${escapeHtml(x.kod || x.barkod || "")} · ${urunParasi(urunFiyati(x), x.paraBirimi)}</small></span><strong>Ekle</strong></button>`).join("");
+            urunSonuclari.innerHTML = bulunanlar.map(x => `<button type="button" class="belge-urun-sonuc" data-belge-urun="${x._id}">${x.gorsel ? `<img src="${x.gorsel}" alt="">` : ""}<span><b>${escapeHtml(x.ad)}</b><small>${escapeHtml(x.kod || x.barkod || "")} · ${urunParasi(urunFiyati(x), x.paraBirimi)}</small></span><strong>Ekle</strong></button>`).join("");
         };
         urunSonuclari.addEventListener("click", event => {
             const button = event.target.closest("[data-belge-urun]");
             if (!button) return;
             const hedefUrun = urunler.find(x => String(x._id) === String(button.dataset.belgeUrun));
             if (!hedefUrun) return;
-            let hedef = [...kalemlerEl.querySelectorAll(".belge-kalem")].find(row => !row.querySelector("select[name=urunId]").value);
+            let hedef = [...kalemlerEl.querySelectorAll(".belge-kalem")].find(row => row.querySelector("select[name=urunId]")?.value === String(hedefUrun._id));
+            if (hedef) { const miktar = hedef.querySelector("input[name=miktar]"); miktar.value = Number(miktar.value || 0) + 1; miktar.dispatchEvent(new Event("input")); urunArama.value = ""; urunSonuclari.innerHTML = ""; return; }
+            hedef = [...kalemlerEl.querySelectorAll(".belge-kalem")].find(row => !row.querySelector("select[name=urunId]").value);
             if (!hedef) {
                 kalemlerEl.insertAdjacentHTML("beforeend", satirHtml({ urunId: hedefUrun._id }));
                 hedef = kalemlerEl.lastElementChild;
@@ -4002,7 +4004,7 @@
         const urunSonuclariniGoster = () => {
             const aranan = urunArama.value.trim().toLocaleLowerCase("tr-TR");
             const bulunanlar = aranan ? urunler.filter(x => `${x.kod || ""} ${x.ad || ""} ${x.barkod || ""}`.toLocaleLowerCase("tr-TR").includes(aranan)).slice(0, 12) : [];
-            urunSonuclari.innerHTML = bulunanlar.map(x => `<button type="button" class="belge-urun-sonuc" data-ted-urun="${x._id}"><span><b>${escapeHtml(x.ad)}</b><small>${escapeHtml(x.kod || x.barkod || "")} · ${para(Number(x.alisFiyati || 0))}</small></span><strong>Ekle</strong></button>`).join("");
+            urunSonuclari.innerHTML = bulunanlar.map(x => `<button type="button" class="belge-urun-sonuc" data-ted-urun="${x._id}">${x.gorsel ? `<img src="${x.gorsel}" alt="">` : ""}<span><b>${escapeHtml(x.ad)}</b><small>${escapeHtml(x.kod || x.barkod || "")} · ${para(Number(x.alisFiyati || 0))}</small></span><strong>Ekle</strong></button>`).join("");
         };
         urunArama.addEventListener("input", urunSonuclariniGoster);
         barkodArama.addEventListener("keydown", event => { if (event.key !== "Enter") return; event.preventDefault(); const barkod = barkodArama.value.trim(); const urun = urunler.find(x => String(x.barkod || "").trim() === barkod); if (!urun) return alert("Bu barkoda ait aktif ürün bulunamadı."); urunArama.value = barkod; urunSonuclariniGoster(); urunSonuclari.querySelector(`[data-ted-urun="${urun._id}"]`)?.click(); barkodArama.value = ""; });
@@ -4023,7 +4025,9 @@
             if (!button) return;
             const hedefUrun = urunler.find(x => String(x._id) === String(button.dataset.tedUrun));
             if (!hedefUrun) return;
-            let hedef = [...tbody.querySelectorAll(".tedarikci-kalem")].find(row => !row.querySelector('[name="urunId"]').value);
+            let hedef = [...tbody.querySelectorAll(".tedarikci-kalem")].find(row => row.querySelector('[name="urunId"]')?.value === String(hedefUrun._id));
+            if (hedef) { const miktar = hedef.querySelector('[name="miktar"]'); miktar.value = Number(miktar.value || 0) + 1; miktar.dispatchEvent(new Event("input")); urunArama.value = ""; urunSonuclari.innerHTML = ""; return; }
+            hedef = [...tbody.querySelectorAll(".tedarikci-kalem")].find(row => !row.querySelector('[name="urunId"]').value);
             if (!hedef) {
                 tbody.insertAdjacentHTML("beforeend", tedarikciKalemSatiri(urunler));
                 hedef = tbody.lastElementChild;
