@@ -193,7 +193,7 @@
 .product-avatar { cursor:zoom-in; transition:transform .15s ease; }
 .product-avatar:hover { transform:scale(1.05); }
 .product-lightbox-overlay { position:fixed; inset:0; background:rgba(15,23,42,.85); display:flex; align-items:center; justify-content:center; z-index:10001; animation:productLightboxFade .18s ease; }
-.product-lightbox-overlay img { max-width:90vw; max-height:85vh; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.5); animation:productLightboxZoom .22s cubic-bezier(.34,1.56,.64,1); }
+.product-lightbox-overlay img { width:min(85vw,900px); height:min(85vh,720px); object-fit:contain; background:#0f172a; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.5); animation:productLightboxZoom .22s cubic-bezier(.34,1.56,.64,1); }
 .product-lightbox-close { position:absolute; top:20px; right:28px; font-size:32px; color:#fff; background:none; border:none; cursor:pointer; }
 .product-lightbox-nav { position:absolute; top:50%; transform:translateY(-50%); font-size:32px; color:#fff; background:none; border:none; cursor:pointer; padding:12px; }
 .product-lightbox-prev { left:16px; }
