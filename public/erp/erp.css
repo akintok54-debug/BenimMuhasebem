@@ -1455,14 +1455,14 @@ th {
 
 .erp-modal form {
     min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
 }
 
 .erp-form-grid {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
+    flex: 0 0 auto;
     padding: 24px;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1526,6 +1526,9 @@ th {
     align-items: center;
     justify-content: space-between;
     gap: 10px;
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
 }
 
 .erp-modal-footer-left,
