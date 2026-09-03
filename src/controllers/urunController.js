@@ -24,7 +24,7 @@ async function pazaryeriUrunPasifBildir(tId, urunId) {
 }
 
 const SAYISAL_ALANLAR = ["kdv", "alisFiyati", "satisFiyati", "bayiFiyati", "perakendeFiyati", "iskonto", "minimumStok", "kritikStok"];
-const TOPLU_ALANLAR = ["kod", "barkod", "ad", "kategori", "marka", "model", "uyumluluk", "birim", "kdv", "alisFiyati", "satisFiyati", "bayiFiyati", "perakendeFiyati", "iskonto", "paraBirimi", "gorsel", "minimumStok", "kritikStok", "aktif", "notlar"];
+const TOPLU_ALANLAR = ["kod", "barkod", "ad", "kategori", "marka", "model", "uyumluluk", "birim", "kdv", "alisFiyati", "satisFiyati", "bayiFiyati", "perakendeFiyati", "iskonto", "paraBirimi", "gorsel", "ekGorseller", "minimumStok", "kritikStok", "aktif", "notlar"];
 
 function metin(value) {
     return String(value ?? "").trim();
@@ -483,6 +483,7 @@ async function topluAktar(req, res, next) {
 
                 for (const [alan, value] of Object.entries(veri)) {
                     if (alan === "gorsel") urun[alan] = gorselDogrula(value);
+                    else if (alan === "ekGorseller") urun[alan] = (Array.isArray(value) ? value : []).filter(Boolean).map(gorselDogrula).slice(0, 2);
                     else if (alan === "paraBirimi") urun[alan] = paraBirimiDogrula(value);
                     else if (SAYISAL_ALANLAR.includes(alan)) urun[alan] = Number(value);
                     else if (alan === "uyumluluk") urun[alan] = Array.isArray(value) ? value.map(metin).filter(Boolean) : metin(value).split(",").map(metin).filter(Boolean);

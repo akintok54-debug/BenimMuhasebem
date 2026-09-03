@@ -26,6 +26,12 @@ uygulama.get("/api/assets/xlsx.js", (req, res) => {
     res.sendFile(path.join(__dirname, "..", "node_modules", "xlsx", "dist", "xlsx.full.min.js"));
 });
 
+uygulama.get("/api/assets/jszip.js", (req, res) => {
+    res.set("Cache-Control", "public, max-age=86400, immutable");
+    res.type("application/javascript");
+    res.sendFile(path.join(__dirname, "..", "node_modules", "jszip", "dist", "jszip.min.js"));
+});
+
 uygulama.get(["/", "/giris", "/login"], (req, res) => {
     res.redirect(302, "/erp/login.html");
 });

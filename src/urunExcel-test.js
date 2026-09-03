@@ -42,6 +42,19 @@ test("XLSX tarayıcı paketi API üzerinden sunulur", async () => {
     }
 });
 
+test("JSZip tarayıcı paketi API üzerinden sunulur", async () => {
+    const server = await testSunucusuAc();
+    try {
+        const { port } = server.address();
+        const response = await fetch(`http://127.0.0.1:${port}/api/assets/jszip.js`);
+        assert.equal(response.status, 200);
+        assert.match(response.headers.get("content-type"), /javascript/);
+        assert.ok((await response.text()).length > 10000);
+    } finally {
+        await new Promise(resolve => server.close(resolve));
+    }
+});
+
 test("Ürün modeli TRY, USD ve EUR para birimlerini destekler", () => {
     assert.deepEqual(Urun.schema.path("paraBirimi").enumValues, ["TRY", "USD", "EUR"]);
 });
