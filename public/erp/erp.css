@@ -2050,13 +2050,15 @@ button, a, [role="button"] { touch-action: manipulation; }
     .erp-modal-footer > * { flex: 1 1 auto; }
 
     #musteriIslemOverlay .erp-modal,
-    #sahaModal .erp-modal {
+    #sahaModal .erp-modal,
+    #tedarikciV2Modal .erp-modal {
         width: 100% !important;
         max-width: none !important;
     }
 
     #musteriIslemOverlay .table-scroll,
-    #sahaModal .table-scroll {
+    #sahaModal .table-scroll,
+    #tedarikciV2Modal .table-scroll {
         display: block;
         flex: 0 0 auto;
         min-height: 108px;
@@ -2065,12 +2067,14 @@ button, a, [role="button"] { touch-action: manipulation; }
     }
 
     #musteriIslemOverlay table,
-    #sahaModal table {
+    #sahaModal table,
+    #tedarikciV2Modal table {
         min-width: 680px;
     }
 
     #musteriIslemOverlay .erp-modal-footer,
-    #sahaModal .erp-modal-footer {
+    #sahaModal .erp-modal-footer,
+    #tedarikciV2Modal .erp-modal-footer {
         position: sticky;
         bottom: 0;
     }
