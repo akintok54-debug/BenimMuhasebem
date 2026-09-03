@@ -463,7 +463,7 @@
 
             const satislar =
                 Array.isArray(data.satislar)
-                    ? data.satislar
+                    ? data.satislar.filter(x => x.durum !== "IPTAL")
                     : [];
 
             const simdi = new Date();
@@ -749,7 +749,7 @@
                 ]);
 
             const satislar = Array.isArray(satisData.satislar)
-                ? satisData.satislar
+                ? satisData.satislar.filter(x => x.durum !== "IPTAL")
                 : [];
 
             const simdi = new Date();
@@ -2466,7 +2466,7 @@
             };
 
             const satislar =
-                tumSatislar.filter(musteriEslesir);
+                tumSatislar.filter(x => x.durum !== "IPTAL" && musteriEslesir(x));
 
             const teklifler =
                 tumTeklifler.filter(musteriEslesir);
