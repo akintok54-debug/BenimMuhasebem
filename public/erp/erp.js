@@ -5630,10 +5630,17 @@
     document.getElementById("accountButton")?.addEventListener("click", () => sayfaYukle("hesabim"));
     document.getElementById("logoutButton")?.addEventListener("click", oturumuKapat);
 
+    // Mobil/tablet: hamburger ile açılıp kapanan yan menü (off-canvas).
+    const sidebarAc = () => document.getElementById("app")?.classList.add("sidebar-open");
+    const sidebarKapat = () => document.getElementById("app")?.classList.remove("sidebar-open");
+    document.getElementById("menuToggle")?.addEventListener("click", () => document.getElementById("app")?.classList.toggle("sidebar-open"));
+    document.getElementById("sidebarBackdrop")?.addEventListener("click", sidebarKapat);
+
     // Menü butonlarında data-page kullanılıyorsa otomatik bağla.
     document.querySelectorAll("[data-page]").forEach(button => {
         button.addEventListener("click", () => {
             sayfaYukle(button.dataset.page);
+            sidebarKapat();
         });
     });
 

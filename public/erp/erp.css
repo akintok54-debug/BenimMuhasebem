@@ -858,19 +858,67 @@ th {
     }
 }
 
+.menu-toggle { display:none; }
+.sidebar-backdrop { display:none; }
+
 @media (max-width: 900px) {
     #app {
         display: block;
     }
 
+    .menu-toggle {
+        display:inline-flex; align-items:center; justify-content:center;
+        width:40px; height:40px; flex:0 0 40px; margin-right:10px;
+        border:1px solid #d7dee9; border-radius:9px; background:#fff;
+        color:#172033; font-size:20px; line-height:1; cursor:pointer;
+    }
+
+    .topbar-title { display:flex; align-items:center; }
+
     .sidebar {
-        width: 100%;
-        min-height: auto;
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 1200;
+        width: min(84vw, 300px);
+        height: 100vh;
+        min-height: 100vh;
+        overflow-y: auto;
+        transform: translateX(-100%);
+        transition: transform .22s ease;
+        box-shadow: 8px 0 30px rgba(15,23,42,.25);
+        padding-top: calc(20px + env(safe-area-inset-top));
+        padding-bottom: calc(20px + env(safe-area-inset-bottom));
+        padding-left: calc(20px + env(safe-area-inset-left));
+    }
+
+    #app.sidebar-open .sidebar {
+        transform: translateX(0);
+    }
+
+    .sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 1100;
+        background: rgba(15,23,42,.5);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .22s ease;
+    }
+
+    #app.sidebar-open .sidebar-backdrop {
+        opacity: 1;
+        pointer-events: auto;
     }
 
     nav {
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: 1fr;
+    }
+
+    nav button {
+        min-height: 46px;
     }
 
     .topbar { padding:14px 16px; }
@@ -1951,5 +1999,53 @@ th {
 
     .invoice-toolbar-actions {
         justify-content: flex-end;
+    }
+}
+
+/* ==========================================================
+   MOBİL / TABLET UYUM (Android + iPhone) — genel güvenlik ağı
+   ========================================================== */
+
+html { -webkit-text-size-adjust: 100%; }
+body { overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
+button, a, [role="button"] { touch-action: manipulation; }
+
+.topbar {
+    padding-top: calc(18px + env(safe-area-inset-top));
+    padding-left: calc(28px + env(safe-area-inset-left));
+    padding-right: calc(28px + env(safe-area-inset-right));
+}
+
+@media (max-width: 900px) {
+    .topbar {
+        padding-top: calc(14px + env(safe-area-inset-top));
+        padding-left: calc(16px + env(safe-area-inset-left));
+        padding-right: calc(16px + env(safe-area-inset-right));
+    }
+
+    .topbar-actions .account-button small { display:none; }
+}
+
+/* iOS Safari, 16px altı yazı boyutlu inputlara odaklanınca sayfayı otomatik yakınlaştırır. */
+@media (max-width: 768px) {
+    input, select, textarea, .erp-input {
+        font-size: 16px !important;
+    }
+
+    .erp-small-button, .erp-primary-button, nav button, .danger-button {
+        min-height: 42px;
+    }
+
+    .erp-modal-footer {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .erp-modal-footer > * { flex: 1 1 auto; }
+}
+
+@media (max-width: 480px) {
+    .dashboard-grid, .erp-form-grid, .supplier-info, .category-chip-list {
+        grid-template-columns: 1fr !important;
     }
 }

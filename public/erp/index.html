@@ -2,13 +2,15 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>benimmuhasebe.com İşletme Yönetimi</title>
-<link rel="stylesheet" href="/erp/erp.css?v=20260903-urungorsel02">
+<link rel="stylesheet" href="/erp/erp.css?v=20260903-mobiluyum01">
 </head>
 <body>
 
 <div id="app">
+
+    <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
 
     <aside class="sidebar">
         <div class="brand">
@@ -42,9 +44,12 @@
 
     <main class="main">
         <header class="topbar">
-            <div>
-                <h1 id="pageTitle">Ana Sayfa</h1>
-                <span id="tenantInfo">İşletme hesabınız aktif</span>
+            <div class="topbar-title">
+                <button id="menuToggle" class="menu-toggle" type="button" aria-label="Menüyü aç/kapat">☰</button>
+                <div>
+                    <h1 id="pageTitle">Ana Sayfa</h1>
+                    <span id="tenantInfo">İşletme hesabınız aktif</span>
+                </div>
             </div>
             <div class="topbar-actions">
                 <button id="accountButton" class="account-button" type="button"><span class="account-avatar">H</span><span><strong>Hesabım</strong><small>Profil ve güvenlik</small></span></button>
@@ -59,7 +64,7 @@
 
 <script src="/api/assets/xlsx.js?v=0.18.5"></script>
 <script src="/api/assets/jszip.js?v=3"></script>
-<script src="/erp/erp.js?v=20260903-urungorsel01"></script>
+<script src="/erp/erp.js?v=20260903-mobiluyum01"></script>
 </body>
 </html>
 
