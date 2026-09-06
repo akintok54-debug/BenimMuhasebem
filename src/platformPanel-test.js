@@ -64,5 +64,6 @@ test("SUPER_ADMIN platform API ve ayrı layout erişimine sahiptir", async (t) =
 
 test("Vercel platform statik yollarını backend yetki zincirine yönlendirir", () => {
  const config=JSON.parse(fs.readFileSync(path.join(__dirname,"..","vercel.json"),"utf8"));
- for(const source of ["/platform/:path*","/admin/:path*"]) assert.ok(config.rewrites.some(x=>x.source===source && x.destination==="/api"));
+ const filesystem=config.routes.findIndex(x=>x.handle==="filesystem");
+ for(const src of ["/platform(?:/.*)?","/admin(?:/.*)?","/.*%.*"]) {const index=config.routes.findIndex(x=>x.src===src && x.dest==="/api");assert.ok(index>=0 && index<filesystem);}
 });

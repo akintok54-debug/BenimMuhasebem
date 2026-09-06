@@ -81,7 +81,7 @@ uygulama.get(["/admin", "/admin/", "/admin/index.html"], kimlikKontrol, superAdm
 uygulama.use((req, res, next) => {
     if (/^\/api\/(tenant|auth|platform)(\/|$)/.test(req.path)) res.set("Cache-Control", "private, no-store");
     let yol;
-    try { yol = decodeURIComponent(req.path); } catch (_) { return res.sendStatus(400); }
+    try { yol = path.posix.normalize(decodeURIComponent(req.path).replace(/\\/g, "/")); } catch (_) { return res.sendStatus(400); }
     if (/(?:\.backup(?:-|$)|\.SNAPSHOT(?:-|$)|\.before-|\.bak$|\.md$|\.map$|(?:^|\/)\.env(?:\.|$))/i.test(yol)) return res.sendStatus(404);
     // Protect encoded static paths too; express.static decodes URLs independently.
     if (/^\/platform(?:\/|$)/i.test(yol)) return kimlikKontrol(req, res, error => {

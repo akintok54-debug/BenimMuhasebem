@@ -1,55 +1,50 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "redirects": [
+  "crons": [
     {
-      "source": "/:path*",
+      "path": "/api/cron/ideasoft-siparisleri",
+      "schedule": "0 3 * * *"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
       "has": [
         {
           "type": "host",
           "value": "benimmuhasebe.com"
         }
       ],
-      "destination": "https://www.benimmuhasebe.com/:path*",
-      "permanent": true
+      "headers": {
+        "Location": "https://www.benimmuhasebe.com/$1"
+      },
+      "status": 308
     },
     {
-      "source": "/",
-      "destination": "/erp/login.html",
-      "permanent": false
+      "src": "/(?:giris|login)?/?",
+      "headers": {
+        "Location": "/erp/login.html"
+      },
+      "status": 307
     },
     {
-      "source": "/giris",
-      "destination": "/erp/login.html",
-      "permanent": false
+      "src": "/platform(?:/.*)?",
+      "dest": "/api"
     },
     {
-      "source": "/login",
-      "destination": "/erp/login.html",
-      "permanent": false
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/platform/:path*",
-      "destination": "/api"
+      "src": "/admin(?:/.*)?",
+      "dest": "/api"
     },
     {
-      "source": "/admin/:path*",
-      "destination": "/api"
+      "src": "/.*%.*",
+      "dest": "/api"
     },
     {
-      "source": "/api/(.*)",
-      "destination": "/api"
+      "handle": "filesystem"
     },
     {
-      "source": "/api",
-      "destination": "/api"
-    }
-  ],
-  "crons": [
-    {
-      "path": "/api/cron/ideasoft-siparisleri",
-      "schedule": "0 3 * * *"
+      "src": "/api(?:/.*)?",
+      "dest": "/api"
     }
   ]
 }
