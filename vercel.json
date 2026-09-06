@@ -3,19 +3,53 @@
   "redirects": [
     {
       "source": "/:path*",
-      "has": [{ "type": "host", "value": "benimmuhasebe.com" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "benimmuhasebe.com"
+        }
+      ],
       "destination": "https://www.benimmuhasebe.com/:path*",
       "permanent": true
     },
-    { "source": "/", "destination": "/erp/login.html", "permanent": false },
-    { "source": "/giris", "destination": "/erp/login.html", "permanent": false },
-    { "source": "/login", "destination": "/erp/login.html", "permanent": false }
+    {
+      "source": "/",
+      "destination": "/erp/login.html",
+      "permanent": false
+    },
+    {
+      "source": "/giris",
+      "destination": "/erp/login.html",
+      "permanent": false
+    },
+    {
+      "source": "/login",
+      "destination": "/erp/login.html",
+      "permanent": false
+    }
   ],
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/api", "destination": "/api" }
+    {
+      "source": "/platform/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/admin/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/api",
+      "destination": "/api"
+    }
   ],
   "crons": [
-    { "path": "/api/cron/ideasoft-siparisleri", "schedule": "0 3 * * *" }
+    {
+      "path": "/api/cron/ideasoft-siparisleri",
+      "schedule": "0 3 * * *"
+    }
   ]
 }

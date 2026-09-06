@@ -55,10 +55,12 @@ Yerel tarayıcıda gerçek platform HTML/JS kullanılarak genel bakış, firma l
 
 ## Sınırlar ve yayın durumu
 
-- Bu çalışma canlıya dağıtılmadı. Canlı SUPER_ADMIN parolasıyla giriş ve gerçek MongoDB transaction/geri alma testi yapılmadı; canlı doğrulama tamamlandı iddiası yoktur.
+- 1.2.0 sürümü üretime yayınlandı. Canlı sağlık ve kimliksiz API erişim kontrolleri yapıldı. Canlı SUPER_ADMIN parolasıyla giriş ve gerçek MongoDB transaction/geri alma testi yapılmadı.
 - Destek erişimi salt okunurdur; normal tenant ERP’ye kullanıcı taklidi veya finansal yazma yetkisi sağlamaz.
 - Oturum listesi bu sürümden itibaren gözlenen, süresi dolmamış ve çıkış kaydı olmayan token oturumlarını gösterir. Henüz yeniden kullanılmamış eski oturumlar veya tarayıcının fiziksel olarak açık olup olmadığı bilinmez. Bu kayıt mevcut token iptal mekanizmasının yerine geçmez.
 - Şube sayısı mevcut `Depo.sube` değerlerinden gelir; ayrı şube sicili bulunmadığından kayıtlı farklı şube adları sayılır. Tanımlanmamış limitler sıfır veya sınırsız diye uydurulmaz.
 - Mail göstergesi yapılandırma kontrolüdür; canlı teslimat testi değildir. Token geçerliliği için yeni bağlantı testi yapılmaz. Kayıt olmayan Cron/backup durumu “Doğrulanmadı” olarak gösterilir. Yeni backup kaydı geri yüklemenin test edildiği anlamına gelmez.
 - Audit değişmezliği uygulamanın Mongoose kayıt/güncelleme/silme/toplu yazma yollarında uygulanır. MongoDB’ye doğrudan yönetici erişimi için ayrıca veritabanı rolü/altyapı politikası gerekir.
 - Mevcut tenant erişim/finans hesaplama kuralları yeniden yazılmadı. Bu çalışma ödeme tahsilatı, yeni şube/depo kota denetimi veya sağlayıcı token yenileme motoru eklemez.
+
+Yayın kontrolünde Vercel statik platform yolları da `vercel.json` üzerinden mevcut Express yetki kontrolüne yönlendirildi.
