@@ -1,3 +1,5 @@
+const { kimlik, maskele } = require("../services/platformGuvenligi");
+const Resolution = require("../models/PlatformErrorResolution");
 const PlatformAuditLog = require("../models/PlatformAuditLog");
 
 async function merkez(req, res, next) {
@@ -17,8 +19,9 @@ async function merkez(req, res, next) {
 
 async function auditKayitlari(req, res, next) {
     try {
-        const limit = Math.min(200, Math.max(1, Number(req.query.limit || 100)));
+        const limit = Math.min(200, Math.max(1, (Number(req.query.limit) || 100)));
         const filter = {};
+        if (req.query.tenantId) filter.tenantId = kimlik(req.query.tenantId);
         if (req.query.category) filter.category = String(req.query.category).slice(0, 50);
         const kayitlar = await PlatformAuditLog.find(filter)
             .populate("actorUserId", "adSoyad email rol")
@@ -27,13 +30,13 @@ async function auditKayitlari(req, res, next) {
             .limit(limit)
             .lean();
         res.set("Cache-Control", "no-store");
-        return res.json({ basarili: true, kayitlar });
+        return res.json({ basarili: true, kayitlar: maskele(kayitlar) });
     } catch (error) { next(error); }
 }
 
 async function sistemHatalari(req, res, next) {
     try {
-        const limit = Math.min(200, Math.max(1, Number(req.query.limit || 100)));
+        const limit = Math.min(200, Math.max(1, (Number(req.query.limit) || 100)));
         const son24Saat = new Date(Date.now() - 24 * 60 * 60 * 1000);
         const filter = { $or: [{ category: "API_HATASI" }, { httpStatus: { $gte: 500 } }] };
         const [hatalar, son24SaatToplam] = await Promise.all([
@@ -45,8 +48,16 @@ async function sistemHatalari(req, res, next) {
                 .lean(),
             PlatformAuditLog.countDocuments({ ...filter, createdAt: { $gte: son24Saat } })
         ]);
+        const resolutions = await Resolution.find({ auditId: { $in: hatalar.map(x => x._id) } }).lean();
+        const map = new Map(resolutions.map(x => [String(x.auditId), x]));
+        const repeats = await PlatformAuditLog.aggregate([
+            { $match: { ...filter, createdAt: { $gte: son24Saat } } },
+            { $group: { _id: { tenantId: "$tenantId", action: "$action", path: "$path", httpStatus: "$httpStatus" }, count: { $sum: 1 } } }
+        ]);
+        const key = x => JSON.stringify([String(x.tenantId?._id || x.tenantId || ""), x.action || "", x.path || "", x.httpStatus || null]);
+        const counts = new Map(repeats.map(x => [key(x._id), x.count]));
         res.set("Cache-Control", "no-store");
-        return res.json({ basarili: true, son24SaatToplam, toplam: hatalar.length, hatalar });
+        return res.json({ basarili: true, son24SaatToplam, toplam: hatalar.length, hatalar: maskele(hatalar.map(x => ({ ...x, resolution: map.get(String(x._id)) || { resolved: false }, repeatCount: counts.get(key(x)) || 0 }))) });
     } catch (error) { next(error); }
 }
 

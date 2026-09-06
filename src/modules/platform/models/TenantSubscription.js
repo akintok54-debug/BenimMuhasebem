@@ -40,6 +40,9 @@ const TenantSubscriptionSchema = new mongoose.Schema({
         default: null
     },
 
+    period: { type: String, enum: ["monthly", "yearly"], default: "monthly" },
+    paymentStatus: { type: String, enum: ["unknown", "paid", "unpaid", "past_due"], default: "unknown" },
+
     autoRenew: {
         type: Boolean,
         default: true

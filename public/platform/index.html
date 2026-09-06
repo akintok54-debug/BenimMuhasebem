@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="robots" content="noindex,nofollow">
     <title>Platform Yönetimi · BenimMuhasebe</title>
-    <link rel="stylesheet" href="/platform/platform.css?v=20260830-1">
+    <link rel="stylesheet" href="/platform/platform.css?v=20260906-platform-2">
 </head>
 <body>
 <div class="platform-shell">
@@ -23,8 +23,11 @@
             <button class="nav-item" data-section="errors"><span>!</span>Sistem Hataları</button>
             <button class="nav-item" data-section="security"><span>⬡</span>Güvenlik</button>
             <button class="nav-item" data-section="audit"><span>◷</span>Audit Log</button>
+            <button class="nav-item" data-section="integrations"><span>⇄</span>Entegrasyon Merkezi</button>
+            <button class="nav-item" data-section="health"><span>♡</span>Sistem Sağlığı</button>
+            <button class="nav-item" data-section="support"><span>◎</span>Destek Modu</button>
         </nav>
-        <div class="sidebar-foot"><span class="online-dot"></span> Üretim sistemi çevrimiçi</div>
+        <div class="sidebar-foot">Durum: Sistem Sağlığı ekranı</div>
     </aside>
 
     <main class="platform-main">
@@ -36,11 +39,12 @@
                 <button id="logoutButton" class="danger-button" type="button">Çıkış</button>
             </div>
         </header>
+        <div id="supportBanner" role="status" hidden></div>
         <section id="platformContent" class="platform-content" aria-live="polite">
             <div class="loading"><span></span>Platform verileri yükleniyor…</div>
         </section>
     </main>
 </div>
-<script src="/platform/platform.js?v=20260830-1"></script>
+<script src="/platform/platform.js?v=20260906-platform-2"></script>
 </body>
 </html>

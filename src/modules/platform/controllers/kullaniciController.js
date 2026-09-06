@@ -2,15 +2,16 @@ const Kullanici = require("../../../models/Kullanici");
 
 async function listele(req, res, next) {
     try {
-        const limit = Math.min(500, Math.max(1, Number(req.query.limit || 200)));
-        const filter = {};
+        const limit = Math.min(500, Math.max(1, (Number(req.query.limit) || 200)));
+        const filter = { silinmeTarihi: null };
+        if (req.query.tenantId) filter.tenantId = require("../services/platformGuvenligi").kimlik(req.query.tenantId);
         if (req.query.rol) filter.rol = String(req.query.rol).trim().toUpperCase();
         if (req.query.aktif === "true") filter.aktif = true;
         if (req.query.aktif === "false") filter.aktif = false;
 
         const [kullanicilar, rolOzeti] = await Promise.all([
             Kullanici.find(filter)
-                .select("adSoyad email rol aktif hesapDurumu tenantId sonGirisTarihi createdAt")
+                .select("adSoyad email rol aktif hesapDurumu tenantId sonGirisTarihi createdAt ikiFaktor.etkin")
                 .populate("tenantId", "name slug status")
                 .sort({ createdAt: -1 })
                 .limit(limit)

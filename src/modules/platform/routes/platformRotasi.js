@@ -16,6 +16,20 @@ const router = express.Router();
  */
 router.use(kimlikKontrol);
 router.use(superAdminKontrol);
+const { rateLimit } = require("../../../middleware/guvenlikKatmani");
+const { onayKontrol } = require("../services/platformGuvenligi");
+const operations = require("../controllers/operationsController");
+router.use(rateLimit({ pencereMs: 60000, limit: 180, anahtar: req => `platform:${req.currentUser._id}` }));
+router.use(onayKontrol);
+router.get("/health", operations.health);
+router.get("/integrations", operations.integrations);
+router.get("/tenants/:id/overview", operations.firma);
+router.patch("/tenants/:id/subscription", operations.subscriptionUpdate);
+router.post("/tenants/:id/users/:userId/password-reset", operations.passwordReset);
+router.post("/support", operations.supportStart);
+router.get("/support/:id", operations.supportRead);
+router.post("/support/:id/close", operations.supportEnd);
+router.patch("/errors/:id/resolution", operations.errorResolve);
 
 /* KIRACI YONETIMI */
 router.get("/tenants", tenantController.listele);

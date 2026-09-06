@@ -19,7 +19,7 @@ async function kaydet({
         resourceId,
         ip: req?.ip || null,
         userAgent: req?.headers?.["user-agent"] || null,
-        details,
+        details: require("./platformGuvenligi").maskele(details),
         category,
         severity,
         success,

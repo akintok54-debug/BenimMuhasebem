@@ -54,10 +54,16 @@ PlatformAuditLogSchema.pre("save", function auditDegismez() {
     if (!this.isNew) throw new Error("Audit kayıtları değiştirilemez.");
 });
 
-for (const hook of ["updateOne", "updateMany", "findOneAndUpdate", "deleteOne", "deleteMany", "findOneAndDelete"]) {
+for (const hook of ["replaceOne", "findOneAndReplace", "updateOne", "updateMany", "findOneAndUpdate", "deleteOne", "deleteMany", "findOneAndDelete"]) {
     PlatformAuditLogSchema.pre(hook, function engelle() {
         throw new Error("Audit kayıtları değiştirilemez veya silinemez.");
     });
 }
 
+PlatformAuditLogSchema.pre("deleteOne", { document: true, query: false }, function () {
+    throw new Error("Audit kayıtları silinemez.");
+});
+PlatformAuditLogSchema.pre("bulkWrite", function () {
+    throw new Error("Audit kayıtları toplu olarak değiştirilemez.");
+});
 module.exports = mongoose.model("PlatformAuditLog", PlatformAuditLogSchema);

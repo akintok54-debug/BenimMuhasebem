@@ -18,6 +18,7 @@ function cronYetkiKontrol(req, res, next) {
 router.get("/ideasoft-siparisleri", cronYetkiKontrol, async (req, res) => {
     try {
         const connectionCount = await ideasoftSiparisleriniOtomatikSirayaAl();
+        await require("../modules/platform/services/auditServisi").kaydet({ req, action: "CRON_COMPLETED", resource: "cron", details: { connectionCount } });
         res.json({ basarili: true, connectionCount });
     } catch (error) {
         console.error("IDEASOFT_CRON_SIPARIS_HATASI", { name: error.name, message: error.message });

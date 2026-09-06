@@ -7,10 +7,15 @@ async function listele(req, res, next) {
             .sort({ createdAt: -1 })
             .lean();
 
+        const [users, depots] = await Promise.all([
+            require("../../../models/Kullanici").aggregate([{ $match: { silinmeTarihi: null } }, { $group: { _id: "$tenantId", count: { $sum: 1 }, lastLogin: { $max: "$sonGirisTarihi" } } }]),
+            require("../../../models/Depo").aggregate([{ $group: { _id: "$tenantId", count: { $sum: 1 }, branches: { $addToSet: "$sube" } } }])
+        ]);
+        const u = new Map(users.map(x => [String(x._id), x])), d = new Map(depots.map(x => [String(x._id), x]));
         res.json({
             basarili: true,
             toplam: tenants.length,
-            tenants
+            tenants: tenants.map(x => ({ ...x, counts: { users: u.get(String(x._id))?.count || 0, depolar: d.get(String(x._id))?.count || 0, subeler: (d.get(String(x._id))?.branches || []).filter(x => x?.trim()).length }, sonGiris: u.get(String(x._id))?.lastLogin || null }))
         });
     } catch (error) {
         next(error);

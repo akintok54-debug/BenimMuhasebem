@@ -83,6 +83,11 @@ uygulama.use((req, res, next) => {
     let yol;
     try { yol = decodeURIComponent(req.path); } catch (_) { return res.sendStatus(400); }
     if (/(?:\.backup(?:-|$)|\.SNAPSHOT(?:-|$)|\.before-|\.bak$|\.md$|\.map$|(?:^|\/)\.env(?:\.|$))/i.test(yol)) return res.sendStatus(404);
+    // Protect encoded static paths too; express.static decodes URLs independently.
+    if (/^\/platform(?:\/|$)/i.test(yol)) return kimlikKontrol(req, res, error => {
+        if (error) return next(error);
+        return superAdminKontrol(req, res, next);
+    });
     next();
 });
 uygulama.use(express.static(publicKlasoru));
@@ -202,7 +207,6 @@ try {
 uygulama.use(hataYonetici);
 
 module.exports = uygulama;
-
 
 
 

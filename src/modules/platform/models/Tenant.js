@@ -55,6 +55,8 @@ const TenantSchema = new mongoose.Schema(
         },
 
         limits: {
+            branches: { type: Number, default: null, min: 0 },
+            warehouses: { type: Number, default: null, min: 0 },
             users: {
                 type: Number,
                 default: 3

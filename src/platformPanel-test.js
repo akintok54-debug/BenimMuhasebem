@@ -32,7 +32,7 @@ test("Tenant kullanıcısı platform API ve layout erişiminden 403 alır", asyn
     const tenantToken = tokenOlustur({ kullaniciId: "507f1f77bcf86cd799439011", email: "tenant@example.com", rol: "ADMIN", tenantId: "507f1f77bcf86cd799439012" });
     try {
         const base = `http://127.0.0.1:${server.address().port}`;
-        for (const requestPath of ["/api/platform/durum", "/platform/"]) {
+        for (const requestPath of ["/api/platform/durum", "/platform/", "/platform/%69ndex.html", "/plat%66orm/platform.js", "/api/platform/health", "/api/platform/integrations", "/api/platform/support/507f1f77bcf86cd799439012"]) {
             const response = await fetch(base + requestPath, { headers: { Authorization: `Bearer ${tenantToken}` } });
             assert.equal(response.status, 403, requestPath);
         }
@@ -41,7 +41,11 @@ test("Tenant kullanıcısı platform API ve layout erişiminden 403 alır", asyn
     }
 });
 
-test("SUPER_ADMIN platform API ve ayrı layout erişimine sahiptir", async () => {
+test("SUPER_ADMIN platform API ve ayrı layout erişimine sahiptir", async (t) => {
+    t.mock.method(require("./models/Kullanici"), "findOne", filter => {
+        assert.equal(filter.rol, "SUPER_ADMIN"); assert.equal(filter.aktif, true);
+        return { select: () => ({ lean: async () => ({ _id: filter._id, rol: "SUPER_ADMIN", hesapDurumu: "active" }) }) };
+    });
     const server = await testSunucusuAc();
     const superToken = tokenOlustur({ kullaniciId: "507f1f77bcf86cd799439013", email: "super@example.com", rol: "SUPER_ADMIN", tenantId: null });
     try {
