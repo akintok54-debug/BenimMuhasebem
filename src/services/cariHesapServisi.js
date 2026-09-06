@@ -28,14 +28,14 @@ function odemeBilgisi(body = {}) {
     return { yontem, hesapTipi: null };
 }
 
-async function hesapBul({ tenantId, hesapTipi, hesapId, aktif = true }) {
+async function hesapBul({ tenantId, hesapTipi, hesapId, aktif = true, session = null }) {
     const Model = HESAP_MODELLERI[String(hesapTipi || "").toUpperCase()];
     if (!Model || !mongoose.Types.ObjectId.isValid(String(hesapId || ""))) return null;
     return Model.findOne({
         _id: hesapId,
         tenantId: objectId(tenantId, "tenant"),
         ...(aktif ? { aktif: { $ne: false } } : {})
-    });
+    }).session(session);
 }
 
 /**
@@ -58,7 +58,8 @@ async function hareketKaydet({
     kullaniciId = null,
     hesap = null,
     paraTipi = null,
-    islemAnahtari
+    islemAnahtari,
+    session = null
 }) {
     const tId = objectId(tenantId, "tenant");
     const tarafTuru = String(tarafTipi || "").toUpperCase();
@@ -71,7 +72,7 @@ async function hareketKaydet({
         throw error;
     }
 
-    const taraf = await Model.findOne({ _id: objectId(tarafId, "cari hesap"), tenantId: tId });
+    const taraf = await Model.findOne({ _id: objectId(tarafId, "cari hesap"), tenantId: tId }).session(session);
     if (!taraf) {
         const error = new Error(tarafTuru === "TEDARIKCI" ? "Tedarikçi bulunamadı." : "Müşteri bulunamadı.");
         error.status = 404;
@@ -92,17 +93,17 @@ async function hareketKaydet({
     if (hesap) hesap.bakiye = Number(hesap.bakiye || 0) + hesapDegisimi;
 
     try {
-        await taraf.save();
-        if (hesap) await hesap.save();
-        cariHareket = await CariHareket.create({
+        await taraf.save({ session });
+        if (hesap) await hesap.save({ session });
+        [cariHareket] = await CariHareket.create([{
             tenantId: tId, tarafTipi: tarafTuru, tarafId: taraf._id, tip, tutar: miktar,
             bakiyeDegisimi: degisim, oncekiBakiye, sonrakiBakiye: taraf.bakiye,
             aciklama: String(aciklama || "").trim(), kaynak, kaynakId,
             belgeNo: String(belgeNo || "").trim(), odemeYontemi,
             tarih, kullaniciId, islemAnahtari
-        });
+        }], { session });
         if (hesap && paraTipi) {
-            paraHareket = await ParaHareket.create({
+            [paraHareket] = await ParaHareket.create([{
                 tenantId: tId,
                 hesapTipi: hesap.constructor.modelName === "Kasa" ? "KASA" : "BANKA",
                 hesapId: hesap._id,
@@ -115,10 +116,11 @@ async function hareketKaydet({
                 belgeNo: String(belgeNo || "").trim(),
                 tarih,
                 kullaniciId
-            });
+            }], { session });
         }
         return { taraf, cariHareket, paraHareket };
     } catch (error) {
+        if (session) throw error;
         if (paraHareket?._id) await ParaHareket.deleteOne({ _id: paraHareket._id, tenantId: tId }).catch(() => {});
         if (cariHareket?._id) await CariHareket.deleteOne({ _id: cariHareket._id, tenantId: tId }).catch(() => {});
         taraf.bakiye = oncekiBakiye;
@@ -131,13 +133,14 @@ async function hareketKaydet({
     }
 }
 
-async function tedarikciAlisKaydet({ tenantId, tedarikciId, genelToplam, odenenTutar = 0, hesap = null, kaynakId, belgeNo, tarih, kullaniciId }) {
+async function tedarikciAlisKaydet({ tenantId, tedarikciId, genelToplam, odenenTutar = 0, hesap = null, kaynakId, belgeNo, tarih, kullaniciId, session = null }) {
     const toplam = Number(genelToplam || 0);
     const odenen = Number(odenenTutar || 0);
     const alis = await hareketKaydet({
         tenantId, tarafTipi: "TEDARIKCI", tarafId: tedarikciId, tip: "ALACAK",
         tutar: toplam, bakiyeDegisimi: toplam, aciklama: `Alış ${belgeNo}`,
-        kaynak: "ALIS", kaynakId, belgeNo, tarih, kullaniciId
+        kaynak: "ALIS", kaynakId, belgeNo, tarih, kullaniciId, session,
+        islemAnahtari: `ALIS:${kaynakId}:CARI:BORC`
     });
     if (!odenen) return { taraf: alis.taraf, alisHareketi: alis.cariHareket, odemeHareketi: null, paraHareket: null };
     try {
@@ -145,10 +148,12 @@ async function tedarikciAlisKaydet({ tenantId, tedarikciId, genelToplam, odenenT
             tenantId, tarafTipi: "TEDARIKCI", tarafId: tedarikciId, tip: "ODEME",
             tutar: odenen, bakiyeDegisimi: -odenen, aciklama: `Alış ödemesi ${belgeNo}`,
             kaynak: "ALIS_ODEME", kaynakId, belgeNo, tarih, kullaniciId,
-            hesap, paraTipi: hesap ? "CIKIS" : null
+            hesap, paraTipi: hesap ? "CIKIS" : null, session,
+            islemAnahtari: `ALIS:${kaynakId}:CARI:ODEME`
         });
         return { taraf: odeme.taraf, alisHareketi: alis.cariHareket, odemeHareketi: odeme.cariHareket, paraHareket: odeme.paraHareket };
     } catch (error) {
+        if (session) throw error;
         await CariHareket.deleteOne({ _id: alis.cariHareket._id, tenantId: objectId(tenantId, "tenant") }).catch(() => {});
         await Tedarikci.updateOne({ _id: tedarikciId, tenantId: objectId(tenantId, "tenant") }, { $inc: { bakiye: -toplam } }).catch(() => {});
         throw error;

@@ -57,8 +57,10 @@ test("satış stok ihtiyacını ürün bazında toplar; alış ve iade başarıs
     const alisKaynak = fs.readFileSync(path.join(__dirname, "controllers", "alisController.js"), "utf8");
     assert.match(satisKaynak, /stokKontrolleri\s*=\s*new Map/);
     assert.match(satisKaynak, /toplamIhtiyac/);
-    assert.match(satisKaynak, /findOneAndUpdate\([\s\S]+miktar:\s*\{\s*\$gte:\s*item\.miktar/);
+    assert.match(satisKaynak, /satisStokDus\(\{[\s\S]+miktar: item\.miktar, session/);
     assert.match(satisKaynak, /Aynı ürün iade belgesinde yalnızca bir satırda/);
-    assert.match(alisKaynak, /kaynak:\s*"ALIS"[\s\S]+\$inc:\s*\{\s*miktar:\s*-stok\.miktar/);
+    assert.match(alisKaynak, /session\.withTransaction/);
+    assert.match(alisKaynak, /StokHareket\.create\(\[\{[\s\S]+kaynak:\s*"ALIS"[\s\S]+\{ session \}/);
+    assert.doesNotMatch(alisKaynak, /rollback\.alisId/);
     assert.match(alisKaynak, /kaynak:\s*"ALIS_IADE"[\s\S]+\$inc:\s*\{\s*miktar:\s*stok\.miktar/);
 });

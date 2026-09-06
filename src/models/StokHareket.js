@@ -43,7 +43,7 @@ const StokHareketSchema = new mongoose.Schema(
         miktar: {
             type: Number,
             required: true,
-            min: 0
+            min: 0.000001
         },
 
         tarih: {

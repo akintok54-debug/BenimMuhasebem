@@ -1,6 +1,6 @@
 {
   "name": "bahadir-erp-v2",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "",
   "main": "src/sunucu.js",
   "directories": {
@@ -10,6 +10,12 @@
     "dev": "nodemon src/sunucu.js",
     "start": "node src/sunucu.js",
     "test": "node --test",
+    "db:indexes": "node scripts/mongodb-index-sync.js",
+    "audit:accounting": "node scripts/muhasebe-butunluk-audit.js",
+    "audit:stock": "node scripts/stok-butunluk-audit.js",
+    "repair:stock-ledger": "node scripts/stok-defteri-onar.js",
+    "cleanup:test-data": "node scripts/canli-test-verisi-iptal.js",
+    "repair:sale-ledger": "node scripts/eksik-satis-cari-onar.js",
     "backup:check": "node scripts/mongodb-backup.js --check",
     "restore:check": "node scripts/mongodb-restore-check.js --check"
   },
@@ -30,7 +36,7 @@
     "morgan": "^1.11.0",
     "multer": "^2.2.0",
     "redis": "^5.8.2",
-    "xlsx": "^0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -78,29 +78,32 @@ async function ozet(req, res, next) {
 async function olustur(req, res, next) {
     const tId = tenantId(req), body = req.body || {}, tutar = sayi(body.tutar, "Tutar", { min: 0.01 });
     const aciklama = metin(body.aciklama, 300), hesapTipi = metin(body.hesapTipi).toUpperCase(), Model = hesapModeli(hesapTipi);
+    const session = await mongoose.startSession();
     let hesap = null, masraf = null, paraHareket = null;
     try {
         if (!aciklama) return res.status(400).json({ basarili: false, mesaj: "Masraf açıklaması zorunludur." });
         if (!Model || !mongoose.Types.ObjectId.isValid(String(body.hesapId || ""))) return res.status(400).json({ basarili: false, mesaj: "Geçerli bir kasa veya banka hesabı seçilmelidir." });
-        hesap = await Model.findOneAndUpdate({ _id: body.hesapId, tenantId: tId, aktif: true, bakiye: { $gte: tutar } }, { $inc: { bakiye: -tutar } }, { new: true });
-        if (!hesap) return res.status(409).json({ basarili: false, mesaj: "Masraf hesabı bulunamadı, pasif veya bakiyesi yetersiz." });
         const kdvOrani = sayi(body.kdvOrani, "KDV oranı", { min: 0, max: 100 });
         const kdvTutari = body.kdvTutari === undefined || body.kdvTutari === "" ? tutar - (tutar / (1 + kdvOrani / 100)) : sayi(body.kdvTutari, "KDV tutarı", { min: 0, max: tutar });
-        masraf = await Masraf.create({
-            tenantId: tId, tarih: body.tarih || new Date(), kategori: kategoriDogrula(body.kategori), aciklama, tutar,
-            firma: metin(body.firma, 160), fisNo: metin(body.fisNo, 80), fisGorseli: fisGorseliDogrula(body.fisGorseli),
-            notlar: metin(body.notlar, 1500), kdvOrani, kdvTutari, aracPlaka: metin(body.aracPlaka, 20).toUpperCase(),
-            hesapTipi, hesapId: hesap._id, paraBirimi: hesap.paraBirimi || "TRY", odemeDurumu: "ODENDI", durum: "AKTIF",
-            kaynak: "MANUEL", kullaniciId: kullaniciId(req)
+        await session.withTransaction(async () => {
+            hesap = await Model.findOneAndUpdate({ _id: body.hesapId, tenantId: tId, aktif: true, bakiye: { $gte: tutar } }, { $inc: { bakiye: -tutar } }, { new: true, session });
+            if (!hesap) throw Object.assign(new Error("Masraf hesabı bulunamadı, pasif veya bakiyesi yetersiz."), { status: 409 });
+            [masraf] = await Masraf.create([{
+                tenantId: tId, tarih: body.tarih || new Date(), kategori: kategoriDogrula(body.kategori), aciklama, tutar,
+                firma: metin(body.firma, 160), fisNo: metin(body.fisNo, 80), fisGorseli: fisGorseliDogrula(body.fisGorseli),
+                notlar: metin(body.notlar, 1500), kdvOrani, kdvTutari, aracPlaka: metin(body.aracPlaka, 20).toUpperCase(),
+                hesapTipi, hesapId: hesap._id, paraBirimi: hesap.paraBirimi || "TRY", odemeDurumu: "ODENDI", durum: "AKTIF",
+                kaynak: "MANUEL", kullaniciId: kullaniciId(req)
+            }], { session });
+            [paraHareket] = await ParaHareket.create([{ tenantId: tId, hesapTipi, hesapId: hesap._id, tip: "CIKIS", tutar, paraBirimi: hesap.paraBirimi || "TRY", aciklama, kaynak: "MASRAF", kaynakId: masraf._id, belgeNo: metin(body.fisNo, 80), tarih: body.tarih || new Date(), kullaniciId: kullaniciId(req), islemAnahtari: `MASRAF:${masraf._id}:PARA:CIKIS` }], { session });
+            masraf.paraHareketId = paraHareket._id;
+            await masraf.save({ session });
         });
-        paraHareket = await ParaHareket.create({ tenantId: tId, hesapTipi, hesapId: hesap._id, tip: "CIKIS", tutar, paraBirimi: hesap.paraBirimi || "TRY", aciklama, kaynak: "MASRAF", kaynakId: masraf._id, belgeNo: metin(body.fisNo, 80), tarih: body.tarih || new Date(), kullaniciId: kullaniciId(req) });
-        masraf.paraHareketId = paraHareket._id; await masraf.save();
         res.status(201).json({ basarili: true, mesaj: "Masraf ve fiş belgesi kaydedildi.", masraf, hesap, paraHareket });
     } catch (error) {
-        if (paraHareket?._id) await ParaHareket.deleteOne({ _id: paraHareket._id, tenantId: tId }).catch(() => {});
-        if (masraf?._id) await Masraf.deleteOne({ _id: masraf._id, tenantId: tId }).catch(() => {});
-        if (hesap?._id && Model) await Model.updateOne({ _id: hesap._id, tenantId: tId }, { $inc: { bakiye: tutar } }).catch(() => {});
         next(error);
+    } finally {
+        await session.endSession();
     }
 }
 

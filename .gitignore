@@ -12,4 +12,7 @@ private-backup-keys/
 *.SNAPSHOT-*
 *.bak
 .vercel
+*.backup-*
+*.before-*
+.tmp-*
 .env*

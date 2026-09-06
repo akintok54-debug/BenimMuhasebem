@@ -177,7 +177,7 @@ test("IdeaSoft tenant izolasyonu oturum tenantıyla korunur ve AKN rollout kimli
     assert.match(controller, /IDEASOFT_AKN_TENANT_ID = "6a8dc53a3ff8c8a32ff9545b"/);
     assert.match(controller, /_id: req\.params\.id, tenantId, active: true/);
     assert.match(controller, /select\("\+encryptedCredentials"\)/);
-    assert.match(controller, /pilotStatus !== "SUCCESS"/);
+    assert.match(controller, /pilotDurumu\(connection\) !== "SUCCESS"/);
     assert.match(routes, /ideasoft\/pilot-test/);
     assert.match(controller, /api\/integrations\/ideasoft\/callback/);
     assert.match(uygulama, /\/api\/integrations\/ideasoft\/callback/);

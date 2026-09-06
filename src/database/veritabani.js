@@ -12,12 +12,9 @@ async function veritabaniBaglan() {
         autoIndex: process.env.NODE_ENV !== "production"
     });
 
-    // Üretimde autoIndex kapalıdır; işlem tekilleştirme indeksi güvenlik kuralıdır
-    // ve boş/yeni koleksiyonda başlangıçta açıkça kurulmalıdır.
-    await require("../models/IslemKaydi").createIndexes();
-    const Urun = require("../models/Urun");
-    try { await Urun.collection.dropIndex("tenantId_1_barkod_1"); } catch (error) { if (error.codeName !== "IndexNotFound") throw error; }
-    await Urun.createIndexes();
+    // İndeks DDL işlemleri sunucu başlangıcından tamamen ayrıdır. Vercel aynı anda
+    // birden fazla instance açabildiği için bakım yalnız `npm run db:indexes` ile
+    // kontrollü olarak yürütülür.
 
     console.log("MongoDB bağlantısı başarılı.");
 }

@@ -1,0 +1,10 @@
+.belge-tutar-ozeti{margin:18px 0 0 auto;width:100%;max-width:390px;border:1px solid #dbe2ea;border-radius:8px;padding:16px;background:#fff;color:#172033;break-inside:avoid;font-variant-numeric:tabular-nums}
+.belge-tutar-ozeti h3{font-size:14px;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid #dbe2ea;letter-spacing:.02em}
+.belge-ozet-satir{display:flex;justify-content:space-between;gap:18px;padding:5px 0;font-size:12px;align-items:baseline}
+.belge-ozet-satir span{overflow-wrap:anywhere}.belge-ozet-satir strong{white-space:nowrap;text-align:right;font-weight:600}
+.belge-kdv-detay{color:#526174;font-size:11px;padding-left:8px}
+.belge-ozet-genel{border-top:2px solid #172033;margin-top:10px;padding-top:12px;font-size:14px;font-weight:800}
+@media print{.belge-tutar-ozeti{border-radius:0;box-shadow:none}.belge-ozet-genel{font-size:13px}thead{display:table-header-group}tr{break-inside:avoid}.invoice-table{font-variant-numeric:tabular-nums}.invoice-table th,.invoice-table td{padding:8px 6px!important}.invoice-page{box-shadow:none!important}.invoice-bottom{break-inside:avoid}}
+@media(max-width:600px){.belge-tutar-ozeti{max-width:100%;padding:12px}.belge-ozet-satir{gap:10px}.belge-ozet-genel{font-size:12px}}
+.invoice-toolbar-actions{flex-wrap:wrap;min-width:0;justify-content:flex-end}.invoice-toolbar{flex-wrap:wrap}.invoice-company-details{font-size:11px;color:#526174;margin-top:8px;line-height:1.5;overflow-wrap:anywhere}.invoice-page,.belge-tutar-ozeti{box-sizing:border-box}
+@media screen and (max-width:600px){.invoice-page{padding:16px;min-height:0}.invoice-table{min-width:0!important;width:100%;table-layout:fixed}.invoice-table th,.invoice-table td{padding:5px 2px!important;font-size:9px;overflow-wrap:anywhere}.invoice-toolbar-actions>*{max-width:100%}}

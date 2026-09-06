@@ -1,101 +1,106 @@
 ﻿<!DOCTYPE html>
 <html lang="tr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>benimmuhasebe.com İşletme Yönetimi</title>
-<link rel="stylesheet" href="/erp/erp.css?v=20260903-barkod01">
+    <link rel="stylesheet" href="/erp/belge-sunum.css?v=20260906-release01">
+    <link rel="stylesheet" href="/erp/erp.css?v=20260906-release01">
 </head>
+
 <body>
 
-<div id="app">
+    <div id="app">
 
-    <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
+        <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
 
-    <aside class="sidebar">
-        <div class="brand">
-            <strong>benimmuhasebe.com</strong>
-            <span>İşletme Yönetimi</span>
-        </div>
+        <aside class="sidebar">
+            <div class="brand">
+                <span class="brand-mark" aria-hidden="true">BM</span>
+                <span class="brand-copy">
+                    <strong>benimmuhasebe.com</strong>
+                    <span>İşletme Yönetimi</span>
+                </span>
+            </div>
 
-        <nav>
-            <button data-page="dashboard">Ana Sayfa</button>
-            <button data-page="musteriler">Müşteriler</button>
-            <button data-page="tedarikciler">Tedarikçiler</button>
-            <button data-page="urunler">Ürünler</button>
-            <button data-page="stok">Stok</button>
-            <button data-page="alis">Alış</button>
-            <button data-page="satis">Satış</button>
-            <button data-page="saha">Saha Satış</button>
-            <button data-page="cari">Cari</button>
-            <button data-page="finans">Kasa / Banka</button>
-            <button data-page="masraflar">Masraflar</button>
-            <button data-page="teklifler">Teklifler</button>
-            <button data-page="siparisler">Siparişler</button>
-            <button data-page="personeller">Personel</button>
-            <button data-page="kullanicilar">Kullanıcılar / Yetkiler</button>
-            <button data-page="raporlar">Raporlar</button>
-            <button data-page="eticaret">E-Ticaret</button>
-            <button data-page="whatsapp">WhatsApp</button>
-            <button data-page="ayarlar">Ayarlar</button>
-        </nav>
+            <nav aria-label="Ana menü">
+                <section class="nav-group" aria-labelledby="navGenel">
+                    <h2 id="navGenel">Genel</h2>
+                    <button data-page="dashboard"><span class="nav-icon" aria-hidden="true">⌂</span><span>Ana Sayfa</span></button>
+                </section>
+                <section class="nav-group" aria-labelledby="navSatis">
+                    <h2 id="navSatis">Satış</h2>
+                    <button data-page="satis"><span class="nav-icon" aria-hidden="true">↗</span><span>Satışlar</span></button>
+                    <button data-page="siparisler"><span class="nav-icon" aria-hidden="true">▣</span><span>Siparişler</span></button>
+                    <button data-page="teklifler"><span class="nav-icon" aria-hidden="true">≡</span><span>Teklifler</span></button>
+                    <button data-page="musteriler"><span class="nav-icon" aria-hidden="true">◎</span><span>Müşteriler</span></button>
+                    <button data-page="saha"><span class="nav-icon" aria-hidden="true">◉</span><span>Saha Satış</span></button>
+                </section>
+                <section class="nav-group" aria-labelledby="navAlis">
+                    <h2 id="navAlis">Satın Alma</h2>
+                    <button data-page="alis"><span class="nav-icon" aria-hidden="true">↙</span><span>Alışlar</span></button>
+                    <button data-page="tedarikciler"><span class="nav-icon" aria-hidden="true">◇</span><span>Tedarikçiler</span></button>
+                </section>
+                <section class="nav-group" aria-labelledby="navStok">
+                    <h2 id="navStok">Stok</h2>
+                    <button data-page="urunler"><span class="nav-icon" aria-hidden="true">▦</span><span>Ürünler</span></button>
+                    <button data-page="stok"><span class="nav-icon" aria-hidden="true">▤</span><span>Stok ve Depolar</span></button>
+                </section>
+                <section class="nav-group" aria-labelledby="navFinans">
+                    <h2 id="navFinans">Finans</h2>
+                    <button data-page="cari"><span class="nav-icon" aria-hidden="true">⇄</span><span>Cari Hesaplar</span></button>
+                    <button data-page="finans"><span class="nav-icon" aria-hidden="true">₺</span><span>Kasa / Banka</span></button>
+                    <button data-page="masraflar"><span class="nav-icon" aria-hidden="true">−</span><span>Masraflar</span></button>
+                </section>
+                <section class="nav-group" aria-labelledby="navYonetim">
+                    <h2 id="navYonetim">Yönetim</h2>
+                    <button data-page="personeller"><span class="nav-icon" aria-hidden="true">○</span><span>Personel</span></button>
+                    <button data-page="kullanicilar"><span class="nav-icon" aria-hidden="true">⚙</span><span>Kullanıcılar / Yetkiler</span></button>
+                </section>
+                <section class="nav-group" aria-labelledby="navRaporlama">
+                    <h2 id="navRaporlama">Raporlama</h2>
+                    <button data-page="raporlar"><span class="nav-icon" aria-hidden="true">▥</span><span>Raporlar</span></button>
+                </section>
+                <section class="nav-group" aria-labelledby="navKanallar">
+                    <h2 id="navKanallar">Kanallar</h2>
+                    <button data-page="eticaret"><span class="nav-icon" aria-hidden="true">◈</span><span>E-Ticaret</span></button>
+                    <button data-page="whatsapp"><span class="nav-icon" aria-hidden="true">◇</span><span>WhatsApp</span></button>
+                </section>
+                <section class="nav-group" aria-labelledby="navSistem">
+                    <h2 id="navSistem">Sistem</h2>
+                    <button data-page="ayarlar"><span class="nav-icon" aria-hidden="true">⚙</span><span>Ayarlar</span></button>
+                </section>
+            </nav>
 
-    </aside>
+        </aside>
 
-    <main class="main">
-        <header class="topbar">
-            <div class="topbar-title">
-                <button id="menuToggle" class="menu-toggle" type="button" aria-label="Menüyü aç/kapat">☰</button>
-                <div>
-                    <h1 id="pageTitle">Ana Sayfa</h1>
-                    <span id="tenantInfo">İşletme hesabınız aktif</span>
+        <main class="main">
+            <header class="topbar">
+                <div class="topbar-title">
+                    <button id="menuToggle" class="menu-toggle" type="button" aria-label="Menüyü aç/kapat">☰</button>
+                    <div>
+                        <h1 id="pageTitle">Ana Sayfa</h1>
+                        <span id="tenantInfo">İşletme hesabınız aktif</span>
+                    </div>
                 </div>
-            </div>
-            <div class="topbar-actions">
-                <button id="accountButton" class="account-button" type="button"><span class="account-avatar">H</span><span><strong>Hesabım</strong><small>Profil ve güvenlik</small></span></button>
-                <button id="logoutButton" class="logout topbar-logout" type="button">Çıkış Yap</button>
-            </div>
-        </header>
+                <div class="topbar-actions">
+                    <button id="accountButton" class="account-button" type="button"><span
+                            class="account-avatar">H</span><span><strong>Hesabım</strong><small>Profil ve
+                                güvenlik</small></span></button>
+                    <button id="logoutButton" class="logout topbar-logout" type="button">Çıkış Yap</button>
+                </div>
+            </header>
 
-        <section id="content"></section>
-    </main>
+            <section id="content"></section>
+        </main>
 
-</div>
+    </div>
 
-<script src="/api/assets/xlsx.js?v=0.18.5"></script>
-<script src="/api/assets/jszip.js?v=3"></script>
-<script src="/erp/erp.js?v=20260903-barkod03"></script>
+    <script src="/api/assets/xlsx.js?v=0.18.5"></script>
+    <script src="/api/assets/jszip.js?v=3"></script>
+    <script src="/erp/belge-sunum.js?v=20260906-release01"></script>
+    <script src="/erp/erp.js?v=20260906-release01"></script>
 </body>
+
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

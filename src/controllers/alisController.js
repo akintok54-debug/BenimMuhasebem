@@ -106,10 +106,9 @@ async function detay(req, res, next) {
 }
 
 async function olustur(req, res, next) {
-    const rollback = { tenantId: null, alisId: null, stoklar: [] };
+    const session = await mongoose.startSession();
     try {
         const tenantId = tenantObjectId(req);
-        rollback.tenantId = tenantId;
         const body = req.body || {};
 
         if (!body.belgeNo) {
@@ -260,95 +259,50 @@ async function olustur(req, res, next) {
             if (Number(odemeHesabi.bakiye || 0) < odenenTutar) return res.status(409).json({ basarili: false, mesaj: "Ödeme hesabında yeterli bakiye yok." });
         }
 
-        const alis = await Alis.create({
-            tenantId,
-            belgeNo,
-            tarih: body.tarih || new Date(),
-            tedarikciId: tedarikci._id,
-            depoId: depo._id,
-            kalemler,
-            araToplam,
-            toplamKdv,
-            genelToplam,
-            odemeDurumu,
-            odemeTipi,
-            odenenTutar,
-            belgeOdemeTutari: odenenTutar,
-            belgeOdemeAyrildi: true,
-            kalanTutar,
-            hesapTipi: odenenTutar > 0 ? hesapTipi : null,
-            hesapId: odenenTutar > 0 ? odemeHesabi?._id : null,
-            notlar: body.notlar || "",
-            kullaniciId:
-                req.kullanici?._id ||
-                req.user?._id ||
-                null
-        });
-        rollback.alisId = alis._id;
+        let alis;
+        let muhasebe;
+        await session.withTransaction(async () => {
+            let transactionHesabi = null;
+            if (odenenTutar > 0) {
+                const HesapModeli = hesapTipi === "KASA" ? Kasa : Banka;
+                transactionHesabi = await HesapModeli.findOne({
+                    _id: odemeHesabi._id, tenantId, aktif: true, bakiye: { $gte: odenenTutar }
+                }).session(session);
+                if (!transactionHesabi) throw Object.assign(new Error("Ödeme hesabı bakiyesi işlem sırasında değişti."), { status: 409 });
+            }
 
-        /*
-         * ALIŞ -> STOK GRŞ
-         */
-        for (const kalem of kalemler) {
-            const stokBirimMaliyeti = kalem.birimFiyat * (1 - Number(kalem.iskonto || 0) / 100);
-            const stok = await Stok.findOneAndUpdate(
-                {
-                    tenantId,
-                    urunId: kalem.urunId,
-                    depoId: depo._id
-                },
-                {
-                    $inc: {
-                        miktar: kalem.miktar
-                    },
-                    $set: {
-                        maliyet: stokBirimMaliyeti,
-                        sonHareketTarihi: new Date()
-                    }
-                },
-                {
-                    new: true,
-                    upsert: true,
-                    setDefaultsOnInsert: true
-                }
-            );
-            if (!stok) throw new Error("Stok güncellenemedi.");
-            rollback.stoklar.push({ stokId: stok._id, miktar: kalem.miktar });
+            [alis] = await Alis.create([{
+                tenantId, belgeNo, tarih: body.tarih || new Date(), tedarikciId: tedarikci._id,
+                depoId: depo._id, kalemler, araToplam, toplamKdv, genelToplam, odemeDurumu,
+                odemeTipi, odenenTutar, belgeOdemeTutari: odenenTutar, belgeOdemeAyrildi: true,
+                kalanTutar, hesapTipi: odenenTutar > 0 ? hesapTipi : null,
+                hesapId: odenenTutar > 0 ? transactionHesabi?._id : null,
+                notlar: body.notlar || "", kullaniciId: kullaniciId(req)
+            }], { session });
 
-            await StokHareket.create({
-                tenantId,
-                urunId: kalem.urunId,
-                depoId: depo._id,
-                tip: "GIRIS",
-                miktar: kalem.miktar,
-                tarih: alis.tarih,
-                birimMaliyet: stokBirimMaliyeti,
-                maliyetDogrulandi: stokBirimMaliyeti > 0,
-                maliyetKaynagi: "ALIS_BELGESI",
-                kaynak: "ALIS",
-                kaynakId: alis._id,
-                aciklama: `Alış ${belgeNo}`,
-                kullaniciId:
-                    req.kullanici?._id ||
-                    req.user?._id ||
-                    null
+            for (const kalem of kalemler) {
+                const stokBirimMaliyeti = kalem.birimFiyat * (1 - Number(kalem.iskonto || 0) / 100);
+                const stok = await Stok.findOneAndUpdate(
+                    { tenantId, urunId: kalem.urunId, depoId: depo._id },
+                    { $inc: { miktar: kalem.miktar }, $set: { maliyet: stokBirimMaliyeti, sonHareketTarihi: new Date() } },
+                    { new: true, upsert: true, setDefaultsOnInsert: true, session }
+                );
+                if (!stok) throw new Error("Stok güncellenemedi.");
+                await StokHareket.create([{
+                    tenantId, urunId: kalem.urunId, depoId: depo._id, tip: "GIRIS",
+                    miktar: kalem.miktar, tarih: alis.tarih, birimMaliyet: stokBirimMaliyeti,
+                    maliyetDogrulandi: stokBirimMaliyeti > 0, maliyetKaynagi: "ALIS_BELGESI",
+                    kaynak: "ALIS", kaynakId: alis._id,
+                    islemAnahtari: `ALIS:${alis._id}:STOK:${kalem.urunId}:${depo._id}`,
+                    aciklama: `Alış ${belgeNo}`, kullaniciId: kullaniciId(req)
+                }], { session });
+            }
+
+            muhasebe = await tedarikciAlisKaydet({
+                tenantId, tedarikciId: tedarikci._id, genelToplam, odenenTutar,
+                hesap: transactionHesabi, kaynakId: alis._id, belgeNo,
+                tarih: body.tarih || new Date(), kullaniciId: kullaniciId(req), session
             });
-
-        }
-
-        /*
-         * AÇIK / KISM ALIŞ -> TEDARKÇ BORCU
-         */
-        const muhasebe = await tedarikciAlisKaydet({
-            tenantId,
-            tedarikciId: tedarikci._id,
-            genelToplam,
-            odenenTutar,
-            hesap: odemeHesabi,
-            kaynakId: alis._id,
-            belgeNo,
-            tarih: body.tarih || new Date(),
-            kullaniciId: kullaniciId(req)
         });
 
         return res.status(201).json({
@@ -358,12 +312,9 @@ async function olustur(req, res, next) {
             tedarikciBakiye: muhasebe.taraf.bakiye
         });
     } catch (error) {
-        if (rollback.alisId && rollback.tenantId) {
-            await StokHareket.deleteMany({ tenantId: rollback.tenantId, kaynak: "ALIS", kaynakId: rollback.alisId }).catch(() => {});
-            for (const stok of rollback.stoklar) await Stok.updateOne({ _id: stok.stokId, tenantId: rollback.tenantId }, { $inc: { miktar: -stok.miktar } }).catch(() => {});
-            await Alis.deleteOne({ _id: rollback.alisId, tenantId: rollback.tenantId }).catch(() => {});
-        }
         next(error);
+    } finally {
+        await session.endSession();
     }
 }
 

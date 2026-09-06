@@ -50,9 +50,33 @@ test("Satış ürün araması kod, barkod ve ada göre sonuç gösterip miktarl�
     const css = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.css"), "utf8");
     for (const ifade of ["data-sales-search", "salesProductResultCount", "salesProductEmpty", "data-sales-quantity", "data-sales-add", "sepeteEkle", "ürün gösteriliyor"]) assert.match(js, new RegExp(ifade));
     assert.match(js, /\[u\.kod,u\.barkod,u\.ad,u\.marka,u\.model,u\.kategori\]/);
-    assert.match(js, /Math\.min\(stok, Math\.floor/);
+    assert.match(js, /Math\.max\(1, Math\.floor\(Number\(input\?\.value/);
     assert.match(css, /\.sales-product-add/);
     assert.match(css, /\.sales-cart-quantity input/);
+});
+
+test("Satis belgesi urun aramasini ilk sirada ve sonucu arama alaninin hemen altinda acar", () => {
+    const js = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
+    const css = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.css"), "utf8");
+    assert.match(js, /tur === "satis" \? "sales-entry-modal"/);
+    assert.match(js, /urunSonuclari\.hidden = true/);
+    assert.match(js, /urunArama\.addEventListener\("focus", urunSonuclariniAc\)/);
+    assert.match(js, /product-result-add/);
+    assert.match(css, /\.sales-entry-modal \.product-picker-section \{ order: -1; \}/);
+    assert.match(css, /\.document-product-tools > \.belge-urun-sonuclari \{ grid-column: 1 \/ -1; order: 2; \}/);
+    assert.match(css, /\.belge-urun-sonuclari\[hidden\] \{ display: none !important; \}/);
+});
+
+test("Satis merkezi ve saha satisi mobilde ayni hizli urun ekleme akisina baglidir", () => {
+    const js = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
+    const css = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.css"), "utf8");
+    assert.match(js, /const uruneGit = mod => \{[\s\S]*arama\.scrollIntoView[\s\S]*arama\.focus/);
+    assert.match(js, /ilk\?\.querySelector\("\[data-sales-add\]"\)\?\.click\(\)/);
+    assert.match(js, /satisUrunAramasiniBagla\(content, katalogDetay\)/);
+    assert.match(js, /musteriBelgeFormu\("satis",m,null,\[\],\{saha:true,sahaGun:d\.gun\}\)/);
+    assert.match(js, /musteriBelgeFormu\("satis", musteri, null, \[\], \{ saha: true, sahaGun: d\.gun \}\)/);
+    assert.match(css, /\.sales-product-grid\{grid-template-columns:1fr;max-height:min\(52dvh,520px\);overflow-y:auto/);
+    assert.match(css, /\.sales-product-search-wrap\{position:sticky/);
 });
 
 test("Perakende satış müşteri seçmeden peşin tahsilat ve ayrı satış kanalı kullanır", () => {

@@ -323,6 +323,7 @@ async function manuelHareketIptal(req, res, next) {
 }
 
 async function transfer(req, res, next) {
+    const session = await mongoose.startSession();
     try {
         const tId = tenantId(req), body = req.body || {}, tutar = tutarDogrula(body.tutar);
         const kaynakTip = metin(body.kaynakHesapTipi).toUpperCase(), hedefTip = metin(body.hedefHesapTipi).toUpperCase();
@@ -334,22 +335,21 @@ async function transfer(req, res, next) {
         if (!kaynakKontrol || !hedefKontrol) return res.status(404).json({ basarili: false, mesaj: "Kaynak veya hedef hesap bulunamadı ya da pasif." });
         const kaynakParaBirimi = kaynakKontrol.paraBirimi || "TRY", hedefParaBirimi = hedefKontrol.paraBirimi || "TRY";
         if (kaynakParaBirimi !== hedefParaBirimi) return res.status(409).json({ basarili: false, mesaj: "Farklı para birimindeki hesaplar arasında doğrudan transfer yapılamaz." });
-        const kaynak = await KaynakModel.findOneAndUpdate({ _id: kaynakId, tenantId: tId, aktif: { $ne: false }, bakiye: { $gte: tutar } }, { $inc: { bakiye: -tutar } }, { new: true });
-        if (!kaynak) return res.status(409).json({ basarili: false, mesaj: "Kaynak hesap bakiyesi yetersiz." });
-        const hedef = await HedefModel.findOneAndUpdate({ _id: hedefId, tenantId: tId, aktif: { $ne: false } }, { $inc: { bakiye: tutar } }, { new: true });
-        if (!hedef) { await KaynakModel.updateOne({ _id: kaynakId, tenantId: tId }, { $inc: { bakiye: tutar } }); return res.status(409).json({ basarili: false, mesaj: "Hedef hesap güncellenemedi." }); }
-        const transferId = new mongoose.Types.ObjectId(), ortak = { tenantId: tId, transactionId: req.transactionId, tutar, paraBirimi: kaynak.paraBirimi || "TRY", kaynak: "TRANSFER", kaynakId: transferId, belgeNo: metin(body.belgeNo) || `TRF-${Date.now()}`, aciklama: metin(body.aciklama) || "Hesaplar arası transfer", tarih: body.tarih || new Date(), kullaniciId: kullaniciId(req) };
-        try {
-            const hareketler = await ParaHareket.insertMany([
+        let kaynak, hedef, hareketler;
+        await session.withTransaction(async () => {
+            kaynak = await KaynakModel.findOneAndUpdate({ _id: kaynakId, tenantId: tId, aktif: { $ne: false }, bakiye: { $gte: tutar } }, { $inc: { bakiye: -tutar } }, { new: true, session });
+            if (!kaynak) throw Object.assign(new Error("Kaynak hesap bakiyesi yetersiz."), { status: 409 });
+            hedef = await HedefModel.findOneAndUpdate({ _id: hedefId, tenantId: tId, aktif: { $ne: false } }, { $inc: { bakiye: tutar } }, { new: true, session });
+            if (!hedef) throw Object.assign(new Error("Hedef hesap güncellenemedi."), { status: 409 });
+            const transferId = new mongoose.Types.ObjectId(), ortak = { tenantId: tId, transactionId: req.transactionId, tutar, paraBirimi: kaynak.paraBirimi || "TRY", kaynak: "TRANSFER", kaynakId: transferId, belgeNo: metin(body.belgeNo) || `TRF-${Date.now()}`, aciklama: metin(body.aciklama) || "Hesaplar arası transfer", tarih: body.tarih || new Date(), kullaniciId: kullaniciId(req) };
+            hareketler = await ParaHareket.insertMany([
                 { ...ortak, hesapTipi: kaynakTip, hesapId: kaynak._id, tip: "CIKIS", islemAnahtari: `TX:${req.transactionId}:PARA:${kaynakTip}:${kaynak._id}:CIKIS:TRANSFER`, karsiHesapTipi: hedefTip, karsiHesapId: hedef._id },
                 { ...ortak, hesapTipi: hedefTip, hesapId: hedef._id, tip: "GIRIS", islemAnahtari: `TX:${req.transactionId}:PARA:${hedefTip}:${hedef._id}:GIRIS:TRANSFER`, karsiHesapTipi: kaynakTip, karsiHesapId: kaynak._id }
-            ]);
-            res.status(201).json({ basarili: true, mesaj: "Hesaplar arası transfer tamamlandı.", kaynak, hedef, hareketler });
-        } catch (error) {
-            await Promise.all([KaynakModel.updateOne({ _id: kaynakId, tenantId: tId }, { $inc: { bakiye: tutar } }), HedefModel.updateOne({ _id: hedefId, tenantId: tId }, { $inc: { bakiye: -tutar } })]);
-            throw error;
-        }
+            ], { session });
+        });
+        res.status(201).json({ basarili: true, mesaj: "Hesaplar arası transfer tamamlandı.", kaynak, hedef, hareketler });
     } catch (error) { next(error); }
+    finally { await session.endSession(); }
 }
 
 function paraToplamlari(hesaplar) {

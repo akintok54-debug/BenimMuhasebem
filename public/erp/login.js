@@ -13,6 +13,21 @@
     const kayitMesaj = document.getElementById("kayitMesaj");
     const kayitBtn = document.getElementById("kayitBtn");
 
+    async function mevcutOturumuKontrolEt() {
+        try {
+            const response = await fetch("/api/auth/profil", { headers: { Accept: "application/json" }, credentials: "include" });
+            if (!response.ok) return;
+            const data = await response.json();
+            if (!data?.basarili) return;
+            if (data.csrfToken) sessionStorage.setItem("bmCsrfToken", data.csrfToken);
+            window.location.replace(data.kullanici?.rol === "SUPER_ADMIN" ? "/platform/" : "/erp/");
+        } catch (_) {
+            // Çevrimdışı veya geçici sunucu hatasında giriş formu kullanılabilir kalır.
+        }
+    }
+
+    mevcutOturumuKontrolEt();
+
     function ekranDegistir(kayitAcik) {
         form.hidden = kayitAcik;
         registerForm.hidden = !kayitAcik;

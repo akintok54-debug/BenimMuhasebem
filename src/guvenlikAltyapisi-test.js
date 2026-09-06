@@ -2,6 +2,8 @@ require("dotenv").config();
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const jwt = require("jsonwebtoken");
 const { guvenliAnahtarlar, kanonikAlanAdi } = require("./middleware/guvenlikKatmani");
 const { izinVar } = require("./middleware/yetkiKontrol");
@@ -62,8 +64,19 @@ test("Oturum cookie'si HttpOnly, SameSite ve production'da Secure olur", () => {
     const yazilan = [], res = { cookie: (ad, deger, secenek) => yazilan.push({ ad, deger, secenek }) };
     const eski = process.env.NODE_ENV; process.env.NODE_ENV = "production"; oturumCookieYaz(res, "jwt"); process.env.NODE_ENV = eski;
     assert.equal(yazilan[0].secenek.httpOnly, true); assert.equal(yazilan[0].secenek.secure, true); assert.equal(yazilan[0].secenek.sameSite, "strict");
-    assert.equal(yazilan[0].secenek.maxAge, 30 * 24 * 60 * 60 * 1000);
+    assert.equal(yazilan[0].secenek.maxAge, 365 * 24 * 60 * 60 * 1000);
     assert.equal(yazilan[1].secenek.httpOnly, false);
+});
+
+test("Telefon oturumu kalici cookie, kayan profil yenilemesi ve yalniz gercek yetki hatasinda giris yonlendirmesi kullanir", () => {
+    const auth = fs.readFileSync(path.join(__dirname, "modules", "auth", "controllers", "authController.js"), "utf8");
+    const erp = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
+    const login = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "login.js"), "utf8");
+    assert.match(auth, /const csrfToken = oturumCookieYaz\(res, tokenOlustur\(p\)\)/);
+    assert.match(erp, /sessionStorage\.getItem\("bmCsrfToken"\) \|\| cookieDegeri\("bm_csrf"\)/);
+    assert.match(erp, /\[401, 403\]\.includes\(Number\(error\?\.status\)\)/);
+    assert.match(login, /fetch\("\/api\/auth\/profil", \{ headers: \{ Accept: "application\/json" \}, credentials: "include" \}\)/);
+    assert.match(login, /mevcutOturumuKontrolEt\(\)/);
 });
 
 test("Production istekleri www.benimmuhasebe.com alan adına yönlendirilir", () => {

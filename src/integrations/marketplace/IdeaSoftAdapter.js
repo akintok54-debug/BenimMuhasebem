@@ -90,7 +90,11 @@ class IdeaSoftAdapter extends MarketplaceAdapter {
         if (!response.ok) { const credential = [401, 403].includes(response.status), retryable = response.status === 429 || response.status >= 500; throw new IntegrationError(credential ? "INVALID_CREDENTIALS" : response.status === 429 ? "RATE_LIMITED" : "PROVIDER_ERROR", credential ? "IdeaSoft erişim anahtarı geçersiz veya süresi dolmuş." : `IdeaSoft isteği başarısız (${response.status}).`, { status: credential ? 401 : 502, retryable, details: { httpStatus: response.status } }); }
         return data;
     }
-    async testConnection() { const products = await this.pullProducts({ limit: 1 }); return { connected: true, provider: "IDEASOFT", sampleCount: Array.isArray(products) ? products.length : 0 }; }
+    async testConnection() {
+        const products = await this.pullProducts({ limit: 1 });
+        if (!Array.isArray(products)) throw new IntegrationError("PROVIDER_ERROR", "IdeaSoft ürün API yanıtı doğrulanamadı.", { status: 502 });
+        return { connected: true, provider: "IDEASOFT", sampleCount: products.length };
+    }
     pullProducts({ limit = 5, page = 1, sinceId } = {}) { return this.request("/admin-api/products", { query: { limit: Math.min(100, Math.max(1, Number(limit) || 5)), page: Math.max(1, Number(page) || 1), sinceId, sort: "id" } }); }
     async pushProducts(items) { if (!Array.isArray(items) || !items.length) throw new IntegrationError("VALIDATION_ERROR", "Gönderilecek IdeaSoft ürünü yok.", { status: 400 }); return Promise.all(items.map(item => this.request("/admin-api/products", { method: "POST", body: item }))); }
     updateProducts(items) { if (!Array.isArray(items)) throw new IntegrationError("VALIDATION_ERROR", "Güncellenecek IdeaSoft ürünü yok.", { status: 400 }); return Promise.all(items.map(item => this.updateProduct(item.externalProductId || item.id, item.changes || item))); }

@@ -77,11 +77,11 @@ async function tesellumHesapla(req, kullaniciId, gun) {
     const odemeler = { nakit: 0, posKrediKarti: 0, iban: 0, cek: 0, senet: 0, acikHesap: 0 };
     for (const satis of satislar) {
         const tutar = Number(satis.genelToplam || 0);
-        if (satis.odemeTipi === "NAKIT") odemeler.nakit += Number(satis.odenenTutar || tutar);
-        else if (satis.odemeTipi === "KART") odemeler.posKrediKarti += Number(satis.odenenTutar || tutar);
-        else if (satis.odemeTipi === "BANKA") odemeler.iban += Number(satis.odenenTutar || tutar);
-        else if (satis.odemeTipi === "CEK") odemeler.cek += Number(satis.odenenTutar || tutar);
-        else if (satis.odemeTipi === "SENET") odemeler.senet += Number(satis.odenenTutar || tutar);
+        if (satis.odemeTipi === "NAKIT") odemeler.nakit += Number(satis.odenenTutar ?? tutar);
+        else if (satis.odemeTipi === "KART") odemeler.posKrediKarti += Number(satis.odenenTutar ?? tutar);
+        else if (satis.odemeTipi === "BANKA") odemeler.iban += Number(satis.odenenTutar ?? tutar);
+        else if (satis.odemeTipi === "CEK") odemeler.cek += Number(satis.odenenTutar ?? tutar);
+        else if (satis.odemeTipi === "SENET") odemeler.senet += Number(satis.odenenTutar ?? tutar);
         odemeler.acikHesap += Number(satis.kalanTutar || 0);
     }
     for (const h of tahsilatlar) {
@@ -98,7 +98,7 @@ async function tesellumHesapla(req, kullaniciId, gun) {
         else masraf.diger += Number(x.tutar || 0);
     }
     const iadeToplam = toplam(iadeler), nakitIade = iadeler.filter(x => x.odemeTipi === "NAKIT").reduce((n, x) => n + Number(x.genelToplam || 0), 0);
-    const teslimEdilmesiGereken = Math.max(0, odemeler.nakit - nakitIade - masraf.toplam);
+    const teslimEdilmesiGereken = Math.max(0, odemeler.nakit - nakitIade - toplam(masraflar.filter(x => x.hesapTipi === "KASA"), "tutar"));
     const tahsilatToplami = odemeler.nakit + odemeler.posKrediKarti + odemeler.iban + odemeler.cek + odemeler.senet;
     return { gun, ciro: toplam(satislar), netCiro: toplam(satislar) - iadeToplam, satisAdedi: satislar.length, tahsilatlar: tahsilatToplami, ...odemeler, iadeler: iadeToplam, masraflar: masraf, teslimEdilmesiGereken, satislar };
 }

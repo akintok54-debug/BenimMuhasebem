@@ -1,7 +1,8 @@
 const crypto = require("crypto");
 
 const AUTH_COOKIE = "bm_session", CSRF_COOKIE = "bm_csrf";
-const OTURUM_SURESI_MS = 30 * 24 * 60 * 60 * 1000;
+const OTURUM_SURESI_GUN = Math.min(365, Math.max(30, Number(process.env.SESSION_MAX_AGE_DAYS || 365)));
+const OTURUM_SURESI_MS = OTURUM_SURESI_GUN * 24 * 60 * 60 * 1000;
 const CSRF_HARIC_AUTH_YOLLARI = new Set([
     "/api/auth/login",
     "/api/auth/kayit",

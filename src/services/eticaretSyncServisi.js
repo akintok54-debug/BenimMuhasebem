@@ -162,11 +162,11 @@ async function ideasoftPilotTest({ tenantId, connection, userId }) {
     if (!claimed) throw Object.assign(new Error("IdeaSoft küçük testi zaten çalışıyor."), { code: "PILOT_ALREADY_RUNNING", status: 409 });
     try {
         const connectionResult = await adapter.testConnection(); stages.push({ step: "CONNECTION", success: connectionResult.connected === true });
-        const productResult = await urunleriAl(job, secured, adapter, { limit: 5, maxPages: 1 }); stages.push({ step: "PRODUCT_PULL_5", success: productResult.processed <= 5, ...productResult }); stages.push({ step: "SKU_BARCODE_MATCH", success: productResult.success > 0, matched: productResult.success, unmatched: productResult.unmatched });
+        const productResult = await urunleriAl(job, secured, adapter, { limit: 5, maxPages: 1 }); stages.push({ step: "PRODUCT_PULL_5", ...productResult, success: productResult.processed > 0 && productResult.processed <= 5 && productResult.errors === 0 && !productResult.unmatched }); stages.push({ step: "SKU_BARCODE_MATCH", success: productResult.success > 0, matched: productResult.success, unmatched: productResult.unmatched });
         const mapping = await MarketplaceProductMapping.findOne({ tenantId, storeConnectionId: secured._id, productId: { $ne: null }, externalProductId: { $ne: "" } }).populate("productId").lean();
         if (mapping?.productId) { const stockRows = await Stok.aggregate([{ $match: { tenantId, urunId: mapping.productId._id } }, { $group: { _id: null, quantity: { $sum: "$miktar" } } }]), quantity = Math.max(0, Math.floor(Number(stockRows[0]?.quantity || 0))), salePrice = Number(mapping.productId.satisFiyati || 0); await adapter.updateStock([{ externalProductId: mapping.externalProductId, quantity }]); stages.push({ step: "STOCK_UPDATE_ONE", success: true }); await adapter.updatePrice([{ externalProductId: mapping.externalProductId, salePrice }]); stages.push({ step: "PRICE_UPDATE_ONE", success: true }); }
         else { stages.push({ step: "STOCK_UPDATE_ONE", success: false, reason: "MATCHED_PRODUCT_REQUIRED" }, { step: "PRICE_UPDATE_ONE", success: false, reason: "MATCHED_PRODUCT_REQUIRED" }); }
-        const firstOrders = await siparisleriAl(job, secured, adapter, { limit: 5 }), secondOrders = await siparisleriAl(job, secured, adapter, { limit: 5 }); stages.push({ step: "ORDER_PULL", success: firstOrders.errors === 0, ...firstOrders }); stages.push({ step: "DUPLICATE_ORDER", success: secondOrders.success === 0, duplicates: secondOrders.duplicates });
+        const firstOrders = await siparisleriAl(job, secured, adapter, { limit: 5 }), secondOrders = await siparisleriAl(job, secured, adapter, { limit: 5 }); stages.push({ step: "ORDER_PULL", ...firstOrders, success: firstOrders.errors === 0 && !firstOrders.pending }); stages.push({ step: "DUPLICATE_ORDER", success: secondOrders.success === 0 && secondOrders.errors === 0 && !secondOrders.pending, duplicates: secondOrders.duplicates });
         const [foreignMappings, foreignOrders] = await Promise.all([MarketplaceProductMapping.countDocuments({ storeConnectionId: secured._id, tenantId: { $ne: tenantId } }), EticaretSiparis.countDocuments({ connectionId: secured._id, tenantId: { $ne: tenantId } })]); stages.push({ step: "TENANT_ISOLATION", success: foreignMappings === 0 && foreignOrders === 0 });
         const required = stages.filter(x => !x.success), status = required.length ? (stages.some(x => x.success) ? "PARTIAL" : "FAILED") : "SUCCESS", result = { status, stages };
         await IntegrationConnection.updateOne({ _id: secured._id, tenantId }, { $set: { pilotStatus: status, pilotCompletedAt: new Date(), pilotResults: result } }); return result;
@@ -177,8 +177,8 @@ async function sorulariAl(job, connection, adapter) {
     for(const q of rows){if(!q.id||!q.text)continue;operations.push(MarketplaceCustomerQuestion.updateOne({tenantId:job.tenantId,provider:connection.provider,externalQuestionId:String(q.id)},{$setOnInsert:{connectionId:connection._id,productId:null,externalBarcode:String(q.product?.barcode||q.barcode||""),customerName:q.userName||"",question:q.text,questionDate:q.creationDate?new Date(q.creationDate):new Date(),status:q.status||"WAITING_FOR_ANSWER"}},{upsert:true}));} await Promise.all(operations);return{processed:rows.length,success:operations.length};
 }
 async function isiCalistir(jobId) {
-    const job = await IntegrationSyncJob.findById(jobId); if (!job || job.status !== "QUEUED") return;
-    job.status = "RUNNING"; job.startedAt = new Date(); await job.save();
+    const job = await IntegrationSyncJob.findOneAndUpdate({ _id: jobId, status: "QUEUED" }, { $set: { status: "RUNNING", startedAt: new Date() } }, { new: true });
+    if (!job) return;
     try {
         const connection = await IntegrationConnection.findOne({ _id: job.connectionId, tenantId: job.tenantId, active: true }).select("+encryptedCredentials");
         if (!connection) throw Object.assign(new Error("Entegrasyon bağlantısı bulunamadı."), { code: "INTEGRATION_NOT_CONFIGURED", status: 409 });
@@ -190,6 +190,7 @@ async function isiCalistir(jobId) {
         else if (job.type === "PRODUCT_PULL") sonuc = connection.provider === "IDEASOFT" ? await urunleriAl(job, connection, adapter) : (() => { throw Object.assign(new Error("Bu sağlayıcı için ürün çekme akışı yapılandırılmadı."), { code: "PROVIDER_METHOD_NOT_IMPLEMENTED", status: 501 }); })();
         else throw Object.assign(new Error(`${job.type} için doğrulanmış sağlayıcı akışı henüz yapılandırılmadı.`), { code: "PROVIDER_METHOD_NOT_IMPLEMENTED", status: 501 });
         job.processedCount = sonuc.processed || 0; job.successCount = sonuc.success || 0; job.errorCount = sonuc.errors || 0; job.errors = guvenliDetay(sonuc.errorDetails || []); job.status = sonuc.errors ? (sonuc.success ? "PARTIAL" : "FAILED") : "SUCCESS";
+        if (job.status === "SUCCESS") await IntegrationErrorKaydi.updateMany({ tenantId: job.tenantId, connectionId: job.connectionId, operation: job.type, status: { $in: ["OPEN", "RETRYING"] }, errorCode: { $in: ["INTEGRATION_NOT_CONFIGURED", "OAUTH_AUTHORIZATION_REQUIRED", "INVALID_CREDENTIALS"] }, createdAt: { $lte: job.startedAt } }, { $set: { status: "RESOLVED" } });
         if (job.status !== "FAILED") await IntegrationConnection.updateOne({ _id: connection._id, tenantId: job.tenantId }, { $set: { lastSuccessfulSyncAt: new Date(), lastError: "" } });
     } catch (error) {
         job.status = "FAILED"; job.errorCount = 1; job.errors = [{ code: error.code || "SYNC_FAILED", message: error.message }];

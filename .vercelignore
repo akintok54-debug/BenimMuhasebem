@@ -13,3 +13,9 @@ uploads/
 sistem-kontrol.ps1
 scripts/backup-key-init.js
 scripts/mukerrer-finans-audit.js
+public/erp/## GitHub Copilot Chat.md
+*.backup-*
+*.before-*
+.tmp-*
+tests/
+docs/releases/

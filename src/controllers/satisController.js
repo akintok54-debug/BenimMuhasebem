@@ -223,10 +223,9 @@ async function detay(req, res, next) {
 }
 
 async function olustur(req, res, next) {
-    const rollback = { tenantId: null, satisId: null, stoklar: [], musteriId: null, musteriBakiyeArtisi: 0, finansModeli: null, finansHesapId: null, finansArtisi: 0 };
+    const session = await mongoose.startSession();
     try {
         const tenantId = tenantObjectId(req);
-        rollback.tenantId = tenantId;
         const body = req.body || {};
         const perakende = body.perakende === true || String(body.satisKanali || "").toUpperCase() === "PERAKENDE";
         const sahaSatisi = String(body.satisKanali || "").toUpperCase() === "SAHA";
@@ -354,12 +353,9 @@ async function olustur(req, res, next) {
             const mevcutKontrol = stokKontrolleri.get(stokAnahtari);
             const stok = mevcutKontrol?.stok || await Stok.findOne({ tenantId, urunId: urun._id, depoId: depo._id });
             const toplamIhtiyac = Number(mevcutKontrol?.miktar || 0) + miktar;
-            if (!stok || Number(stok.miktar || 0) < toplamIhtiyac) {
-                return res.status(409).json({ basarili: false, mesaj: `Yetersiz stok: ${urun.kod}` });
-            }
 
             kalemler.push(kalem);
-            stokKontrolleri.set(stokAnahtari, { stok, miktar: toplamIhtiyac });
+            stokKontrolleri.set(stokAnahtari, { stok, urunId: urun._id, miktar: toplamIhtiyac });
 
             araToplam += kalem.araToplam;
             toplamKdv += kalem.kdvTutari;
@@ -478,164 +474,91 @@ async function olustur(req, res, next) {
             }
         }
 
-        const satis = await Satis.create({
-            tenantId,
-            belgeNo,
-            tarih: body.tarih || new Date(),
-            musteriId: musteri._id,
-            depoId: depo._id,
-            kalemler,
-            araToplam,
-            toplamKdv,
-            genelToplam,
-            odemeDurumu,
-            odemeTipi,
-            odenenTutar,
-            kalanTutar,
-            hesapTipi,
-            hesapId,
-            satisKanali: perakende ? "PERAKENDE" : (sahaSatisi ? "SAHA" : "NORMAL"),
-            notlar: body.notlar || "",
-            kullaniciId: islemKullaniciId(req)
-        });
-        rollback.satisId = satis._id;
+        let satis;
+        let musteriBakiye = Number(musteri.bakiye || 0);
+        await session.withTransaction(async () => {
+            [satis] = await Satis.create([{
+                tenantId, belgeNo, tarih: body.tarih || new Date(), musteriId: musteri._id,
+                depoId: depo._id, kalemler, araToplam, toplamKdv, genelToplam, odemeDurumu,
+                odemeTipi, odenenTutar, kalanTutar, hesapTipi, hesapId,
+                satisKanali: perakende ? "PERAKENDE" : (sahaSatisi ? "SAHA" : "NORMAL"),
+                notlar: body.notlar || "", kullaniciId: islemKullaniciId(req)
+            }], { session });
 
-        // SATIŞ -> STOK ÇIKIŞI
-        for (const item of stokKontrolleri.values()) {
-            const stok = await Stok.findOneAndUpdate(
-                { _id: item.stok._id, tenantId, miktar: { $gte: item.miktar } },
-                { $inc: { miktar: -item.miktar }, $set: { sonHareketTarihi: new Date() } },
-                { new: true }
+            for (const item of stokKontrolleri.values()) {
+                const stok = await require("../services/satisStokServisi").satisStokDus({
+                    tenantId, urunId: item.urunId, depoId: depo._id, miktar: item.miktar, session
+                });
+                await StokHareket.create([{
+                    tenantId, urunId: stok.urunId, depoId: depo._id, tip: "CIKIS",
+                    miktar: item.miktar, tarih: satis.tarih, birimMaliyet: stok.maliyet || 0,
+                    maliyetDogrulandi: Number(stok.maliyet || 0) > 0, maliyetKaynagi: "STOK_KARTI",
+                    kaynak: "SATIS", kaynakId: satis._id,
+                    islemAnahtari: `SATIS:${satis._id}:STOK:${stok.urunId}:${depo._id}`,
+                    aciklama: `Satış ${belgeNo}`, kullaniciId: islemKullaniciId(req)
+                }], { session });
+            }
+
+            const oncekiMusteri = await Musteri.findOneAndUpdate(
+                { _id: musteri._id, tenantId }, { $inc: { bakiye: kalanTutar } }, { new: false, session }
             );
-            if (!stok) throw Object.assign(new Error("Satış sırasında stok başka bir işlem tarafından kullanıldı."), { status: 409 });
-            rollback.stoklar.push({ stokId: stok._id, miktar: item.miktar });
+            if (!oncekiMusteri) throw Object.assign(new Error("Müşteri hesabı işlem sırasında bulunamadı."), { status: 409 });
+            const oncekiBakiye = Number(oncekiMusteri.bakiye || 0);
+            musteriBakiye = oncekiBakiye + kalanTutar;
 
-            await StokHareket.create({
-                tenantId,
-                urunId: stok.urunId,
-                depoId: depo._id,
-                tip: "CIKIS",
-                miktar: item.miktar,
-                tarih: satis.tarih,
-                birimMaliyet: stok.maliyet || 0,
-                maliyetDogrulandi: Number(stok.maliyet || 0) > 0,
-                maliyetKaynagi: "STOK_KARTI",
-                kaynak: "SATIS",
-                kaynakId: satis._id,
-                islemAnahtari: `SATIS:${satis._id}:STOK:${stok.urunId}:${depo._id}`,
-                aciklama: `Satış ${belgeNo}`,
+            await CariHareket.create([{
+                tenantId, tarafTipi: "MUSTERI", tarafId: musteri._id, tip: "BORC",
+                tutar: genelToplam, aciklama: `Satış ${belgeNo}`, kaynak: "SATIS",
+                kaynakId: satis._id, islemAnahtari: `SATIS:${satis._id}:BORC`,
+                bakiyeDegisimi: genelToplam, oncekiBakiye, sonrakiBakiye: oncekiBakiye + genelToplam,
+                tarih: body.tarih || new Date(), kullaniciId: islemKullaniciId(req)
+            }], { session });
+
+            if (odenenTutar > 0) await CariHareket.create([{
+                tenantId, tarafTipi: "MUSTERI", tarafId: musteri._id, tip: "TAHSILAT", tutar: odenenTutar,
+                aciklama: `Satış tahsilatı ${belgeNo}`, kaynak: "SATIS_TAHSILAT", kaynakId: satis._id,
+                islemAnahtari: `SATIS:${satis._id}:TAHSILAT`,
+                odemeYontemi: odemeTipi === "KART" ? "KREDI_KARTI" : odemeTipi === "BANKA" ? "IBAN" : odemeTipi,
+                bakiyeDegisimi: -odenenTutar, oncekiBakiye: oncekiBakiye + genelToplam,
+                sonrakiBakiye: musteriBakiye, tarih: body.tarih || new Date(), belgeNo,
                 kullaniciId: islemKullaniciId(req)
-            });
-        }
+            }], { session });
 
-        // ==================================================
-        // SATIŞ ÖDEME BALANTISI
-        // ==================================================
+            if (odenenTutar > 0 && finansHesabi) {
+                const FinansModeli = hesapTipi === "KASA" ? Kasa : Banka;
+                const guncelHesap = await FinansModeli.findOneAndUpdate(
+                    { _id: finansHesabi._id, tenantId, aktif: { $ne: false } },
+                    { $inc: { bakiye: odenenTutar } }, { new: true, session }
+                );
+                if (!guncelHesap) throw Object.assign(new Error("Ödeme hesabı işlem sırasında bulunamadı."), { status: 409 });
+                await ParaHareket.create([{
+                    tenantId, hesapTipi, hesapId: guncelHesap._id, tip: "GIRIS", tutar: odenenTutar,
+                    paraBirimi: guncelHesap.paraBirimi || "TRY", aciklama: `Satış ${belgeNo}`,
+                    kaynak: "SATIS", kaynakId: satis._id, belgeNo,
+                    islemAnahtari: `SATIS:${satis._id}:PARA:TAHSILAT`,
+                    tarih: body.tarih || new Date(), kullaniciId: islemKullaniciId(req)
+                }], { session });
+            }
 
-        const oncekiBakiye = Number(musteri.bakiye || 0);
-        musteri.bakiye += kalanTutar;
-        await musteri.save();
-        rollback.musteriId = musteri._id;
-        rollback.musteriBakiyeArtisi = kalanTutar;
-
-        await CariHareket.create({
-                tenantId,
-                tarafTipi: "MUSTERI",
-                tarafId: musteri._id,
-                tip: "BORC",
-                tutar: genelToplam,
-                aciklama: `Satış ${belgeNo}`,
-                kaynak: "SATIS",
-                kaynakId: satis._id,
-                islemAnahtari: `SATIS:${satis._id}:BORC`,
-                bakiyeDegisimi: genelToplam,
-                oncekiBakiye,
-                sonrakiBakiye: oncekiBakiye + genelToplam,
-                tarih: body.tarih || new Date(),
+            if (["CEK", "SENET"].includes(odemeTipi)) await CekSenetPortfoy.create([{
+                tenantId, tur: odemeTipi, hareketTipi: "GIRIS", musteriId: musteri._id, tutar: odenenTutar,
+                belgeNo: String(body.evrakNo || belgeNo).trim(), vadeTarihi: body.vadeTarihi || null,
+                banka: String(body.banka || "").trim(), kesideci: String(body.kesideci || "").trim(),
+                kaynak: "SATIS", kaynakId: satis._id, aciklama: `Saha/satış tahsilatı ${belgeNo}`,
                 kullaniciId: islemKullaniciId(req)
-            });
-
-        if (odenenTutar > 0) await CariHareket.create({
-            tenantId, tarafTipi: "MUSTERI", tarafId: musteri._id, tip: "TAHSILAT", tutar: odenenTutar,
-            aciklama: `Satış tahsilatı ${belgeNo}`, kaynak: "SATIS_TAHSILAT", kaynakId: satis._id,
-            islemAnahtari: `SATIS:${satis._id}:TAHSILAT`,
-            odemeYontemi: odemeTipi === "KART" ? "KREDI_KARTI" : odemeTipi === "BANKA" ? "IBAN" : odemeTipi,
-            bakiyeDegisimi: -odenenTutar, oncekiBakiye: oncekiBakiye + genelToplam, sonrakiBakiye: oncekiBakiye + kalanTutar,
-            tarih: body.tarih || new Date(), belgeNo, kullaniciId: islemKullaniciId(req)
-        });
-
-        if (
-            odenenTutar > 0 &&
-            finansHesabi
-        ) {
-
-            finansHesabi.bakiye +=
-                odenenTutar;
-
-            await finansHesabi.save();
-            rollback.finansModeli = hesapTipi === "KASA" ? Kasa : Banka;
-            rollback.finansHesapId = finansHesabi._id;
-            rollback.finansArtisi = odenenTutar;
-
-            await ParaHareket.create({
-
-                tenantId,
-
-                hesapTipi,
-
-                hesapId:
-                    finansHesabi._id,
-
-                tip:
-                    "GIRIS",
-
-                tutar:
-                    odenenTutar,
-
-                paraBirimi:
-                    finansHesabi.paraBirimi || "TRY",
-
-                aciklama:
-                    `Satış ${belgeNo}`,
-
-                kaynak:
-                    "SATIS",
-
-                kaynakId:
-                    satis._id,
-
-                tarih:
-                    body.tarih || new Date(),
-
-                kullaniciId: islemKullaniciId(req)
-            });
-        }
-
-        if (["CEK", "SENET"].includes(odemeTipi)) await CekSenetPortfoy.create({
-            tenantId, tur: odemeTipi, hareketTipi: "GIRIS", musteriId: musteri._id, tutar: odenenTutar,
-            belgeNo: String(body.evrakNo || belgeNo).trim(), vadeTarihi: body.vadeTarihi || null,
-            banka: String(body.banka || "").trim(), kesideci: String(body.kesideci || "").trim(),
-            kaynak: "SATIS", kaynakId: satis._id, aciklama: `Saha/satış tahsilatı ${belgeNo}`, kullaniciId: islemKullaniciId(req)
+            }], { session });
         });
 
         res.status(201).json({
             basarili: true,
             mesaj: "Satış kaydedildi. Stok güncellendi.",
             satis,
-            musteriBakiye: musteri.bakiye
+            musteriBakiye
         });
     } catch (error) {
-        if (rollback.satisId && rollback.tenantId) {
-            await CekSenetPortfoy.deleteMany({ tenantId: rollback.tenantId, kaynak: "SATIS", kaynakId: rollback.satisId }).catch(() => {});
-            await ParaHareket.deleteMany({ tenantId: rollback.tenantId, kaynak: "SATIS", kaynakId: rollback.satisId }).catch(() => {});
-            await CariHareket.deleteMany({ tenantId: rollback.tenantId, kaynakId: rollback.satisId, kaynak: { $in: ["SATIS", "SATIS_TAHSILAT"] } }).catch(() => {});
-            await StokHareket.deleteMany({ tenantId: rollback.tenantId, kaynak: "SATIS", kaynakId: rollback.satisId }).catch(() => {});
-            if (rollback.finansModeli && rollback.finansHesapId && rollback.finansArtisi) await rollback.finansModeli.updateOne({ _id: rollback.finansHesapId, tenantId: rollback.tenantId }, { $inc: { bakiye: -rollback.finansArtisi } }).catch(() => {});
-            if (rollback.musteriId && rollback.musteriBakiyeArtisi) await Musteri.updateOne({ _id: rollback.musteriId, tenantId: rollback.tenantId }, { $inc: { bakiye: -rollback.musteriBakiyeArtisi } }).catch(() => {});
-            for (const stok of rollback.stoklar) await Stok.updateOne({ _id: stok.stokId, tenantId: rollback.tenantId }, { $inc: { miktar: stok.miktar } }).catch(() => {});
-            await Satis.deleteOne({ _id: rollback.satisId, tenantId: rollback.tenantId }).catch(() => {});
-        }
         next(error);
+    } finally {
+        await session.endSession();
     }
 }
 
@@ -780,9 +703,8 @@ async function guncelle(req, res, next) {
         const yeniKalemler=[];let araToplam=0,toplamKdv=0,genelToplam=0;const ihtiyac=new Map();
         for(const item of body.kalemler){const urun=await Urun.findOne({_id:item.urunId,tenantId});if(!urun)return res.status(404).json({basarili:false,mesaj:"Ürün bulunamadı."});const k=hesaplaKalem({urunId:urun._id,miktar:item.miktar,birimFiyat:item.birimFiyat??urun.satisFiyati,kdv:item.kdv??urun.kdv,iskonto:item.iskonto??urun.iskonto??0});if(!kalemGecerliMi(k))return res.status(400).json({basarili:false,mesaj:"Satış kalemi geçersiz."});yeniKalemler.push(k);araToplam+=k.araToplam;toplamKdv+=k.kdvTutari;genelToplam+=k.toplam;ihtiyac.set(String(urun._id),(ihtiyac.get(String(urun._id))||0)+k.miktar);}
         const eski=new Map();for(const k of satis.kalemler)eski.set(String(k.urunId),(eski.get(String(k.urunId))||0)+Number(k.miktar||0));
-        for(const [urunId,miktar] of ihtiyac){const stok=await Stok.findOne({tenantId,urunId,depoId});const kullanilabilir=Number(stok?.miktar||0)+Number(eski.get(urunId)||0);if(kullanilabilir<miktar)return res.status(409).json({basarili:false,mesaj:`Düzeltme için yetersiz stok: ${urunId}`});}
         for(const [urunId,miktar] of eski){let stok=await Stok.findOne({tenantId,urunId,depoId});if(!stok)stok=new Stok({tenantId,urunId,depoId,miktar:0,maliyet:0});stok.miktar+=miktar;await stok.save();}
-        for(const [urunId,miktar] of ihtiyac){const stok=await Stok.findOne({tenantId,urunId,depoId});stok.miktar-=miktar;stok.sonHareketTarihi=new Date();await stok.save();}
+        for(const [urunId,miktar] of ihtiyac){await require("../services/satisStokServisi").satisStokDus({tenantId,urunId,depoId,miktar});}
         const musteri=await Musteri.findOne({_id:satis.musteriId,tenantId});musteri.bakiye-=Number(satis.kalanTutar||satis.genelToplam||0);musteri.bakiye+=genelToplam;await musteri.save();
         await CariHareket.findOneAndUpdate({tenantId,kaynak:"SATIS",kaynakId:satis._id,tarafTipi:"MUSTERI"},{tutar:genelToplam,bakiyeDegisimi:genelToplam,aciklama:`Satış düzeltmesi ${body.belgeNo||satis.belgeNo}`,tarih:body.tarih||satis.tarih},{new:true});
         const degisenUrunler=new Set([...eski.keys(),...ihtiyac.keys()]);

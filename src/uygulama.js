@@ -56,7 +56,7 @@ const corsIzinleri = new Set([
 uygulama.use(cors({
     credentials: true,
     origin(origin, callback) {
-        const yerel = !origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+        const yerel = !origin || (process.env.NODE_ENV !== "production" && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin));
         if (yerel || corsIzinleri.has(String(origin).replace(/\/$/, ""))) return callback(null, true);
         return callback(Object.assign(new Error("CORS erişimi reddedildi."), { status: 403 }));
     },
@@ -78,6 +78,13 @@ const platformPaneliGonder = (req, res) => {
 };
 uygulama.get(["/platform", "/platform/", "/platform/index.html"], kimlikKontrol, superAdminKontrol, platformPaneliGonder);
 uygulama.get(["/admin", "/admin/", "/admin/index.html"], kimlikKontrol, superAdminKontrol, (req, res) => res.redirect(302, "/platform/"));
+uygulama.use((req, res, next) => {
+    if (/^\/api\/(tenant|auth|platform)(\/|$)/.test(req.path)) res.set("Cache-Control", "private, no-store");
+    let yol;
+    try { yol = decodeURIComponent(req.path); } catch (_) { return res.sendStatus(400); }
+    if (/(?:\.backup(?:-|$)|\.SNAPSHOT(?:-|$)|\.before-|\.bak$|\.md$|\.map$|(?:^|\/)\.env(?:\.|$))/i.test(yol)) return res.sendStatus(404);
+    next();
+});
 uygulama.use(express.static(publicKlasoru));
 uygulama.use(
     "/vendor/xlsx",
@@ -85,6 +92,7 @@ uygulama.use(
 );
 
 uygulama.get("/api/saglik", saglikRotasi);
+uygulama.use(require("./services/belgeTutarOzetiServisi").belgeSunumMiddleware);
 const paylasimRotasi = require("./routes/paylasimRotasi");
 uygulama.use("/api/paylasim", paylasimRotasi.publicRouter);
 uygulama.use("/api/tenant/paylasim", paylasimRotasi.tenantRouter);
@@ -194,8 +202,6 @@ try {
 uygulama.use(hataYonetici);
 
 module.exports = uygulama;
-
-
 
 
 
