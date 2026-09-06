@@ -30,6 +30,6 @@ exports.listele = async (req, res, next) => {
         res.json({ basarili: true, checkedAt: new Date(), windowDays: 30,
             counts: { errors: errorCount, integrations: integrationCount, accounts: accountCount, disabledUsers, services: services.length },
             latest: errors[0]?.latest || [], integrations, services,
-            delivery: { panel: "POLL_30_SECONDS", webhookConfigured: !!process.env.SECURITY_ALERT_WEBHOOK } });
+            delivery: { ...require("../../../services/platformBildirimServisi").durum(), panel: "POLL_30_SECONDS", webhookConfigured: !!process.env.SECURITY_ALERT_WEBHOOK } });
     } catch (error) { next(error); }
 };

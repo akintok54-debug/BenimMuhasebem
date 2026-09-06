@@ -11,7 +11,7 @@ async function kaydet({
     , category = "ISLEM", severity = "BILGI", success = true, httpStatus = null
 }) {
     if (mongoose.connection.readyState !== 1) return null;
-    return PlatformAuditLog.create({
+    const record = await PlatformAuditLog.create({
         actorUserId: req?.currentUser?._id || req?.user?._id || req?.user?.id || req?.user?.kullaniciId || req?.kullanici?.kullaniciId || null,
         tenantId: tenantId || req?.tenantId || req?.user?.tenantId || null,
         action,
@@ -28,6 +28,9 @@ async function kaydet({
         method: req?.method || "",
         path: req?.originalUrl?.split("?")[0] || ""
     });
+    try { await require("../../../services/platformBildirimServisi").bildir({ category, severity, details }); }
+    catch (_) { console.error("PLATFORM_ALERT_FAILED"); }
+    return record;
 }
 
 module.exports = { kaydet };
