@@ -1,3 +1,4 @@
+require("../src/modules/platform/services/runtimeIzleme");
 const uygulama = require("../src/uygulama");
 const mongoose = require("mongoose");
 const veritabaniBaglan = require("../src/database/veritabani");

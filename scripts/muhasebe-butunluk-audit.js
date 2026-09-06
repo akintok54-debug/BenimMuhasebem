@@ -22,9 +22,9 @@ function hataEkle(hatalar, tur, belge, eksik) {
     hatalar.push({ tur, tenantId: String(belge.tenantId), belgeId: String(belge._id), belgeNo: belge.belgeNo, eksik });
 }
 
-async function main() {
-    if (!process.env.MONGODB_URI) throw new Error("MONGODB_URI tanımlı değil.");
-    await mongoose.connect(process.env.MONGODB_URI, { autoIndex: false, serverSelectionTimeoutMS: 10000 });
+async function main({ connect = true, output = true } = {}) {
+    if (connect && !process.env.MONGODB_URI) throw new Error("MONGODB_URI tanımlı değil.");
+    if (connect) await mongoose.connect(process.env.MONGODB_URI, { autoIndex: false, serverSelectionTimeoutMS: 10000 });
 
     const [alislar, satislar, tumAlislar, tumSatislar, siparisler, stoklar, cariler, paralar, portfoyler, urunler, depolar, musteriler, tedarikciler, kasalar, bankalar] = await Promise.all([
         Alis.find(aktif).select("tenantId belgeNo kalemler odenenTutar belgeOdemeTutari belgeOdemeAyrildi hesapId durum").limit(50000).lean(),
@@ -86,33 +86,37 @@ async function main() {
     const bankaSet = new Set(bankalar.map((x) => anahtar(x.tenantId, x._id)));
     const kopukReferanslar = [];
     for (const h of stoklar) {
-        if (!urunSet.has(anahtar(h.tenantId, h.urunId)) || !depoSet.has(anahtar(h.tenantId, h.depoId))) kopukReferanslar.push({ koleksiyon: "stokHareket", id: String(h._id) });
+        if (!urunSet.has(anahtar(h.tenantId, h.urunId)) || !depoSet.has(anahtar(h.tenantId, h.depoId))) kopukReferanslar.push({ koleksiyon: "stokHareket", id: String(h._id), tenantId: String(h.tenantId) });
     }
     for (const h of cariler) {
         const set = h.tarafTipi === "MUSTERI" ? musteriSet : tedarikciSet;
-        if (!set.has(anahtar(h.tenantId, h.tarafId))) kopukReferanslar.push({ koleksiyon: "cariHareket", id: String(h._id) });
+        if (!set.has(anahtar(h.tenantId, h.tarafId))) kopukReferanslar.push({ koleksiyon: "cariHareket", id: String(h._id), tenantId: String(h.tenantId) });
     }
     for (const h of paralar) {
         const set = h.hesapTipi === "KASA" ? kasaSet : bankaSet;
-        if (!set.has(anahtar(h.tenantId, h.hesapId))) kopukReferanslar.push({ koleksiyon: "paraHareket", id: String(h._id) });
+        if (!set.has(anahtar(h.tenantId, h.hesapId))) kopukReferanslar.push({ koleksiyon: "paraHareket", id: String(h._id), tenantId: String(h.tenantId) });
     }
     const yetimBelgeHareketleri = [
         ...stoklar.filter((h) => ["ALIS", "SATIS"].includes(h.kaynak) && !belgeSet.has(anahtar(h.tenantId, h.kaynak, h.kaynakId))),
         ...cariler.filter((h) => ["ALIS", "SATIS"].includes(h.kaynak) && !belgeSet.has(anahtar(h.tenantId, h.kaynak, h.kaynakId))),
         ...paralar.filter((h) => ["ALIS", "SATIS"].includes(h.kaynak) && !belgeSet.has(anahtar(h.tenantId, h.kaynak, h.kaynakId)))
-    ].map((h) => ({ kaynak: h.kaynak, hareketId: String(h._id), kaynakId: String(h.kaynakId) }));
+    ].map((h) => ({ kaynak: h.kaynak, tenantId: String(h.tenantId), hareketId: String(h._id), kaynakId: String(h.kaynakId) }));
 
     const sonuc = {
         saltOkunur: true,
+        tamTarama: alislar.length < 50000 && satislar.length < 50000 && tumAlislar.length < 50000 && tumSatislar.length < 50000 && siparisler.length < 50000 && stoklar.length < 100000 && cariler.length < 100000 && paralar.length < 100000 && portfoyler.length < 50000,
         kapsam: { alis: alislar.length, satis: satislar.length, stokHareket: stoklar.length, cariHareket: cariler.length, paraHareket: paralar.length },
         ozet: { eksikBelgeBaglantisi: hatalar.length, kopukReferans: kopukReferanslar.length, yetimBelgeHareketi: yetimBelgeHareketleri.length },
-        hatalar: hatalar.slice(0, 200), kopukReferanslar: kopukReferanslar.slice(0, 200), yetimBelgeHareketleri: yetimBelgeHareketleri.slice(0, 200)
+        hatalar: output ? hatalar.slice(0, 200) : hatalar, kopukReferanslar: output ? kopukReferanslar.slice(0, 200) : kopukReferanslar, yetimBelgeHareketleri: output ? yetimBelgeHareketleri.slice(0, 200) : yetimBelgeHareketleri
     };
-    process.stdout.write(`${JSON.stringify(sonuc, null, 2)}\n`);
-    if (hatalar.length || kopukReferanslar.length || yetimBelgeHareketleri.length) process.exitCode = 2;
+    if (output) process.stdout.write(`${JSON.stringify(sonuc, null, 2)}\n`);
+    if (output && (hatalar.length || kopukReferanslar.length || yetimBelgeHareketleri.length)) process.exitCode = 2;
+    return sonuc;
 }
 
-main().catch((error) => {
+if (require.main === module) main().catch((error) => {
     process.stderr.write(`Muhasebe bütünlük auditi çalıştırılamadı: ${error.message}\n`);
     process.exitCode = 1;
 }).finally(() => mongoose.disconnect());
+
+module.exports = { run: main };

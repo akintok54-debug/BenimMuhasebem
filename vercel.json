@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/ideasoft-siparisleri",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/platform-kontrol",
+      "schedule": "15 3 * * *"
     }
   ],
   "routes": [

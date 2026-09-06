@@ -21,7 +21,7 @@ function auditMiddleware(req, res, next) {
             httpStatus: res.statusCode,
             details: { sureMs: Date.now() - baslangic }
         };
-        setImmediate(async () => { try { await kaydet(olay); if (olay.severity === "KRITIK" || ["SUPHELI_GIRIS", "BANKA_ENTEGRASYON", "SISTEM_GUVENLIK"].includes(olay.category)) await alarmGonder({ ...olay, requestId: req.id }); } catch (error) { console.error("AUDIT_ALARM_HATASI", { requestId: req.id, message: error.message }); } });
+        setImmediate(async () => { try { if (!res.locals.platformErrorSaved) await kaydet(olay); if (olay.severity === "KRITIK" || ["SUPHELI_GIRIS", "BANKA_ENTEGRASYON", "SISTEM_GUVENLIK"].includes(olay.category)) await alarmGonder({ ...olay, requestId: req.id }); } catch (error) { console.error("AUDIT_ALARM_HATASI", { requestId: req.id, message: error.message }); } });
     });
     next();
 }

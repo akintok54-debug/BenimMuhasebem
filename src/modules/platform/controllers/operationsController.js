@@ -150,7 +150,7 @@ exports.supportEnd = endpoint(async (req, res) => {
 exports.errorResolve = endpoint(async (req, res) => {
     const auditId = kimlik(req.params.id), note = String(req.body.note || "").trim();
     if (typeof req.body.resolved !== "boolean" || note.length < 5 || note.length > 1000) fail("Çözüm durumu ve 5–1000 karakter açıklama gerekli.");
-    const audit = await Audit.findOne({ _id: auditId, $or: [{ category: "API_HATASI" }, { httpStatus: { $gte: 500 } }] }).lean();
+    const audit = await Audit.findOne({ _id: auditId, ...require("../services/hataIzlemeServisi").errorFilter() }).lean();
     if (!audit) fail("Hata kaydı bulunamadı.", 404);
     await kaydet({ req, action: "ERROR_RESOLUTION", resource: "platform_error", resourceId: String(auditId), tenantId: audit.tenantId, details: { resolved: req.body.resolved, note } });
     await Resolution.findOneAndUpdate({ auditId }, { resolved: req.body.resolved, note, actorId: actor(req) }, { upsert: true, runValidators: true });

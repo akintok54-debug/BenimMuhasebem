@@ -26,4 +26,8 @@ router.get("/ideasoft-siparisleri", cronYetkiKontrol, async (req, res) => {
     }
 });
 
+router.get("/platform-kontrol", cronYetkiKontrol, async (req, res, next) => {
+    try { const result = await require("../modules/platform/services/tutarlilikIzlemeServisi").run(req); res.json({ basarili: true, ...result }); }
+    catch (error) { next(error); }
+});
 module.exports = router;

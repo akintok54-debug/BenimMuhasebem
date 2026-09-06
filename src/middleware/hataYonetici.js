@@ -1,6 +1,7 @@
 ﻿function hataYonetici(err, req, res, next) {
-    console.error("API_HATASI", { requestId: req.id, method: req.method, path: req.originalUrl?.split("?")[0], name: err.name, message: err.message });
+    console.error("API_HATASI", { requestId: req.id, method: req.method, path: req.originalUrl?.split("?")[0], ...require("../modules/platform/services/hataIzlemeServisi").errorDetails(err) });
 
+    res.locals.platformError = err;
     let status = err.status || 500;
     let mesaj = status >= 500 ? "İşlem sırasında beklenmeyen bir hata oluştu." : (err.message || "İstek işlenemedi.");
 

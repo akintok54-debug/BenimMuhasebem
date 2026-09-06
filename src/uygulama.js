@@ -48,6 +48,7 @@ uygulama.use(helmet({
 }));
 uygulama.use(istekKimligi);
 uygulama.use(auditMiddleware);
+uygulama.use(require("./middleware/hataIzlemeMiddleware"));
 const corsIzinleri = new Set([
     ...String(process.env.CORS_ORIGINS || "").split(","),
     process.env.PUBLIC_APP_URL,
@@ -63,6 +64,7 @@ uygulama.use(cors({
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Authorization", "Content-Type", "X-Request-Id", "X-CSRF-Token"]
 }));
+uygulama.use("/api/telemetry", express.json({ limit: "8kb" }));
 uygulama.use(express.json({ limit: "10mb" }));
 uygulama.use(express.urlencoded({ extended: true }));
 uygulama.use(girdiTemizleme);
@@ -101,6 +103,7 @@ uygulama.use(require("./services/belgeTutarOzetiServisi").belgeSunumMiddleware);
 const paylasimRotasi = require("./routes/paylasimRotasi");
 uygulama.use("/api/paylasim", paylasimRotasi.publicRouter);
 uygulama.use("/api/tenant/paylasim", paylasimRotasi.tenantRouter);
+uygulama.use("/api/telemetry", require("./modules/platform/routes/telemetryRotasi"));
 const tenantRotasi = require("./routes/tenantRotasi");
 uygulama.use("/api/tenant", tenantRotasi);
 

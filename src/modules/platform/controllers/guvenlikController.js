@@ -38,7 +38,7 @@ async function sistemHatalari(req, res, next) {
     try {
         const limit = Math.min(200, Math.max(1, (Number(req.query.limit) || 100)));
         const son24Saat = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        const filter = { $or: [{ category: "API_HATASI" }, { httpStatus: { $gte: 500 } }] };
+        const filter = require("../services/hataIzlemeServisi").errorFilter();
         const [hatalar, son24SaatToplam] = await Promise.all([
             PlatformAuditLog.find(filter)
                 .populate("actorUserId", "adSoyad email rol")

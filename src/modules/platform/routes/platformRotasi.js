@@ -22,6 +22,7 @@ const operations = require("../controllers/operationsController");
 router.use(rateLimit({ pencereMs: 60000, limit: 180, anahtar: req => `platform:${req.currentUser._id}` }));
 router.use(onayKontrol);
 router.get("/health", operations.health);
+router.get("/notifications", require("../controllers/notificationController").listele);
 router.get("/integrations", operations.integrations);
 router.get("/tenants/:id/overview", operations.firma);
 router.patch("/tenants/:id/subscription", operations.subscriptionUpdate);

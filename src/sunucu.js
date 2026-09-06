@@ -1,3 +1,4 @@
+require("./modules/platform/services/runtimeIzleme");
 ﻿require("dotenv").config();
 
 const uygulama = require("./uygulama");
