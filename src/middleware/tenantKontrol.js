@@ -43,6 +43,7 @@ async function tenantKontrol(req, res, next) {
         const guncelKullanici = await Kullanici.findOne({ _id: kullanici.kullaniciId, tenantId: id, aktif: true, silinmeTarihi: null })
             .select("adSoyad email telefon rol aktif ozelYetkiler yetkiModu tenantId").lean();
         if (!guncelKullanici) return res.status(401).json({ basarili: false, mesaj: "Kullanıcı hesabı pasif veya oturum yetkisi kaldırılmış." });
+        if (guncelKullanici.rol === "BAYI" || rol === "BAYI") return res.status(403).json({ basarili: false, mesaj: "Bayi hesabı yalnızca bayi portalını kullanabilir." });
         await eskiTenantSahibiniDogrula(req, guncelKullanici);
         req.currentUser = guncelKullanici;
         req.kullanici.rol = guncelKullanici.rol;

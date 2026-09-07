@@ -20,6 +20,7 @@
             const data = await response.json();
             if (!data?.basarili) return;
             if (data.csrfToken) sessionStorage.setItem("bmCsrfToken", data.csrfToken);
+            if (data.kullanici?.rol === "BAYI") { window.location.replace("/b2b/"); return; }
             window.location.replace(data.kullanici?.rol === "SUPER_ADMIN" ? "/platform/" : "/erp/");
         } catch (_) {
             // Çevrimdışı veya geçici sunucu hatasında giriş formu kullanılabilir kalır.
@@ -114,6 +115,7 @@
 
             if (data.csrfToken) sessionStorage.setItem("bmCsrfToken", data.csrfToken);
 
+            if (data.kullanici?.rol === "BAYI") { window.location.replace("/b2b/"); return; }
             window.location.replace(data.kullanici?.rol === "SUPER_ADMIN" ? "/platform/" : "/erp/");
 
         } catch (error) {

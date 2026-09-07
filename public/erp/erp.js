@@ -166,6 +166,7 @@
         return izinler.some(izin => izin === gerekli || (!(["SALES", "SATIS"].includes(rol) && gerekli.startsWith("supplier.")) && izin === eskiCari[gerekli]) || (izin.endsWith(".") && gerekli.startsWith(izin)));
     }
     function sayfaErisimiVar(page) {
+        if (page === "b2b") return ["OWNER", "ADMIN"].includes(oturumKullanici?.rol);
         const esleme = { musteriler: ["customer.read"], tedarikciler: ["supplier.read"], urunler: ["stock.read"], stok: ["stock.read"], alis: ["purchase.read", "supplier.read"], satis: ["sales.read"], saha: ["field.read"], teklifler: ["sales.read"], siparisler: ["sales.read"], eticaret: ["ecommerce.view"], whatsapp: ["sales.read"], cari: ["customer.read", "supplier.read"], finans: ["cash.read"], masraflar: ["accounting.read"], personeller: ["tenant.users"], kullanicilar: ["tenant.users"], raporlar: ["reports.read"], ayarlar: ["tenant.settings"] };
         if (page === "alis") return esleme.alis.every(oturumYetkisiVar);
         return !esleme[page] || esleme[page].some(oturumYetkisiVar);
@@ -5983,6 +5984,8 @@
             await dashboardYukle();
             return;
         }
+
+        if (page === "b2b") { setTitle("B2B Bayi Yönetimi"); await window.B2BAdmin(content, api); return; }
 
         if (page === "cari" || page === "cariler") {
             if (buYukleme !== sayfaYuklemeNo) return;

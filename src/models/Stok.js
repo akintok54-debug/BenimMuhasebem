@@ -28,6 +28,7 @@ const StokSchema = new mongoose.Schema(
             default: 0
         },
 
+        b2bSurum: { type: Number, default: 0 },
         maliyet: {
             type: Number,
             default: 0,

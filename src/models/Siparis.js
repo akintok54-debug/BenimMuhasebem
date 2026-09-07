@@ -68,6 +68,7 @@ const SiparisSchema = new mongoose.Schema(
             index: true
         },
 
+        kaynakKanal: { type: String, enum: ["MERKEZ", "B2B"], default: "MERKEZ", index: true },
         teklifId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Teklif",

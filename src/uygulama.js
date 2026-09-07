@@ -104,6 +104,9 @@ const paylasimRotasi = require("./routes/paylasimRotasi");
 uygulama.use("/api/paylasim", paylasimRotasi.publicRouter);
 uygulama.use("/api/tenant/paylasim", paylasimRotasi.tenantRouter);
 uygulama.use("/api/telemetry", require("./modules/platform/routes/telemetryRotasi"));
+const b2bRoutes = require("./modules/b2b/routes");
+uygulama.use("/api/b2b", b2bRoutes.portal);
+uygulama.use("/api/tenant/b2b", b2bRoutes.admin);
 const tenantRotasi = require("./routes/tenantRotasi");
 uygulama.use("/api/tenant", tenantRotasi);
 

@@ -1,0 +1,61 @@
+(function () {
+    "use strict";
+    const esc = x => String(x ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+    window.B2BAdmin = async function (content, api) {
+        const root = document.createElement("div"); root.className = "b2b"; content.replaceChildren(root);
+        let data, page = 0, query = "", orderPage = 0, prices = [], editKind = "", editId = "";
+        const call = (path, method = "GET", body) => api("/api/tenant/b2b" + path, { method, ...(body ? { body: JSON.stringify(body) } : {}) });
+        const message = x => { const el = root.querySelector("[role=status]"); if (el) el.textContent = x; };
+        const input = (name, label, value = "", type = "text", extra = "") => `<label>${label}<input name="${name}" type="${type}" value="${esc(value)}" ${extra}></label>`;
+        const money = x => BelgeSunum.para(x);
+        const pricesEditor = () => `<details><summary>Ürüne özel net fiyat listesi (${prices.length})</summary><p>Liste fiyatı iskontonun yerine geçer. Müşteriye özel fiyat grup fiyatından önceliklidir.</p><div class="actions"><input id="b2bPriceSearch" placeholder="Ürün adı, kod veya barkod ara" aria-label="Fiyat listesine ürün ara"><button type="button" data-search-product="1">Ürün bul</button></div><div id="b2bPriceResults"></div><div id="b2bPrices" class="admin-prices">${priceRows()}</div></details>`;
+        function priceRows() { return prices.map((x, i) => `<div class="row"><div>${esc(x.ad || x.urunId)}</div><label>Net fiyat (KDV hariç)<input type="number" min="0" step="0.01" value="${x.fiyat}" data-price="${i}"></label><button type="button" data-remove-price="${i}">Kaldır</button></div>`).join(""); }
+        async function load() {
+            root.innerHTML = '<p role="status">B2B yönetimi yükleniyor…</p>';
+            data = await call(`/?page=${page}&q=${encodeURIComponent(query)}`); if (!root.isConnected) return;
+            root.innerHTML = `<p class="eyebrow">B2B YÖNETİMİ</p><h2>Bayi ağı</h2><p>Mevcut carilere portal erişimi tanımlayın. <a href="/b2b/" target="_blank" rel="noopener">Bayi portalını aç ↗</a></p><div role="status" aria-live="polite"></div><div class="actions"><button data-groups="1">Bayi grupları / fiyatlar</button><button data-orders="1">B2B siparişleri</button></div><form id="b2bSearch" class="actions"><label>Cari ara<input name="q" value="${esc(query)}" placeholder="Firma, ad veya kod"></label><button>Ara</button></form><div id="b2bEditor"></div><div class="panel">${data.customers.map(c => `<div class="row"><div><strong>${esc(c.unvan || c.adSoyad)}</strong><p>${esc(c.kod)} · ${c.b2b?.aktif ? "B2B açık" : "B2B kapalı"}</p></div><button data-customer="${c._id}">Bayi ayarları</button><button data-users="${c._id}">Kullanıcılar</button></div>`).join("") || '<p>Müşteri bulunamadı. Önce Müşteriler modülünden cari oluşturun.</p>'}</div><div class="actions"><button data-page="prev" ${page ? "" : "disabled"}>Önceki</button><span>Sayfa ${page + 1}</span><button data-page="next" ${data.customers.length === 50 ? "" : "disabled"}>Sonraki</button></div>`;
+        }
+        function editor(html) { const el = root.querySelector("#b2bEditor"); el.innerHTML = '<section class="panel">' + html + '<div class="actions"><button type="button" data-close-editor="1">Kapat</button></div></section>'; el.scrollIntoView({ block: "start", behavior: "smooth" }); }
+        function customer(id) {
+            const c = data.customers.find(x => x._id === id), b = c.b2b || {}; editKind = "customer"; editId = id; prices = (b.fiyatlar || []).map(x => ({ ...x }));
+            const select = (name, label, items, selected) => `<label>${label}<select name="${name}"><option value="">Seçilmedi</option>${items.map(x => `<option value="${x._id}" ${x._id === selected ? "selected" : ""}>${esc(x.ad)}</option>`).join("")}</select></label>`;
+            editor(`<h3>${esc(c.unvan || c.adSoyad)} · Bayi ayarları</h3><form id="b2bSaveCustomer"><div class="fields"><label class="check"><input type="checkbox" name="aktif" ${b.aktif ? "checked" : ""}>B2B açık</label><label class="check"><input type="checkbox" name="siparisYetkisi" ${b.siparisYetkisi !== false ? "checked" : ""}>Sipariş verebilir</label><label class="check"><input type="checkbox" name="negatifStok" ${b.negatifStok !== false ? "checked" : ""}>Stok yetersizken sipariş al</label>${select("grupId", "Bayi grubu", data.groups, b.grupId)}${select("depoId", "Sipariş deposu", data.depots, b.depoId)}${input("limit", "Kredi limiti (TL, 0 = sınırsız)", c.limit || 0, "number", 'min="0" step="0.01"')}${input("riskLimiti", "Risk limiti (TL, 0 = sınırsız)", c.riskLimiti || 0, "number", 'min="0" step="0.01"')}${input("vadeGun", "Ödeme vadesi (gün)", c.vadeGun || 0, "number", 'min="0" max="3650"')}${input("minimumSiparis", "Minimum sipariş (KDV dahil TL)", b.minimumSiparis || 0, "number", 'min="0" step="0.01"')}</div>${pricesEditor()}<button class="primary">Bayi ayarlarını kaydet</button></form>`);
+        }
+        function groups() { editor(`<h3>Bayi grupları</h3><div class="actions"><button data-new-group="1">Yeni grup</button></div>${data.groups.map(g => `<div class="row"><div><strong>${esc(g.ad)}</strong><p>%${g.iskonto} iskonto · ${g.fiyatlar.length} özel fiyat</p></div><button data-group="${g._id}">Düzenle</button></div>`).join("") || '<p>Henüz grup tanımlanmamış.</p>'}`); }
+        function group(id) { const g = data.groups.find(x => x._id === id) || { ad: "", iskonto: 0, fiyatlar: [] }; editKind = "group"; editId = id || ""; prices = g.fiyatlar.map(x => ({ ...x })); editor(`<h3>${id ? "Grup düzenle" : "Yeni bayi grubu"}</h3><form id="b2bSaveGroup"><div class="fields">${input("ad", "Grup adı", g.ad, "text", 'required maxlength="80"')}${input("iskonto", "İskonto (%)", g.iskonto, "number", 'min="0" max="100" step="0.01" required')}</div>${pricesEditor()}<button class="primary">Grubu kaydet</button></form>`); }
+        function users(id) { const c = data.customers.find(x => x._id === id); editId = id; editor(`<h3>${esc(c.unvan || c.adSoyad)} · Bayi kullanıcıları</h3>${data.users.filter(x => x.musteriId === id).map(u => `<div class="row"><div>${esc(u.adSoyad)}<p>${esc(u.email)} · ${u.aktif ? "Aktif" : "Kapalı"}</p></div><button data-user-status="${u._id}" data-active="${!u.aktif}">${u.aktif ? "Erişimi kapat" : "Erişimi aç"}</button></div>`).join("")}<details><summary>Yeni bayi kullanıcısı</summary><form id="b2bCreateUser"><div class="fields">${input("adSoyad", "Ad soyad", "", "text", "required")}${input("email", "E-posta", "", "email", "required")}${input("sifre", "İlk parola (en az 12 karakter)", "", "password", 'required minlength="12" maxlength="128" autocomplete="new-password"')}</div><p>Hesabı açmak otomatik e-posta göndermez. Parola yenileme mevcut giriş ekranından yapılabilir.</p><button class="primary">Kullanıcı oluştur</button></form></details>`); }
+        async function orders() { const d = await call("/orders?page=" + orderPage); const next = { TASLAK: ["ONAYLANDI", "Onayla"], ONAYLANDI: ["HAZIRLANIYOR", "Hazırla"], HAZIRLANIYOR: ["SEVK_EDILDI", "Sevk et"] }; editor(`<h3>B2B siparişleri</h3><p>Siparişler ERP Siparişler modülündeki aynı kayıtlardır. Stok çıkışı satışa dönüşümde bir kez işlenir.</p>${d.orders.map(o => `<div class="row"><div><strong>${esc(o.siparisNo)}</strong><p>${esc(o.musteriId?.unvan || o.musteriId?.adSoyad)} · ${money(o.genelToplam)} · ${esc(o.durum)}</p></div>${next[o.durum] ? `<button data-order-status="${o._id}" data-status="${next[o.durum][0]}">${next[o.durum][1]}</button>` : ""}${o.durum === "SEVK_EDILDI" && !o.satisId ? `<button class="primary" data-convert="${o._id}">Satışa / faturaya çevir</button>` : ""}${["TASLAK", "ONAYLANDI", "HAZIRLANIYOR"].includes(o.durum) ? `<button data-order-status="${o._id}" data-status="IPTAL">İptal</button>` : ""}</div>`).join("") || '<p>Sipariş bulunamadı.</p>'}<div class="actions"><button data-order-page="prev" ${orderPage ? "" : "disabled"}>Önceki</button><button data-order-page="next" ${d.orders.length === 25 ? "" : "disabled"}>Sonraki</button></div>`); }
+        root.addEventListener("click", async e => {
+            const b = e.target.closest("button"); if (!b || b.type === "submit" && b.closest("form") && !Object.keys(b.dataset).length) return;
+            try {
+                if (b.dataset.customer) customer(b.dataset.customer);
+                if (b.dataset.groups) groups();
+                if (b.dataset.group || b.dataset.newGroup) group(b.dataset.group);
+                if (b.dataset.users) users(b.dataset.users);
+                if (b.dataset.closeEditor) root.querySelector("#b2bEditor").replaceChildren();
+                if (b.dataset.page) { page += b.dataset.page === "next" ? 1 : -1; await load(); }
+                if (b.dataset.orders) { orderPage = 0; await orders(); }
+                if (b.dataset.orderPage) { orderPage += b.dataset.orderPage === "next" ? 1 : -1; await orders(); }
+                if (b.dataset.orderStatus) { if (!confirm("Sipariş durumunu " + b.dataset.status + " olarak güncelle?")) return; b.disabled = true; await call("/orders/" + b.dataset.orderStatus + "/status", "PATCH", { durum: b.dataset.status }); await orders(); }
+                if (b.dataset.convert) { if (!confirm("Bu sipariş satışa dönüşecek; stok ve cari hesap işlenecek. Onaylıyor musunuz?")) return; b.disabled = true; await api("/api/tenant/siparisler/" + b.dataset.convert + "/satisa-donustur", { method: "POST", body: JSON.stringify({ transactionId: "B2B-SALE-" + b.dataset.convert }) }); await orders(); message("Satış kaydı oluşturuldu."); }
+                if (b.dataset.userStatus) { await call("/users/" + b.dataset.userStatus, "PATCH", { aktif: b.dataset.active === "true" }); await load(); message("Bayi kullanıcı erişimi güncellendi."); }
+                if (b.dataset.searchProduct) { const q = root.querySelector("#b2bPriceSearch").value; const d = await call("/products?q=" + encodeURIComponent(q)); root.querySelector("#b2bPriceResults").innerHTML = d.products.map(p => `<button type="button" data-add-price="${p._id}" data-name="${esc(p.ad)}">${esc(p.kod)} · ${esc(p.ad)} (${esc(p.paraBirimi)})</button>`).join("") || "Ürün bulunamadı."; }
+                if (b.dataset.addPrice) { if (!prices.some(p => p.urunId === b.dataset.addPrice)) prices.push({ urunId: b.dataset.addPrice, ad: b.dataset.name, fiyat: 0 }); root.querySelector("#b2bPrices").innerHTML = priceRows(); }
+                if (b.dataset.removePrice !== undefined) { prices.splice(Number(b.dataset.removePrice), 1); root.querySelector("#b2bPrices").innerHTML = priceRows(); }
+            } catch (err) { message(err.message); } finally { b.disabled = false; }
+        });
+        root.addEventListener("change", e => { if (e.target.dataset.price !== undefined) prices[Number(e.target.dataset.price)].fiyat = Number(e.target.value); });
+        root.addEventListener("submit", async e => {
+            e.preventDefault(); const b = e.submitter; b.disabled = true;
+            try {
+                const f = Object.fromEntries(new FormData(e.target));
+                if (e.target.id === "b2bSearch") { query = f.q; page = 0; await load(); return; }
+                if (e.target.id === "b2bSaveGroup") await call("/groups" + (editId ? "/" + editId : ""), editId ? "PATCH" : "POST", { ...f, iskonto: Number(f.iskonto), fiyatlar: prices.map(({ urunId, fiyat }) => ({ urunId, fiyat })) });
+                if (e.target.id === "b2bSaveCustomer") { for (const k of ["aktif", "siparisYetkisi", "negatifStok"]) f[k] = f[k] === "on"; for (const k of ["limit", "riskLimiti", "minimumSiparis", "vadeGun"]) f[k] = Number(f[k]); f.fiyatlar = prices.map(({ urunId, fiyat }) => ({ urunId, fiyat })); await call("/customers/" + editId, "PATCH", f); }
+                if (e.target.id === "b2bCreateUser") await call("/customers/" + editId + "/users", "POST", f);
+                await load(); message("Kaydedildi.");
+            } catch (err) { message(err.message); } finally { b.disabled = false; }
+        });
+        try { await load(); } catch (e) { root.innerHTML = `<p role="alert">${esc(e.message)}</p>`; }
+    };
+})();

@@ -29,6 +29,7 @@ const KullaniciSchema = new mongoose.Schema(
             type: String,
             enum: [
                 "SUPER_ADMIN",
+                "BAYI",
                 "OWNER",
                 "ADMIN",
                 "MANAGER",
@@ -51,6 +52,9 @@ const KullaniciSchema = new mongoose.Schema(
             default: null,
             index: true
         },
+
+        musteriId: { type: mongoose.Schema.Types.ObjectId, ref: "Musteri", default: null },
+        favoriler: { type: [mongoose.Schema.Types.ObjectId], ref: "Urun", default: [] },
 
         aktif: {
             type: Boolean,

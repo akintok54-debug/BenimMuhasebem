@@ -54,6 +54,7 @@ async function guncelle(req, res, next) {
     try {
         const kullanici = await Kullanici.findOne({ _id: req.params.id, tenantId: tenantId(req), silinmeTarihi: null });
         if (!kullanici) return res.status(404).json({ basarili: false, mesaj: "Kullanıcı bulunamadı." });
+        if (kullanici.rol === "BAYI") return res.status(403).json({ basarili: false, mesaj: "Bayi hesabını B2B yönetiminden düzenleyin." });
         if (kullanici.rol === "OWNER") return res.status(403).json({ basarili: false, mesaj: "İşletme sahibi hesabı bu ekrandan değiştirilemez." });
         if (req.currentUser?.rol === "ADMIN" && kullanici.rol === "ADMIN") return res.status(403).json({ basarili: false, mesaj: "Yönetici başka bir yönetici hesabını değiştiremez." });
         if (String(kullanici._id) === String(req.currentUser?._id)) return res.status(409).json({ basarili: false, mesaj: "Kendi rol ve yetkilerinizi bu ekrandan değiştiremezsiniz." });

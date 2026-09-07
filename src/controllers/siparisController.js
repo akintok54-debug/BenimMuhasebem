@@ -107,7 +107,7 @@ async function olustur(req, res, next) {
         const siparis = await Siparis.create({
             tenantId: tId, siparisNo: String(body.siparisNo).trim().toUpperCase(),
             tarih: body.tarih || new Date(), musteriId: musteri._id, depoId: depo._id,
-            kalemler, araToplam, toplamKdv, genelToplam, durum: body.durum || "TASLAK",
+            ...require("../services/siparisHesaplamaServisi").hesapla(kalemler), durum: body.durum || "TASLAK",
             paraBirimi: body.paraBirimi || "TRY", teslimTarihi: body.teslimTarihi || null,
             sevkAdresi: body.sevkAdresi || "", odemeKosullari: body.odemeKosullari || "",
             notlar: body.notlar || "", kullaniciId: aktorId(req)
@@ -141,7 +141,8 @@ async function satisdonustur(req, res, next) {
             });
         }
 
-        if (!["ONAYLANDI", "HAZIRLANIYOR"].includes(siparis.durum)) {
+        const satisDurumlari = siparis.kaynakKanal === "B2B" ? ["SEVK_EDILDI"] : ["ONAYLANDI", "HAZIRLANIYOR"];
+        if (!satisDurumlari.includes(siparis.durum)) {
             return res.status(409).json({
                 basarili: false,
                 mesaj: "Sipariş satışa uygun durumda değil."
@@ -203,7 +204,7 @@ async function satisdonustur(req, res, next) {
         await session.withTransaction(async () => {
             const guncelSiparis = await Siparis.findOne({
                 _id: siparis._id, tenantId: tId, satisId: null,
-                durum: { $in: ["ONAYLANDI", "HAZIRLANIYOR"] }
+                durum: { $in: satisDurumlari }
             }).session(session);
             if (!guncelSiparis) throw Object.assign(new Error("Sipariş başka bir işlem tarafından satışa dönüştürüldü."), { status: 409 });
 

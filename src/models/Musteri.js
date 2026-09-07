@@ -141,6 +141,16 @@ const MusteriSchema = new mongoose.Schema(
             default: true
         },
 
+        b2b: {
+            aktif: { type: Boolean, default: false },
+            siparisYetkisi: { type: Boolean, default: true },
+            grupId: { type: mongoose.Schema.Types.ObjectId, ref: "BayiGrubu", default: null },
+            depoId: { type: mongoose.Schema.Types.ObjectId, ref: "Depo", default: null },
+            minimumSiparis: { type: Number, min: 0, default: 0 },
+            negatifStok: { type: Boolean, default: true },
+            surum: { type: Number, default: 0 },
+            fiyatlar: { type: [new mongoose.Schema({ urunId: { type: mongoose.Schema.Types.ObjectId, ref: "Urun", required: true }, fiyat: { type: Number, min: 0, required: true } }, { _id: false })], default: [] }
+        },
         temsilciId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null, index: true },
         olusturanKullaniciId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null },
         konum: {
