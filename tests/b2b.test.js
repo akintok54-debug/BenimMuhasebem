@@ -84,6 +84,32 @@ test("B2B HTTP authentication, isolation and privacy", async t => {
             assert.equal((await request("/api/b2b/me", null, { Authorization: "Bearer " + owner })).status, 403);
         } finally { user.rol = "BAYI"; }
     });
+    await t.test("dealer creation explains duplicate email, preserves existing accounts and accepts a new email", async tt => {
+        user.rol = "OWNER";
+        try {
+            const owner = tokenOlustur({ kullaniciId: userId, tenantId, rol: "OWNER" });
+            const headers = { Authorization: "Bearer " + owner };
+            let duplicate = true, creates = 0, race = false;
+            tt.mock.method(Customer, "exists", async filter => { assert.equal(filter.aktif, true); assert.equal(String(filter.tenantId), tenantId); assert.equal(filter["b2b.aktif"], true); return { _id: customerId }; });
+            tt.mock.method(User, "exists", async () => duplicate ? { _id: foreignId } : null);
+            tt.mock.method(User, "countDocuments", async () => 0);
+            tt.mock.method(User, "create", async fields => {
+                if (race) throw Object.assign(new Error("Duplicate"), { code: 11000, keyPattern: { email: 1 } });
+                creates++; assert.equal(fields.rol, "BAYI"); assert.equal(String(fields.musteriId), customerId); assert.equal(String(fields.tenantId), tenantId);
+                assert.equal(await bcrypt.compare(" exact-test-password ", fields.sifre), true);
+                return { _id: foreignId, email: fields.email };
+            });
+            const body = { adSoyad: "Dealer User", email: "dealer-new@example.test", sifre: " exact-test-password " };
+            const conflict = await request(`/api/tenant/b2b/customers/${customerId}/users`, body, headers);
+            assert.equal(conflict.status, 409); assert.equal((await conflict.json()).kod, "B2B_EMAIL_IN_USE"); assert.equal(creates, 0); assert.equal(user.rol, "OWNER");
+            duplicate = false;
+            const created = await request(`/api/tenant/b2b/customers/${customerId}/users`, body, headers);
+            assert.equal(created.status, 201); assert.equal(creates, 1); assert.equal((await created.json()).kullanici.email, body.email);
+            race = true;
+            const raced = await request(`/api/tenant/b2b/customers/${customerId}/users`, body, headers);
+            assert.equal(raced.status, 409); assert.equal((await raced.json()).kod, "B2B_EMAIL_IN_USE");
+        } finally { user.rol = "BAYI"; }
+    });
 });
 test("B2B quote and order reuse ERP models and persisted totals", async t => {
     const customer = { _id: new mongoose.Types.ObjectId(customerId), tenantId: new mongoose.Types.ObjectId(tenantId), b2b: { aktif: true, depoId: depotId, negatifStok: true, siparisYetkisi: true, minimumSiparis: 0 }, bakiye: 10, limit: 500, riskLimiti: 500, vadeGun: 30 };

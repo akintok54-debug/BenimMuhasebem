@@ -18,7 +18,7 @@ function bodyKontrol(req, res, next) {
     next();
 }
 portal.use(bodyKontrol); admin.use(bodyKontrol);
-const run = fn => async (req, res, next) => { try { await fn(req, res); } catch (e) { if (e.code === 11000) return res.status(409).json({ basarili: false, mesaj: "Kayıt zaten mevcut." }); next(e); } };
+const run = fn => async (req, res, next) => { try { await fn(req, res); } catch (e) { if (e.kod?.startsWith("B2B_")) return res.status(e.status || 400).json({ basarili: false, kod: e.kod, mesaj: e.message }); if (e.code === 11000 && e.keyPattern?.email) return res.status(409).json({ basarili: false, kod: "B2B_EMAIL_IN_USE", mesaj: "Bu e-posta zaten bir kullanıcı hesabında kayıtlı. Bayi için farklı bir e-posta kullanın; mevcut hesabın rolü değiştirilmedi." }); if (e.code === 11000) return res.status(409).json({ basarili: false, mesaj: "Kayıt zaten mevcut." }); next(e); } };
 const page = req => Math.min(100000, Math.max(0, Number.parseInt(req.query.page, 10) || 0));
 const literal = x => String(x || "").slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const orderFields = "siparisNo belgeNo tarih durum kalemler araToplam toplamKdv genelToplam paraBirimi satisId sevkAdresi odemeKosullari odemeDurumu odenenTutar kalanTutar";
@@ -77,7 +77,7 @@ admin.get("/products", run(async (req, res) => res.json({ basarili: true, produc
 admin.get("/", run(async (req, res) => {
     const filter = { tenantId: req.tenantId };
     const [customers, groups, depots, users] = await Promise.all([
-        Customer.find({ ...filter, ...(req.query.q ? { $or: ["unvan", "adSoyad", "kod"].map(k => ({ [k]: { $regex: literal(req.query.q), $options: "i" } })) } : {}) }).select("kod unvan adSoyad b2b limit riskLimiti vadeGun").sort({ "b2b.aktif": -1, kod: 1 }).skip(page(req) * 50).limit(50).lean(),
+        Customer.find({ ...filter, ...(req.query.q ? { $or: ["unvan", "adSoyad", "kod"].map(k => ({ [k]: { $regex: literal(req.query.q), $options: "i" } })) } : {}) }).select("kod unvan adSoyad aktif b2b limit riskLimiti vadeGun").sort({ "b2b.aktif": -1, kod: 1 }).skip(page(req) * 50).limit(50).lean(),
         Group.find(filter).sort({ ad: 1 }).lean(), Depot.find({ ...filter, aktif: true }).select("ad kod").lean(), User.find({ ...filter, rol: "BAYI", silinmeTarihi: null }).select("adSoyad email musteriId aktif sonGirisTarihi").limit(1000).lean()
     ]);
     res.json({ basarili: true, customers, groups, depots, users });
@@ -110,12 +110,13 @@ admin.patch("/customers/:id", run(async (req, res) => {
 }));
 admin.post("/customers/:id/users", run(async (req, res) => {
     const customerId = s.oid(req.params.id), body = req.body;
-    if (!await Customer.exists({ _id: customerId, tenantId: req.tenantId, "b2b.aktif": true })) throw s.hata("Önce B2B bayi hesabını etkinleştirin.", 409);
-    const adSoyad = s.metin(body.adSoyad, 100), email = s.metin(body.email, 254).toLowerCase(), password = s.metin(body.sifre, 128);
-    if (adSoyad.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 12) throw s.hata("Ad, e-posta ve en az 12 karakterli parola gerekli.");
+    if (!await Customer.exists({ _id: customerId, tenantId: req.tenantId, aktif: true, "b2b.aktif": true })) throw Object.assign(s.hata("Önce müşteriyi ve B2B bayi erişimini etkinleştirin.", 409), { kod: "B2B_CUSTOMER_DISABLED" });
+    const adSoyad = s.metin(body.adSoyad, 100), email = s.metin(body.email, 254).toLowerCase(), password = typeof body.sifre === "string" ? body.sifre : "";
+    if (adSoyad.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 12 || password.length > 128) throw s.hata("Ad, e-posta ve en az 12 karakterli parola gerekli.");
+    if (await User.exists({ email })) throw Object.assign(s.hata("Bu e-posta zaten bir kullanıcı hesabında kayıtlı. Bayi için farklı bir e-posta kullanın; mevcut hesabın rolü değiştirilmedi.", 409), { kod: "B2B_EMAIL_IN_USE" });
     const plan = await require("../platform/models/Tenant").findById(req.tenantId).select("limits.users").lean();
     const limit = Number(plan?.limits?.users || 0);
-    if (limit > 0 && await User.countDocuments({ tenantId: req.tenantId, silinmeTarihi: null }) >= limit) throw s.hata("Paket kullanıcı limiti dolu.", 409);
+    if (limit > 0 && await User.countDocuments({ tenantId: req.tenantId, silinmeTarihi: null }) >= limit) throw Object.assign(s.hata(`Paketinizin ${limit} kullanıcı limiti dolu. Kullanıcı/paket ayarlarınızı kontrol edin.`, 409), { kod: "B2B_USER_LIMIT" });
     const user = await User.create({ tenantId: req.tenantId, musteriId: customerId, adSoyad, email, sifre: await bcrypt.hash(password, 12), rol: "BAYI", aktif: true, ozelYetkiler: [], yetkiModu: "ROL" });
     await kaydet({ req, tenantId: req.tenantId, action: "B2B_USER_CREATED", resource: "Kullanici", resourceId: user._id });
     res.status(201).json({ basarili: true, kullanici: { _id: user._id, email: user.email } });
