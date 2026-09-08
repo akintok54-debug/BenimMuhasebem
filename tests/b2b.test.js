@@ -46,6 +46,16 @@ test("B2B HTTP authentication, isolation and privacy", async t => {
     await t.test("dealer cannot access general ERP or platform APIs", async () => {
         for (const path of ["/api/tenant/dashboard", "/api/tenant/musteriler", "/api/tenant/urunler", "/api/tenant/siparisler", "/api/tenant/b2b/", "/api/auth/verilerim", "/api/platform/notifications"]) assert.equal((await request(path)).status, 403, path);
     });
+    await t.test("dealer and ERP cookies are independent", async () => {
+        const staffToken = tokenOlustur({ kullaniciId: foreignId, tenantId, rol: "OWNER" });
+        const headers = { Authorization: "", Cookie: 'bm_session=' + staffToken + '; bm_b2b_session=' + token + '; bm_csrf=staff; bm_b2b_csrf=dealer' };
+        assert.equal((await request('/api/b2b/me', null, headers)).status, 200);
+        assert.equal((await request('/api/b2b/me', null, { Authorization: '', Cookie: 'bm_session=' + staffToken })).status, 401);
+        const out = await request('/api/b2b/auth/logout', {}, {...headers, 'X-CSRF-Token':'dealer'});
+        assert.equal(out.status,200); assert.match(out.headers.get('set-cookie'), /bm_b2b_session=/); assert.ok(!out.headers.get('set-cookie').includes('bm_session='));
+        const login = await request('/api/b2b/auth/login', {email:user.email,sifre:'correct-test-password'}, headers);
+        assert.equal(login.status,200); assert.match(login.headers.get('set-cookie'),/bm_b2b_session=/); assert.ok(!login.headers.get('set-cookie').includes('bm_session='));
+    });
     await t.test("forged tenant and account parameters are ignored", async () => {
         const r = await request(`/api/b2b/me?tenantId=${foreignId}&customerId=${foreignId}&userId=${foreignId}`); assert.equal(r.status, 200);
         const d = await r.json(); assert.equal(d.cari.unvan, "Own company"); assert.ok(!JSON.stringify(d).includes("fiyatlar"));
@@ -56,7 +66,7 @@ test("B2B HTTP authentication, isolation and privacy", async t => {
         userActive = false; assert.equal((await request("/api/b2b/me")).status, 403); userActive = true;
     });
     await t.test("cookie CSRF cannot be bypassed by adding a bearer header", async () => {
-        assert.equal((await request("/api/b2b/quote", { kalemler: [] }, { Cookie: `bm_session=${token}; bm_csrf=expected` })).status, 403);
+        assert.equal((await request("/api/b2b/quote", { kalemler: [] }, { Cookie: `bm_b2b_session=${token}; bm_b2b_csrf=expected` })).status, 403);
     });
     await t.test("foreign order and sale IDs are always customer and tenant scoped", async tt => {
         for (const [Model, path] of [[Order, "orders"], [Sale, "documents"]]) {

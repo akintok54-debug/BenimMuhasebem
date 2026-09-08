@@ -4,10 +4,10 @@ const Customer = require("../../models/Musteri");
 const { tenantAboneliginiKontrolEt } = require("../../services/abonelikServisi");
 function cookieCsrf(req, res, next) {
     if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();
-    const { cookieOku, AUTH_COOKIE, CSRF_COOKIE } = require("../../services/oturumGuvenligi");
-    const cookies = cookieOku(req);
-    if (!cookies[AUTH_COOKIE]) return next();
-    const sent = String(req.get("x-csrf-token") || ""), expected = String(cookies[CSRF_COOKIE] || "");
+    const { cookieOku, cookieAdlari } = require("../../services/oturumGuvenligi");
+    const cookies = cookieOku(req), names = cookieAdlari(req);
+    if (!cookies[names.auth]) return next();
+    const sent = String(req.get("x-csrf-token") || ""), expected = String(cookies[names.csrf] || "");
     if (!sent || !expected || Buffer.byteLength(sent) !== Buffer.byteLength(expected) || !require("crypto").timingSafeEqual(Buffer.from(sent), Buffer.from(expected))) return res.status(403).json({ basarili: false, mesaj: "CSRF doğrulaması gerekli." });
     next();
 }

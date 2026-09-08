@@ -694,26 +694,38 @@ async function iadeIptalEt(req, res, next) {
 }
 
 async function guncelle(req, res, next) {
+    const session = await mongoose.startSession();
     try {
-        const tenantId=tenantObjectId(req), body=req.body||{}; const satis=await Satis.findOne({_id:req.params.id,tenantId,durum:{$ne:"IPTAL"},...sahiplik(req)});
+        let responseData;
+        await session.withTransaction(async () => {
+        responseData = null;
+        const tenantId=tenantObjectId(req), body=req.body||{}; const satis=await Satis.findOne({_id:req.params.id,tenantId,durum:{$ne:"IPTAL"},...sahiplik(req)}).session(session);
         if(!satis)return res.status(404).json({basarili:false,mesaj:"Satış bulunamadı."});
-        if(Number(satis.odenenTutar||0)>0)return res.status(409).json({basarili:false,mesaj:"Ödeme alınmış satış doğrudan değiştirilemez; iade/düzeltme belgesi kullanın."});
+        if (await SatisIade.exists({tenantId,orijinalSatisId:satis._id,durum:{$ne:"IPTAL"}}).session(session)) throw Object.assign(new Error("İadeli satış için iade kayıtlarını önce kontrol edin."), {status:409});
         if(!Array.isArray(body.kalemler)||!body.kalemler.length)return res.status(400).json({basarili:false,mesaj:"En az bir satış kalemi gerekir."});
         const depoId=body.depoId||satis.depoId; if(String(depoId)!==String(satis.depoId))return res.status(409).json({basarili:false,mesaj:"Kayıtlı satışın deposu değiştirilemez."});
         const yeniKalemler=[];let araToplam=0,toplamKdv=0,genelToplam=0;const ihtiyac=new Map();
-        for(const item of body.kalemler){const urun=await Urun.findOne({_id:item.urunId,tenantId});if(!urun)return res.status(404).json({basarili:false,mesaj:"Ürün bulunamadı."});const k=hesaplaKalem({urunId:urun._id,miktar:item.miktar,birimFiyat:item.birimFiyat??urun.satisFiyati,kdv:item.kdv??urun.kdv,iskonto:item.iskonto??urun.iskonto??0});if(!kalemGecerliMi(k))return res.status(400).json({basarili:false,mesaj:"Satış kalemi geçersiz."});yeniKalemler.push(k);araToplam+=k.araToplam;toplamKdv+=k.kdvTutari;genelToplam+=k.toplam;ihtiyac.set(String(urun._id),(ihtiyac.get(String(urun._id))||0)+k.miktar);}
+        for(const item of body.kalemler){const urun=await Urun.findOne({_id:item.urunId,tenantId}).session(session);if(!urun)return res.status(404).json({basarili:false,mesaj:"Ürün bulunamadı."});const k=hesaplaKalem({urunId:urun._id,miktar:item.miktar,birimFiyat:item.birimFiyat??urun.satisFiyati,kdv:item.kdv??urun.kdv,iskonto:item.iskonto??urun.iskonto??0});if(!kalemGecerliMi(k))return res.status(400).json({basarili:false,mesaj:"Satış kalemi geçersiz."});yeniKalemler.push(k);araToplam+=k.araToplam;toplamKdv+=k.kdvTutari;genelToplam+=k.toplam;ihtiyac.set(String(urun._id),(ihtiyac.get(String(urun._id))||0)+k.miktar);}
+        if (genelToplam + 0.001 < Number(satis.odenenTutar || 0)) throw Object.assign(new Error("Yeni toplam alınan ödemeden az olamaz. Fazla ödeme için iade işlemi kullanın."), {status:409});
+        const musteri=await Musteri.findOne({_id:satis.musteriId,tenantId}).session(session);
+        if(!musteri) throw Object.assign(new Error("Müşteri bulunamadı."), {status:409});
         const eski=new Map();for(const k of satis.kalemler)eski.set(String(k.urunId),(eski.get(String(k.urunId))||0)+Number(k.miktar||0));
-        for(const [urunId,miktar] of eski){let stok=await Stok.findOne({tenantId,urunId,depoId});if(!stok)stok=new Stok({tenantId,urunId,depoId,miktar:0,maliyet:0});stok.miktar+=miktar;await stok.save();}
-        for(const [urunId,miktar] of ihtiyac){await require("../services/satisStokServisi").satisStokDus({tenantId,urunId,depoId,miktar});}
-        const musteri=await Musteri.findOne({_id:satis.musteriId,tenantId});musteri.bakiye-=Number(satis.kalanTutar||satis.genelToplam||0);musteri.bakiye+=genelToplam;await musteri.save();
-        await CariHareket.findOneAndUpdate({tenantId,kaynak:"SATIS",kaynakId:satis._id,tarafTipi:"MUSTERI"},{tutar:genelToplam,bakiyeDegisimi:genelToplam,aciklama:`Satış düzeltmesi ${body.belgeNo||satis.belgeNo}`,tarih:body.tarih||satis.tarih},{new:true});
+        for(const [urunId,miktar] of eski){let stok=await Stok.findOne({tenantId,urunId,depoId}).session(session);if(!stok)stok=new Stok({tenantId,urunId,depoId,miktar:0,maliyet:0});stok.miktar+=miktar;await stok.save({session});}
+        for(const [urunId,miktar] of ihtiyac){await require("../services/satisStokServisi").satisStokDus({tenantId,urunId,depoId,miktar,session});}
+        musteri.bakiye += genelToplam - Number(satis.genelToplam || 0); await musteri.save({session});
+        const delta = genelToplam - Number(satis.genelToplam || 0);
+        if (Math.abs(delta) > 0.000001) await CariHareket.create([{tenantId,tarafTipi:"MUSTERI",tarafId:musteri._id,tip:"DUZELTME",tutar:Math.abs(delta),bakiyeDegisimi:delta,oncekiBakiye:musteri.bakiye-delta,sonrakiBakiye:musteri.bakiye,kaynak:"SATIS_DUZELTME",kaynakId:satis._id,belgeNo:satis.belgeNo,tarih:new Date(),aciklama:"Satış düzeltmesi " + satis.belgeNo,kullaniciId:islemKullaniciId(req)}],{session});
         const degisenUrunler=new Set([...eski.keys(),...ihtiyac.keys()]);
-        for(const urunId of degisenUrunler){const fark=Number(eski.get(urunId)||0)-Number(ihtiyac.get(urunId)||0);if(Math.abs(fark)<0.000001)continue;const stok=await Stok.findOne({tenantId,urunId,depoId}).select("maliyet").lean();const maliyet=Number(stok?.maliyet||0);await StokHareket.create({tenantId,urunId,depoId,tip:fark>0?"SAYIM_ARTI":"SAYIM_EKSI",miktar:Math.abs(fark),tarih:body.tarih||satis.tarih,birimMaliyet:maliyet,maliyetDogrulandi:maliyet>0,maliyetKaynagi:"STOK_KARTI",kaynak:"SATIS_DUZELTME",kaynakId:satis._id,aciklama:`Satış ${satis.belgeNo} kalem düzeltmesi`,kullaniciId:req.kullanici?._id||req.user?._id||null});}
+        for(const urunId of degisenUrunler){const fark=Number(eski.get(urunId)||0)-Number(ihtiyac.get(urunId)||0);if(Math.abs(fark)<0.000001)continue;const stok=await Stok.findOne({tenantId,urunId,depoId}).session(session).select("maliyet").lean();const maliyet=Number(stok?.maliyet||0);await StokHareket.create([{tenantId,urunId,depoId,tip:fark>0?"SAYIM_ARTI":"SAYIM_EKSI",miktar:Math.abs(fark),tarih:body.tarih||satis.tarih,birimMaliyet:maliyet,maliyetDogrulandi:maliyet>0,maliyetKaynagi:"STOK_KARTI",kaynak:"SATIS_DUZELTME",kaynakId:satis._id,aciklama:`Satış ${satis.belgeNo} kalem düzeltmesi`,kullaniciId:islemKullaniciId(req)}], {session});}
         const eskiDeger=satis.toObject();
-        satis.belgeNo=String(body.belgeNo||satis.belgeNo).trim().toUpperCase();satis.tarih=body.tarih||satis.tarih;satis.kalemler=yeniKalemler;satis.araToplam=araToplam;satis.toplamKdv=toplamKdv;satis.genelToplam=genelToplam;satis.kalanTutar=genelToplam;satis.notlar=body.notlar??satis.notlar;satis.revizyonNo=Number(satis.revizyonNo||0)+1;satis.sonDuzeltmeTarihi=new Date();satis.sonDuzeltenKullaniciId=islemKullaniciId(req);await satis.save();
-        await auditKaydet({req,action:"SALE_CORRECTED",resource:"Satis",resourceId:String(satis._id),tenantId,category:"MUHASEBE_DUZELTME",severity:"UYARI",details:{islemId:String(satis._id),transactionId:req.transactionId,eskiDeger,yeniDeger:satis.toObject()}});
-        res.json({basarili:true,satis,musteriBakiye:musteri.bakiye});
-    }catch(error){next(error);}
+        satis.belgeNo=String(body.belgeNo||satis.belgeNo).trim().toUpperCase();satis.tarih=body.tarih||satis.tarih;satis.kalemler=yeniKalemler;satis.araToplam=araToplam;satis.toplamKdv=toplamKdv;satis.genelToplam=genelToplam;satis.kalanTutar=Math.max(0,genelToplam-Number(satis.odenenTutar||0));satis.odemeDurumu=satis.kalanTutar<=0?"ODENDI":Number(satis.odenenTutar||0)>0?"KISMI":"ACIK";satis.notlar=body.notlar??satis.notlar;satis.revizyonNo=Number(satis.revizyonNo||0)+1;satis.sonDuzeltmeTarihi=new Date();satis.sonDuzeltenKullaniciId=islemKullaniciId(req);await satis.save({session});
+        await require("../modules/platform/models/PlatformAuditLog").create([{tenantId,actorUserId:islemKullaniciId(req),action:"SALE_CORRECTED",resource:"Satis",resourceId:String(satis._id),category:"MUHASEBE_DUZELTME",severity:"UYARI",details:require("../modules/platform/services/platformGuvenligi").maskele({eskiDeger,yeniDeger:satis.toObject(),transactionId:req.transactionId})}],{session});
+        responseData = { satis, musteriBakiye:musteri.bakiye, eskiDeger, tenantId };
+        });
+        if (!responseData) return;
+        const {satis,musteriBakiye,eskiDeger,tenantId} = responseData;
+        res.json({basarili:true,satis,musteriBakiye});
+    }catch(error){next(error);}finally{await session.endSession();}
 }
 
 async function sil(req, res, next) {

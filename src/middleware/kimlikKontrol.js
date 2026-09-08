@@ -1,11 +1,11 @@
 const { tokenDogrula } = require("../services/tokenServisi");
-const { AUTH_COOKIE, cookieOku } = require("../services/oturumGuvenligi");
+const { cookieAdlari, cookieOku } = require("../services/oturumGuvenligi");
 
 async function kimlikKontrol(req, res, next) {
     try {
         const header = req.headers.authorization;
         const bearer = header?.startsWith("Bearer ") ? header.substring(7).trim() : "";
-        const cookieToken = cookieOku(req)[AUTH_COOKIE] || "";
+        const cookieToken = cookieOku(req)[cookieAdlari(req).auth] || "";
         const token = cookieToken || bearer;
         if (!token) return res.status(401).json({ basarili: false, mesaj: "Yetkilendirme tokenı gerekli." });
         const kullanici = tokenDogrula(token);

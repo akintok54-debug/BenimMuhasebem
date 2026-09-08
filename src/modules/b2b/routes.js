@@ -34,6 +34,10 @@ portal.get("/company/:slug", rateLimit({ pencereMs: 60000, limit: 30 }), run(asy
     if (!company || !await Customer.exists({ tenantId: company._id, aktif: true, "b2b.aktif": true })) throw s.hata("Firma bulunamadı.", 404);
     res.json({ basarili: true, firma: { unvan: company.firmaBilgileri?.unvan || company.name } });
 }));
+const authController = require("../auth/controllers/authController");
+portal.post("/auth/login", rateLimit({ pencereMs: 60000, limit: 15, anahtar: req => "b2b-login:" + req.ip }), (req, res) => { req.bayiOturumu = true; return authController.login(req, res); });
+portal.post("/auth/2fa-dogrula", rateLimit({ pencereMs: 60000, limit: 10, anahtar: req => "b2b-mfa:" + req.ip }), (req, res) => { req.bayiOturumu = true; return authController.ikiFaktorDogrula(req, res); });
+portal.post("/auth/logout", cookieCsrf, authController.logout);
 portal.use(cookieCsrf, kimlik, bayiKontrol, rateLimit({ pencereMs: 60000, limit: 120, anahtar: req => `b2b:${req.currentUser._id}` }));
 portal.get("/me", run(async (req, res) => {
     const c = req.bayi;

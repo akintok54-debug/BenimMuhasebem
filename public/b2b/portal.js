@@ -8,7 +8,7 @@
     let sessionRevision = 0, signingOut = false;
     const message = x => { $("message").textContent = x; };
     async function api(path, method = "GET", body) {
-        const csrf = document.cookie.split(";").map(x => x.trim()).find(x => x.startsWith("bm_csrf="))?.slice(8) || "";
+        const csrf = document.cookie.split(";").map(x => x.trim()).find(x => x.startsWith("bm_b2b_csrf="))?.slice(12) || "";
         const response = await fetch(path, { method, credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json", "X-CSRF-Token": decodeURIComponent(csrf) }, body: body === undefined ? undefined : JSON.stringify(body) });
         let data; try { data = await response.json(); } catch (_) { data = {}; }
         if (!response.ok || !data.basarili) throw Object.assign(new Error(data.mesaj || (response.status === 403 ? "Bayi erişimi kapalı veya bu işlem için yetkiniz yok." : "İşlem tamamlanamadı.")), { status: response.status });
@@ -63,8 +63,8 @@
         try { const stored = JSON.parse(sessionStorage.getItem("b2b-cart-" + me.kullanici.id) || "[]"); cart = Array.isArray(stored) ? stored.filter(x => /^[a-f\d]{24}$/i.test(x.urunId) && Number.isFinite(x.miktar) && x.miktar > 0).slice(0, 100) : []; } catch (_) { cart = []; }
         $("cartCount").textContent = cart.length; $("identity").textContent = (me.firma?.unvan || "") + " · " + me.cari.unvan; $("login").hidden = true; $("logout").hidden = false; $("portal").hidden = false; await render();
     }
-    $("loginForm").addEventListener("submit", async e => { e.preventDefault(); const button = e.submitter; button.disabled = true; try { const data = await api("/api/auth/login", "POST", Object.fromEntries(new FormData(e.target))); if (data.ikiFaktorGerekli) { challenge = data.challengeToken; $("mfaForm").hidden = false; $("loginForm").hidden = true; } else await start(); } catch (err) { message(err.message); } finally { button.disabled = false; } });
-    $("mfaForm").addEventListener("submit", async e => { e.preventDefault(); try { await api("/api/auth/2fa-dogrula", "POST", { challengeToken: challenge, kod: new FormData(e.target).get("kod") }); await start(); } catch (err) { message(err.message); } });
+    $("loginForm").addEventListener("submit", async e => { e.preventDefault(); const button = e.submitter; button.disabled = true; try { const data = await api("/api/b2b/auth/login", "POST", Object.fromEntries(new FormData(e.target))); if (data.ikiFaktorGerekli) { challenge = data.challengeToken; $("mfaForm").hidden = false; $("loginForm").hidden = true; } else await start(); } catch (err) { message(err.message); } finally { button.disabled = false; } });
+    $("mfaForm").addEventListener("submit", async e => { e.preventDefault(); try { await api("/api/b2b/auth/2fa-dogrula", "POST", { challengeToken: challenge, kod: new FormData(e.target).get("kod") }); await start(); } catch (err) { message(err.message); } });
     function showLogin() {
         sessionRevision++; revision++; me = null; cart = []; quote = null; key = ""; challenge = "";
         view.replaceChildren(); $("identity").textContent = ""; $("cartCount").textContent = "0";
@@ -76,7 +76,7 @@
         if (signingOut) return;
         signingOut = true; sessionRevision++; const button = $("logout"); button.disabled = true;
         try {
-            await api("/api/auth/logout", "POST", {});
+            await api("/api/b2b/auth/logout", "POST", {});
             try { if (me) sessionStorage.removeItem("b2b-cart-" + me.kullanici.id); } catch (_) {}
             showLogin(); message("Çıkış yapıldı. Yeniden giriş yapmak için bilgilerinizi girin.");
         } catch (e) { message("Çıkış tamamlanamadı: " + e.message); }
