@@ -73,7 +73,8 @@ test("Telefon oturumu kalici cookie, kayan profil yenilemesi ve yalniz gercek ye
     const erp = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
     const login = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "login.js"), "utf8");
     assert.match(auth, /const csrfToken = oturumCookieYaz\(res, tokenOlustur\(p\)\)/);
-    assert.match(erp, /sessionStorage\.getItem\("bmCsrfToken"\) \|\| cookieDegeri\("bm_csrf"\)/);
+    assert.match(erp, /const csrf = cookieDegeri\("bm_csrf"\)/);
+    assert.doesNotMatch(erp, /sessionStorage\.getItem\("bmCsrfToken"\)/);
     assert.match(erp, /\[401, 403\]\.includes\(Number\(error\?\.status\)\)/);
     assert.match(login, /fetch\("\/api\/auth\/profil", \{ headers: \{ Accept: "application\/json" \}, credentials: "include" \}\)/);
     assert.match(login, /mevcutOturumuKontrolEt\(\)/);
