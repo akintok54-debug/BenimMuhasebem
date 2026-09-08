@@ -1,5 +1,6 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
+const { telefonNormalize } = require("../../utils/kullaniciKimligi");
 const kimlik = require("../../middleware/kimlikKontrol");
 const tenant = require("../../middleware/tenantKontrol");
 const { rateLimit } = require("../../middleware/guvenlikKatmani");
@@ -24,19 +25,27 @@ const literal = x => String(x || "").slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g
 const orderFields = "siparisNo belgeNo tarih durum kalemler araToplam toplamKdv genelToplam paraBirimi satisId sevkAdresi odemeKosullari odemeDurumu odenenTutar kalanTutar";
 function documentQuery(Model, req, id) {
     return Model.findOne({ ...kapsam(req), _id: s.oid(id) }).select(orderFields)
-        .populate({ path: "kalemler.urunId", match: { tenantId: req.tenantId }, select: "ad kod barkod birim" }).lean();
+        .populate({ path: "kalemler.urunId", match: { tenantId: req.tenantId }, select: req.bayi.b2b.gorunum?.barkod === true ? "ad kod barkod birim" : "ad kod birim" }).lean();
 }
+portal.get("/company/:slug", rateLimit({ pencereMs: 60000, limit: 30 }), run(async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    if (!/^[a-z0-9-]{1,100}$/.test(req.params.slug)) throw s.hata("Firma bulunamadı.", 404);
+    const company = await require("../platform/models/Tenant").findOne({ slug: req.params.slug, $or: [{ status: "active" }, { status: "trial", trialEndsAt: { $gt: new Date() } }] }).select("_id name firmaBilgileri.unvan").lean();
+    if (!company || !await Customer.exists({ tenantId: company._id, aktif: true, "b2b.aktif": true })) throw s.hata("Firma bulunamadı.", 404);
+    res.json({ basarili: true, firma: { unvan: company.firmaBilgileri?.unvan || company.name } });
+}));
 portal.use(cookieCsrf, kimlik, bayiKontrol, rateLimit({ pencereMs: 60000, limit: 120, anahtar: req => `b2b:${req.currentUser._id}` }));
 portal.get("/me", run(async (req, res) => {
     const c = req.bayi;
     const company = await require("../platform/models/Tenant").findById(req.tenantId).select("name firmaBilgileri.unvan firmaBilgileri.vergiDairesi firmaBilgileri.vergiNo firmaBilgileri.adres firmaBilgileri.telefon").lean();
     res.json({ basarili: true, firma: { unvan: company?.firmaBilgileri?.unvan || company?.name, vergiDairesi: company?.firmaBilgileri?.vergiDairesi, vergiNo: company?.firmaBilgileri?.vergiNo, adres: company?.firmaBilgileri?.adres, telefon: company?.firmaBilgileri?.telefon }, kullanici: { id: req.currentUser._id, adSoyad: req.currentUser.adSoyad, email: req.currentUser.email },
-        cari: { unvan: c.unvan || c.adSoyad, kod: c.kod, adres: c.adres, vergiNo: c.vergiNo, vergiDairesi: c.vergiDairesi, bakiye: c.bakiye, vadeGun: c.vadeGun, limit: c.limit, riskLimiti: c.riskLimiti, siparisYetkisi: c.b2b.siparisYetkisi, minimumSiparis: c.b2b.minimumSiparis }, favoriler: req.currentUser.favoriler || [] });
+        cari: { unvan: c.unvan || c.adSoyad, kod: c.kod, adres: c.adres, vergiNo: c.vergiNo, vergiDairesi: c.vergiDairesi, bakiye: c.bakiye, vadeGun: c.vadeGun, limit: c.limit, riskLimiti: c.riskLimiti, siparisYetkisi: c.b2b.siparisYetkisi, minimumSiparis: c.b2b.minimumSiparis, gorunum: c.b2b.gorunum || {} }, favoriler: req.currentUser.favoriler || [] });
 }));
 portal.get("/catalog", run(async (req, res) => {
+    const visibility = req.bayi.b2b.gorunum || {};
     const filter = { tenantId: req.tenantId, aktif: true };
-    if (req.query.q) filter.$or = ["ad", "kod", "barkod"].map(k => ({ [k]: { $regex: literal(req.query.q), $options: "i" } }));
-    if (req.query.exact === "1" && req.query.q) filter.$or = [{ kod: String(req.query.q).slice(0, 100).toUpperCase() }, { barkod: String(req.query.q).slice(0, 100) }];
+    if (req.query.q) filter.$or = ["ad", "kod", ...(visibility.barkod === true ? ["barkod"] : [])].map(k => ({ [k]: { $regex: literal(req.query.q), $options: "i" } }));
+    if (req.query.exact === "1" && req.query.q) filter.$or = [{ kod: String(req.query.q).slice(0, 100).toUpperCase() }, ...(visibility.barkod === true ? [{ barkod: String(req.query.q).slice(0, 100) }] : [])];
     for (const key of ["kategori", "marka"]) if (req.query[key]) filter[key] = String(req.query[key]).slice(0, 100);
     if (req.query.favorites === "1") filter._id = { $in: req.currentUser.favoriler || [] };
     const [products, total, categories, brands, group, depot] = await Promise.all([
@@ -48,7 +57,7 @@ portal.get("/catalog", run(async (req, res) => {
     if (req.bayi.b2b.grupId && !group) throw s.hata("Fiyat grubu kontrol edilmeli.", 409);
     const stocks = depot ? await Stock.find({ tenantId: req.tenantId, depoId: depot._id, urunId: { $in: products.map(x => x._id) } }).select("urunId miktar").lean() : [];
     const map = new Map(stocks.map(x => [String(x.urunId), x.miktar]));
-    res.json({ basarili: true, total, page: page(req), categories, brands, depo: depot?.ad || null, products: products.map(x => ({ _id: x._id, ad: x.ad, kod: x.kod, barkod: x.barkod, kategori: x.kategori, marka: x.marka, birim: x.birim, gorsel: x.gorsel, kdv: x.kdv, paraBirimi: x.paraBirimi, netFiyat: s.netFiyat(x, req.bayi, group), stok: depot ? map.get(String(x._id)) || 0 : null })) });
+    res.json({ basarili: true, total, page: page(req), categories, brands, depo: visibility.depo === true ? depot?.ad || null : null, products: products.map(x => ({ _id: x._id, ad: x.ad, kod: x.kod, ...(visibility.barkod === true ? { barkod: x.barkod } : {}), kategori: x.kategori, marka: x.marka, birim: x.birim, ...(visibility.gorsel === true ? { gorsel: x.gorsel } : {}), kdv: x.kdv, paraBirimi: x.paraBirimi, ...(visibility.katalogFiyati === true ? { netFiyat: s.netFiyat(x, req.bayi, group) } : {}), ...(visibility.stok === true ? { stok: depot ? map.get(String(x._id)) || 0 : null } : {}) })) });
 }));
 portal.put("/favorites/:id", run(async (req, res) => {
     const id = s.oid(req.params.id);
@@ -80,7 +89,8 @@ admin.get("/", run(async (req, res) => {
         Customer.find({ ...filter, ...(req.query.q ? { $or: ["unvan", "adSoyad", "kod"].map(k => ({ [k]: { $regex: literal(req.query.q), $options: "i" } })) } : {}) }).select("kod unvan adSoyad aktif b2b limit riskLimiti vadeGun").sort({ "b2b.aktif": -1, kod: 1 }).skip(page(req) * 50).limit(50).lean(),
         Group.find(filter).sort({ ad: 1 }).lean(), Depot.find({ ...filter, aktif: true }).select("ad kod").lean(), User.find({ ...filter, rol: "BAYI", silinmeTarihi: null }).select("adSoyad email musteriId aktif sonGirisTarihi").limit(1000).lean()
     ]);
-    res.json({ basarili: true, customers, groups, depots, users });
+    const company = await require("../platform/models/Tenant").findById(req.tenantId).select("slug").lean();
+    res.json({ basarili: true, customers, groups, depots, users, portalPath: company?.slug ? "/b2b/?firma=" + encodeURIComponent(company.slug) : "/b2b/" });
 }));
 async function saveGroup(req, res) {
     const fields = { ad: s.metin(req.body.ad, 80), iskonto: s.sayi(req.body.iskonto, 0, 100), fiyatlar: await s.fiyatListesiDogrula(req.tenantId, req.body.fiyatlar || []) };
@@ -93,6 +103,13 @@ async function saveGroup(req, res) {
 admin.post("/groups", run(saveGroup)); admin.patch("/groups/:id", run(saveGroup));
 admin.patch("/customers/:id", run(async (req, res) => {
     const body = req.body, fields = {};
+    if (body.gorunum !== undefined) {
+        if (!body.gorunum || typeof body.gorunum !== "object" || Array.isArray(body.gorunum)) throw s.hata("Görünürlük izinleri geçersiz.");
+        for (const key of ["stok", "katalogFiyati", "barkod", "gorsel", "depo"]) {
+            if (typeof body.gorunum[key] !== "boolean") throw s.hata("Görünürlük izinleri geçersiz.");
+            fields[`b2b.gorunum.${key}`] = body.gorunum[key];
+        }
+    }
     for (const k of ["aktif", "siparisYetkisi", "negatifStok"]) { if (typeof body[k] !== "boolean") throw s.hata("Bayi seçenekleri geçersiz."); fields[`b2b.${k}`] = body[k]; }
     for (const k of ["limit", "riskLimiti", "vadeGun"]) fields[k] = s.sayi(body[k], 0, k === "vadeGun" ? 3650 : 1e12);
     fields["b2b.minimumSiparis"] = s.sayi(body.minimumSiparis);
@@ -114,10 +131,13 @@ admin.post("/customers/:id/users", run(async (req, res) => {
     const adSoyad = s.metin(body.adSoyad, 100), email = s.metin(body.email, 254).toLowerCase(), password = typeof body.sifre === "string" ? body.sifre : "";
     if (adSoyad.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 12 || password.length > 128) throw s.hata("Ad, e-posta ve en az 12 karakterli parola gerekli.");
     if (await User.exists({ email })) throw Object.assign(s.hata("Bu e-posta zaten bir kullanıcı hesabında kayıtlı. Bayi için farklı bir e-posta kullanın; mevcut hesabın rolü değiştirilmedi.", 409), { kod: "B2B_EMAIL_IN_USE" });
+    const phone = telefonNormalize(body.telefon);
+    if (body.telefon && (typeof body.telefon !== "string" || !/^90[5][0-9]{9}$/.test(phone))) throw s.hata("Geçerli bir Türkiye cep telefonu girin.");
+    if (phone && await User.exists({ telefonNormalize: phone })) throw Object.assign(s.hata("Bu telefon başka bir kullanıcı hesabında kayıtlı.", 409), { kod: "B2B_PHONE_IN_USE" });
     const plan = await require("../platform/models/Tenant").findById(req.tenantId).select("limits.users").lean();
     const limit = Number(plan?.limits?.users || 0);
     if (limit > 0 && await User.countDocuments({ tenantId: req.tenantId, silinmeTarihi: null }) >= limit) throw Object.assign(s.hata(`Paketinizin ${limit} kullanıcı limiti dolu. Kullanıcı/paket ayarlarınızı kontrol edin.`, 409), { kod: "B2B_USER_LIMIT" });
-    const user = await User.create({ tenantId: req.tenantId, musteriId: customerId, adSoyad, email, sifre: await bcrypt.hash(password, 12), rol: "BAYI", aktif: true, ozelYetkiler: [], yetkiModu: "ROL" });
+    const user = await User.create({ tenantId: req.tenantId, musteriId: customerId, adSoyad, email, ...(phone ? { telefon: phone, telefonNormalize: phone } : {}), sifre: await bcrypt.hash(password, 12), rol: "BAYI", aktif: true, ozelYetkiler: [], yetkiModu: "ROL" });
     await kaydet({ req, tenantId: req.tenantId, action: "B2B_USER_CREATED", resource: "Kullanici", resourceId: user._id });
     res.status(201).json({ basarili: true, kullanici: { _id: user._id, email: user.email } });
 }));

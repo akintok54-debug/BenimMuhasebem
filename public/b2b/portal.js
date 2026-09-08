@@ -26,7 +26,7 @@
         const d = await api("/api/b2b/catalog?" + query); if (turn !== revision) return;
         catalogItems = d.products;
         const options = (values, selected) => '<option value="">Tümü</option>' + values.filter(Boolean).sort().map(x => `<option ${selected === x ? "selected" : ""}>${esc(x)}</option>`).join("");
-        view.innerHTML = `<p class="eyebrow">SİZE ÖZEL FİYATLAR</p><h1>${current === "favorites" ? "Favorilerim" : "Ürün kataloğu"}</h1><p>${d.total} ürün · ${esc(d.depo || "Depo tanımlanmamış")} · Net birim fiyatlar KDV hariçtir. Stok sipariş anında tekrar kontrol edilir.</p><form id="search" class="filters"><label>Ürün adı, kod veya barkod<input name="q" value="${esc(filter.q)}" placeholder="Ürün ara…"></label><label>Kategori<select name="kategori">${options(d.categories, filter.kategori)}</select></label><label>Marka<select name="marka">${options(d.brands, filter.marka)}</select></label><button>Ara</button></form><details><summary>Hızlı sipariş: kod / barkod ile ekle</summary><form id="quick"><label>Her satıra kod veya barkod; miktar<textarea name="lines" rows="4" placeholder="URUN001; 2" required></textarea></label><button>Sepete ekle</button></form></details><div class="cards">${d.products.map(x => `<article class="product">${image(x.gorsel)}<p>${esc(x.marka)} · ${esc(x.kategori)}</p><h3>${esc(x.ad)}</h3><p>Kod: ${esc(x.kod)}<br>Barkod: ${esc(x.barkod || "—")}</p><span class="pill">Stok: ${x.stok === null ? "Tanımsız" : qty(x.stok)} ${esc(x.birim)}</span><div class="price">${money(x.netFiyat, x.paraBirimi)}</div><p>KDV %${qty(x.kdv)} hariç</p><div class="actions"><button class="primary" data-add="${x._id}" ${!me.cari.siparisYetkisi || x.paraBirimi !== "TRY" ? "disabled" : ""}>Sepete ekle</button><button data-favorite="${x._id}" aria-label="Favori durumunu değiştir">${me.favoriler.includes(x._id) ? "★" : "☆"}</button></div>${x.paraBirimi !== "TRY" ? '<p>Dövizli ürün için firma ile görüşün.</p>' : ""}</article>`).join("") || empty("Aramanıza uygun ürün bulunamadı.")}</div>${pager((listPage + 1) * 24 < d.total)}`;
+        view.innerHTML = `<p class="eyebrow">SİZE ÖZEL FİYATLAR</p><h1>${current === "favorites" ? "Favorilerim" : "Ürün kataloğu"}</h1><p>${d.total} ürün · ${esc(d.depo || "Bayi kataloğu")} · Net birim fiyatlar KDV hariçtir. Stok sipariş anında tekrar kontrol edilir.</p><form id="search" class="filters"><label>Ürün adı, kod veya barkod<input name="q" value="${esc(filter.q)}" placeholder="Ürün ara…"></label><label>Kategori<select name="kategori">${options(d.categories, filter.kategori)}</select></label><label>Marka<select name="marka">${options(d.brands, filter.marka)}</select></label><button>Ara</button></form><details><summary>Hızlı sipariş: kod / barkod ile ekle</summary><form id="quick"><label>Her satıra kod veya barkod; miktar<textarea name="lines" rows="4" placeholder="URUN001; 2" required></textarea></label><button>Sepete ekle</button></form></details><div class="cards">${d.products.map(x => `<article class="product">${image(x.gorsel) === '<div class="image-placeholder" aria-hidden="true">▦</div>' ? image(x.gorsel) : `<button type="button" class="product-image" data-preview="${esc(x._id)}" aria-label="${esc(x.ad)} resmini büyüt">${image(x.gorsel)}<span>Yakından incele ⤢</span></button>`}<p>${esc(x.marka)} · ${esc(x.kategori)}</p><h3>${esc(x.ad)}</h3><p>Kod: ${esc(x.kod)}${x.barkod !== undefined ? `<br>Barkod: ${esc(x.barkod || "—")}` : ""}</p>${x.stok !== undefined ? `<span class="pill">Stok: ${x.stok === null ? "Tanımsız" : qty(x.stok)} ${esc(x.birim)}</span>` : ""}${x.netFiyat !== undefined ? `<div class="price">${money(x.netFiyat, x.paraBirimi)}</div><p>KDV %${qty(x.kdv)} hariç</p>` : `<p>Fiyatı sipariş onayında görebilirsiniz.</p>`}<div class="actions"><button class="primary" data-add="${x._id}" ${!me.cari.siparisYetkisi || x.paraBirimi !== "TRY" ? "disabled" : ""}>Sepete ekle</button><button data-favorite="${x._id}" aria-label="Favori durumunu değiştir">${me.favoriler.includes(x._id) ? "★" : "☆"}</button></div>${x.paraBirimi !== "TRY" ? '<p>Dövizli ürün için firma ile görüşün.</p>' : ""}</article>`).join("") || empty("Aramanıza uygun ürün bulunamadı.")}</div>${pager((listPage + 1) * 24 < d.total)}`;
     }
     async function renderCart(turn) {
         if (!cart.length) { view.innerHTML = '<h1>Sepetim</h1>' + empty("Sepetiniz boş. Katalogdan ürün ekleyin."); return; }
@@ -59,16 +59,30 @@
     async function start() {
         const d = await api("/api/b2b/me"); me = d;
         try { const stored = JSON.parse(sessionStorage.getItem("b2b-cart-" + me.kullanici.id) || "[]"); cart = Array.isArray(stored) ? stored.filter(x => /^[a-f\d]{24}$/i.test(x.urunId) && Number.isFinite(x.miktar) && x.miktar > 0).slice(0, 100) : []; } catch (_) { cart = []; }
-        $("cartCount").textContent = cart.length; $("identity").textContent = me.cari.unvan; $("login").hidden = true; $("logout").hidden = false; $("portal").hidden = false; await render();
+        $("cartCount").textContent = cart.length; $("identity").textContent = (me.firma?.unvan || "") + " · " + me.cari.unvan; $("login").hidden = true; $("logout").hidden = false; $("portal").hidden = false; await render();
     }
     $("loginForm").addEventListener("submit", async e => { e.preventDefault(); const button = e.submitter; button.disabled = true; try { const data = await api("/api/auth/login", "POST", Object.fromEntries(new FormData(e.target))); if (data.ikiFaktorGerekli) { challenge = data.challengeToken; $("mfaForm").hidden = false; $("loginForm").hidden = true; } else await start(); } catch (err) { message(err.message); } finally { button.disabled = false; } });
     $("mfaForm").addEventListener("submit", async e => { e.preventDefault(); try { await api("/api/auth/2fa-dogrula", "POST", { challengeToken: challenge, kod: new FormData(e.target).get("kod") }); await start(); } catch (err) { message(err.message); } });
     $("logout").addEventListener("click", async () => { try { await api("/api/auth/logout", "POST", {}); location.reload(); } catch (e) { message(e.message); } });
+    const imageDialog = $("productImageDialog");
+    $("closeProductImage").addEventListener("click", () => imageDialog.close());
+    imageDialog.addEventListener("click", e => { if (e.target === imageDialog) { const r = imageDialog.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) imageDialog.close(); } });
+    imageDialog.addEventListener("close", () => $("productImageBody").replaceChildren());
+    $("productImageBody").addEventListener("error", e => { if (e.target.tagName === "IMG") $("productImageBody").textContent = "Ürün resmi yüklenemedi."; }, true);
     $("closeDetail").addEventListener("click", () => $("detail").close()); $("printDetail").addEventListener("click", () => window.print());
     document.querySelector(".b2b-nav").addEventListener("click", e => { const b = e.target.closest("[data-view]"); if (b) { current = b.dataset.view; listPage = 0; render(); } });
     view.addEventListener("click", async e => {
         const b = e.target.closest("button"); if (!b) return;
         try {
+            if (b.dataset.preview) {
+                const product = catalogItems.find(x => String(x._id) === b.dataset.preview);
+                if (!product) return;
+                $("productImageTitle").textContent = product.ad;
+                $("productImageInfo").textContent = [product.kod, ...(product.netFiyat !== undefined ? [money(product.netFiyat, product.paraBirimi) + " + KDV"] : []), ...(product.stok !== undefined ? ["Stok: " + (product.stok === null ? "Tanımsız" : qty(product.stok) + " " + product.birim)] : [])].join(" · ");
+                $("productImageBody").innerHTML = image(product.gorsel);
+                $("productImageBody").querySelector("img")?.setAttribute("alt", product.ad);
+                $("productImageDialog").showModal(); return;
+            }
             if (b.dataset.add) { add(b.dataset.add); return; }
             if (b.dataset.favorite) { const id = b.dataset.favorite, active = !me.favoriler.includes(id); await api("/api/b2b/favorites/" + id, "PUT", { aktif: active }); me.favoriler = active ? [...me.favoriler, id] : me.favoriler.filter(x => x !== id); b.textContent = active ? "★" : "☆"; return; }
             if (b.dataset.remove) { cart = cart.filter(x => x.urunId !== b.dataset.remove); remember(); await render(); return; }
@@ -87,7 +101,7 @@
             if (e.target.id === "quick") {
                 const lines = fields.lines.split(/\r?\n/).filter(x => x.trim()); if (lines.length > 100) throw new Error("En fazla 100 satır ekleyin.");
                 const resolved = [];
-                for (const line of lines) { const [code, value = "1"] = line.split(";").map(x => x.trim()); const amount = Number(value.replace(",", ".")); if (!Number.isFinite(amount) || amount <= 0) throw new Error("Miktar geçersiz: " + code); const d = await api("/api/b2b/catalog?exact=1&q=" + encodeURIComponent(code)); const p = d.products.find(x => x.kod.toLocaleUpperCase("tr-TR") === code.toLocaleUpperCase("tr-TR") || x.barkod === code); if (!p) throw new Error("Kod/barkod bulunamadı: " + code); resolved.push({ id: p._id, amount }); }
+                for (const line of lines) { const [code, value = "1"] = line.split(";").map(x => x.trim()); const amount = Number(value.replace(",", ".")); if (!Number.isFinite(amount) || amount <= 0) throw new Error("Miktar geçersiz: " + code); const d = await api("/api/b2b/catalog?exact=1&q=" + encodeURIComponent(code)); const p = d.products.find(x => String(x.kod || "").toLocaleUpperCase("tr-TR") === code.toLocaleUpperCase("tr-TR") || x.barkod === code); if (!p) throw new Error("Kod/barkod bulunamadı: " + code); resolved.push({ id: p._id, amount }); }
                 resolved.forEach(x => add(x.id, x.amount)); current = "cart"; await render();
             }
             if (e.target.id === "checkout") {
@@ -95,5 +109,10 @@
             }
         } catch (err) { message(err.message); } finally { if (b) b.disabled = false; }
     });
+    const companySlug = new URLSearchParams(location.search).get("firma");
+    if (companySlug) api("/api/b2b/company/" + encodeURIComponent(companySlug)).then(data => {
+        $("companyName").textContent = data.firma.unvan;
+        document.title = data.firma.unvan + " · Bayi Portalı";
+    }).catch(e => message(e.message));
     start().catch(e => { if (![401, 403].includes(e.status)) message(e.message); });
 })();

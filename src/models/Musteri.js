@@ -142,6 +142,13 @@ const MusteriSchema = new mongoose.Schema(
         },
 
         b2b: {
+            gorunum: {
+                stok: { type: Boolean, default: false },
+                katalogFiyati: { type: Boolean, default: false },
+                barkod: { type: Boolean, default: false },
+                gorsel: { type: Boolean, default: false },
+                depo: { type: Boolean, default: false }
+            },
             aktif: { type: Boolean, default: false },
             siparisYetkisi: { type: Boolean, default: true },
             grupId: { type: mongoose.Schema.Types.ObjectId, ref: "BayiGrubu", default: null },

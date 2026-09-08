@@ -30,6 +30,14 @@ test("B2B HTTP authentication, isolation and privacy", async t => {
     const base = "http://127.0.0.1:" + server.address().port;
     const token = tokenOlustur({ kullaniciId: userId, tenantId, rol: "BAYI" });
     const request = (path, body, extra = {}) => fetch(base + path, { method: body ? "POST" : "GET", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json", ...extra }, body: body ? JSON.stringify(body) : undefined });
+    await t.test("public company branding exposes only company name and requires active B2B", async tt => {
+        tt.mock.method(Tenant, "findOne", filter => { assert.equal(filter.slug, "akn-motosiklet"); assert.ok(filter.$or); return q({ _id: tenantId, name: "AKN", firmaBilgileri: { unvan: "AKN Motosiklet", vergiNo: "private" } }); });
+        let active = true;
+        tt.mock.method(Customer, "exists", filter => { assert.equal(String(filter.tenantId), tenantId); assert.equal(filter["b2b.aktif"], true); return Promise.resolve(active); });
+        const response = await request("/api/b2b/company/akn-motosiklet");
+        assert.equal(response.status, 200); assert.deepEqual(await response.json(), { basarili: true, firma: { unvan: "AKN Motosiklet" } });
+        active = false; assert.equal((await request("/api/b2b/company/akn-motosiklet")).status, 404);
+    });
     await t.test("existing real password login issues a dealer session", async () => {
         const r = await request("/api/auth/login", { email: user.email, sifre: "correct-test-password" }); assert.equal(r.status, 200);
         const d = await r.json(); assert.equal(d.kullanici.rol, "BAYI"); assert.match(r.headers.get("set-cookie"), /HttpOnly/i); assert.ok(!JSON.stringify(d).includes(hash));
@@ -67,8 +75,13 @@ test("B2B HTTP authentication, isolation and privacy", async t => {
         tt.mock.method(Product, "countDocuments", async () => 1); tt.mock.method(Product, "distinct", async () => []);
         tt.mock.method(Depot, "findOne", filter => { assert.equal(String(filter.tenantId), tenantId); assert.equal(String(filter._id), depotId); return q({ _id: depotId, ad: "Main" }); });
         tt.mock.method(Stock, "find", filter => { assert.equal(String(filter.tenantId), tenantId); assert.equal(String(filter.depoId), depotId); return q([{ urunId: productId, miktar: -3 }]); });
+        customer.b2b.gorunum = { stok: true, katalogFiyati: true, barkod: true, gorsel: true, depo: true };
         const d = await (await request("/api/b2b/catalog?tenantId=" + foreignId)).json();
         assert.equal(d.products[0].netFiyat, 100); assert.equal(d.products[0].stok, -3);
+        customer.b2b.gorunum = {};
+        const hidden = await (await request("/api/b2b/catalog?stok=true&katalogFiyati=true")).json();
+        for (const field of ["stok", "netFiyat", "barkod", "gorsel"]) assert.ok(!(field in hidden.products[0]));
+        assert.equal(hidden.depo, null);
         for (const field of ["alisFiyati", "satisFiyati", "bayiFiyati", "fiyatlar", "tenantId"]) assert.ok(!(field in d.products[0]));
     });
     await t.test("admin group writes use the authenticated tenant and reject foreign references", async tt => {
@@ -95,16 +108,19 @@ test("B2B HTTP authentication, isolation and privacy", async t => {
             tt.mock.method(User, "countDocuments", async () => 0);
             tt.mock.method(User, "create", async fields => {
                 if (race) throw Object.assign(new Error("Duplicate"), { code: 11000, keyPattern: { email: 1 } });
+                assert.equal(fields.telefonNormalize, "905051234567");
                 creates++; assert.equal(fields.rol, "BAYI"); assert.equal(String(fields.musteriId), customerId); assert.equal(String(fields.tenantId), tenantId);
                 assert.equal(await bcrypt.compare(" exact-test-password ", fields.sifre), true);
                 return { _id: foreignId, email: fields.email };
             });
-            const body = { adSoyad: "Dealer User", email: "dealer-new@example.test", sifre: " exact-test-password " };
+            const body = { adSoyad: "Dealer User", email: "dealer-new@example.test", telefon: "0505 123 45 67", sifre: " exact-test-password " };
             const conflict = await request(`/api/tenant/b2b/customers/${customerId}/users`, body, headers);
             assert.equal(conflict.status, 409); assert.equal((await conflict.json()).kod, "B2B_EMAIL_IN_USE"); assert.equal(creates, 0); assert.equal(user.rol, "OWNER");
             duplicate = false;
             const created = await request(`/api/tenant/b2b/customers/${customerId}/users`, body, headers);
             assert.equal(created.status, 201); assert.equal(creates, 1); assert.equal((await created.json()).kullanici.email, body.email);
+            const invalidPhone = await request(`/api/tenant/b2b/customers/${customerId}/users`, { ...body, telefon: "123" }, headers);
+            assert.equal(invalidPhone.status, 400);
             race = true;
             const raced = await request(`/api/tenant/b2b/customers/${customerId}/users`, body, headers);
             assert.equal(raced.status, 409); assert.equal((await raced.json()).kod, "B2B_EMAIL_IN_USE");

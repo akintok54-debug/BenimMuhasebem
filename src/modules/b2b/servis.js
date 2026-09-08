@@ -51,7 +51,7 @@ async function teklif(tenantId, customer, items, session = null) {
         if (urunler.some(x => (stocks.get(String(x._id)) || 0) - (allocated.get(String(x._id)) || 0) < amounts.get(String(x._id)))) throw hata("Seçili depoda bekleyen siparişler sonrası yeterli stok yok.", 409);
     }
     const result = hesapla(urunler.map(x => ({ urunId: x._id, miktar: amounts.get(String(x._id)), birimFiyat: netFiyat(x, customer, grup), kdv: sayi(x.kdv, 0, 100), iskonto: 0 })));
-    return { ...result, fiyatOnayi: crypto.createHash("sha256").update(JSON.stringify(result.kalemler)).digest("hex"), depoId: depo._id, paraBirimi: "TRY", urunler: urunler.map(x => ({ _id: x._id, ad: x.ad, kod: x.kod, birim: x.birim, stok: stocks.get(String(x._id)) || 0 })) };
+    return { ...result, fiyatOnayi: crypto.createHash("sha256").update(JSON.stringify(result.kalemler)).digest("hex"), depoId: depo._id, paraBirimi: "TRY", urunler: urunler.map(x => ({ _id: x._id, ad: x.ad, kod: x.kod, birim: x.birim, ...(customer.b2b.gorunum?.stok === true ? { stok: stocks.get(String(x._id)) || 0 } : {}) })) };
 }
 function siparisNo(userId, key) {
     if (typeof key !== "string" || !/^[a-zA-Z0-9-]{16,80}$/.test(key)) throw hata("Sipariş işlem anahtarı gerekli.");
