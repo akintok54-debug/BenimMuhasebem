@@ -92,7 +92,7 @@
         }
 
         if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
-            const csrf = sessionStorage.getItem("bmCsrfToken") || cookieDegeri("bm_csrf");
+            const csrf = cookieDegeri("bm_csrf");
             if (csrf) headers["X-CSRF-Token"] = csrf;
         }
 
@@ -102,12 +102,9 @@
             headers["Idempotency-Key"] = String(options.transactionId || bodyTransactionId || globalThis.crypto?.randomUUID?.() || `tx-${Date.now()}-${Math.random().toString(36).slice(2)}`);
         }
 
-        const t = token();
-        if (t) {
-            headers.Authorization = t.startsWith("Bearer ")
-                ? t
-                : `Bearer ${t}`;
-        }
+        // Browser ERP requests use only the current ERP HttpOnly cookie.
+        delete headers.Authorization;
+        delete headers.authorization;
 
         const istek = (async () => {
             const response = await fetch(url, {

@@ -39,7 +39,7 @@ test("B2B HTTP authentication, isolation and privacy", async t => {
         active = false; assert.equal((await request("/api/b2b/company/akn-motosiklet")).status, 404);
     });
     await t.test("existing real password login issues a dealer session", async () => {
-        const r = await request("/api/auth/login", { email: user.email, sifre: "correct-test-password" }); assert.equal(r.status, 200);
+        const r = await request("/api/b2b/auth/login", { email: user.email, sifre: "correct-test-password" }); assert.equal(r.status, 200);
         const d = await r.json(); assert.equal(d.kullanici.rol, "BAYI"); assert.match(r.headers.get("set-cookie"), /HttpOnly/i); assert.ok(!JSON.stringify(d).includes(hash));
     });
     await t.test("anonymous cannot access catalog", async () => { assert.equal((await fetch(base + "/api/b2b/catalog")).status, 401); });
@@ -47,6 +47,8 @@ test("B2B HTTP authentication, isolation and privacy", async t => {
         for (const path of ["/api/tenant/dashboard", "/api/tenant/musteriler", "/api/tenant/urunler", "/api/tenant/siparisler", "/api/tenant/b2b/", "/api/auth/verilerim", "/api/platform/notifications"]) assert.equal((await request(path)).status, 403, path);
     });
     await t.test("dealer and ERP cookies are independent", async () => {
+        const rejected = await request("/api/auth/login", {email:user.email,sifre:"correct-test-password"});
+        assert.equal(rejected.status,403); assert.equal(rejected.headers.get("set-cookie"),null);
         const staffToken = tokenOlustur({ kullaniciId: foreignId, tenantId, rol: "OWNER" });
         const headers = { Authorization: "", Cookie: 'bm_session=' + staffToken + '; bm_b2b_session=' + token + '; bm_csrf=staff; bm_b2b_csrf=dealer' };
         assert.equal((await request('/api/b2b/me', null, headers)).status, 200);
