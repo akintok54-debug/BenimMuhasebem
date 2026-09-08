@@ -125,7 +125,7 @@ async function sifremiUnuttum(req, res) {
             k.sifreSifirlama = { tokenHash: crypto.createHash("sha256").update(token).digest("hex"), sonKullanmaTarihi: new Date(Date.now() + 20 * 60 * 1000) };
             await k.save();
             const origin = String(process.env.PUBLIC_APP_URL || `${req.protocol}://${req.get("host")}`).replace(/\/$/, "");
-            const result = await sifreSifirlamaEpostasiGonder({ email: k.email, adSoyad: k.adSoyad, resetUrl: `${origin}/erp/sifre-yenile.html?token=${token}` });
+            const result = await sifreSifirlamaEpostasiGonder({ email: k.email, adSoyad: k.adSoyad, resetUrl: k.rol === "BAYI" ? `${origin}/b2b/sifre.html#token=${token}` : `${origin}/erp/sifre-yenile.html?token=${token}` });
             if (!result.gonderildi) console.warn("PASSWORD_RESET_EMAIL_DISABLED", { reason: result.neden });
         }
         return res.json({ basarili: true, mesaj: genelMesaj });
