@@ -5,6 +5,7 @@
     const money = (x, currency) => BelgeSunum.para(x, currency), qty = x => BelgeSunum.miktar(x);
     const date = x => new Date(x).toLocaleDateString("tr-TR");
     let me, cart = [], current = "catalog", listPage = 0, filter = { q: "", kategori: "", marka: "" }, catalogItems = [], quote, challenge = "", key = "", revision = 0;
+    let sessionRevision = 0, signingOut = false;
     const message = x => { $("message").textContent = x; };
     async function api(path, method = "GET", body) {
         const csrf = document.cookie.split(";").map(x => x.trim()).find(x => x.startsWith("bm_csrf="))?.slice(8) || "";
@@ -57,13 +58,31 @@
         $("detail").showModal();
     }
     async function start() {
-        const d = await api("/api/b2b/me"); me = d;
+        const turn = ++sessionRevision;
+        const d = await api("/api/b2b/me"); if (turn !== sessionRevision || signingOut) return; me = d;
         try { const stored = JSON.parse(sessionStorage.getItem("b2b-cart-" + me.kullanici.id) || "[]"); cart = Array.isArray(stored) ? stored.filter(x => /^[a-f\d]{24}$/i.test(x.urunId) && Number.isFinite(x.miktar) && x.miktar > 0).slice(0, 100) : []; } catch (_) { cart = []; }
         $("cartCount").textContent = cart.length; $("identity").textContent = (me.firma?.unvan || "") + " · " + me.cari.unvan; $("login").hidden = true; $("logout").hidden = false; $("portal").hidden = false; await render();
     }
     $("loginForm").addEventListener("submit", async e => { e.preventDefault(); const button = e.submitter; button.disabled = true; try { const data = await api("/api/auth/login", "POST", Object.fromEntries(new FormData(e.target))); if (data.ikiFaktorGerekli) { challenge = data.challengeToken; $("mfaForm").hidden = false; $("loginForm").hidden = true; } else await start(); } catch (err) { message(err.message); } finally { button.disabled = false; } });
     $("mfaForm").addEventListener("submit", async e => { e.preventDefault(); try { await api("/api/auth/2fa-dogrula", "POST", { challengeToken: challenge, kod: new FormData(e.target).get("kod") }); await start(); } catch (err) { message(err.message); } });
-    $("logout").addEventListener("click", async () => { try { await api("/api/auth/logout", "POST", {}); location.reload(); } catch (e) { message(e.message); } });
+    function showLogin() {
+        sessionRevision++; revision++; me = null; cart = []; quote = null; key = ""; challenge = "";
+        view.replaceChildren(); $("identity").textContent = ""; $("cartCount").textContent = "0";
+        $("portal").hidden = true; $("logout").hidden = true; $("login").hidden = false;
+        $("loginForm").hidden = false; $("mfaForm").hidden = true; $("loginForm").reset(); $("mfaForm").reset();
+        document.querySelectorAll("dialog[open]").forEach(dialog => dialog.close());
+    }
+    $("logout").addEventListener("click", async () => {
+        if (signingOut) return;
+        signingOut = true; sessionRevision++; const button = $("logout"); button.disabled = true;
+        try {
+            await api("/api/auth/logout", "POST", {});
+            try { if (me) sessionStorage.removeItem("b2b-cart-" + me.kullanici.id); } catch (_) {}
+            showLogin(); message("Çıkış yapıldı. Yeniden giriş yapmak için bilgilerinizi girin.");
+        } catch (e) { message("Çıkış tamamlanamadı: " + e.message); }
+        finally { signingOut = false; button.disabled = false; }
+    });
+    window.addEventListener("pageshow", e => { if (e.persisted) { showLogin(); start().catch(err => message([401,403].includes(err.status) ? "Oturum kapalı. Lütfen giriş yapın." : err.message)); } });
     const imageDialog = $("productImageDialog");
     $("closeProductImage").addEventListener("click", () => imageDialog.close());
     imageDialog.addEventListener("click", e => { if (e.target === imageDialog) { const r = imageDialog.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) imageDialog.close(); } });
