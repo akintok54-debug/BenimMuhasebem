@@ -2260,7 +2260,7 @@
         overlay.innerHTML = `<div class="erp-modal" style="max-width:680px;width:95%">
             <div class="erp-modal-header"><div><h2>Tahsilat Yap</h2><p>${escapeHtml(musteri.kod)} · ${escapeHtml(musteri.unvan || musteri.adSoyad)}</p></div><button class="erp-modal-close" type="button">×</button></div>
             <form id="musteriTahsilatForm"><div class="erp-form-grid">
-                <label>Tutar<input name="tutar" type="number" min="0.01" max="${Number(musteri.bakiye || 0)}" step="0.01" required></label>
+                <label>Tutar (TL)<input name="tutar" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Örn. 5000" required><small>Bakiyeyi aşan tahsilat müşteri avansı olarak kalır.</small></label>
                 <label>Tarih<input name="tarih" type="date" value="${new Date().toISOString().slice(0, 10)}" required></label>
                 <label class="full">Kasa / Banka<select name="hesap" required><option value="">Hesap seçin</option>${hesaplar.map(x => `<option value="${x.tip}|${x._id}">${x.tip} · ${escapeHtml(x.kod || "")} ${escapeHtml(x.adGoster || "")} (${para(x.bakiye)})</option>`).join("")}</select></label>
                 <label class="full">Açıklama<textarea name="aciklama">Müşteri tahsilatı</textarea></label>

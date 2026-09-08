@@ -2921,3 +2921,13 @@ body {
 .sales-catalog .transaction-disclosure .sales-product-grid { grid-template-columns: repeat(auto-fit,minmax(min(100%,210px),1fr)); min-height: 0; }
 .sales-product-grid .empty-state { grid-column: 1 / -1; }
 .report-filter-grid>label[hidden],.report-detail-shell[hidden]{display:none!important}
+
+/* Customer creation: prevent form sections shrinking inside mobile flex modal. */
+#musteriFormOverlay .erp-modal{width:min(680px,calc(100% - 24px))!important;max-height:calc(100dvh - 24px);min-height:0}
+#musteriForm{display:block;overflow:auto;min-height:0;overscroll-behavior:contain}
+#musteriForm .dashboard-panel{min-height:0;margin:0 0 12px;padding:12px;overflow:visible}
+#musteriForm .erp-form-grid{padding:8px;min-width:0}
+#musteriForm input,#musteriForm select,#musteriForm textarea{min-width:0;width:100%;box-sizing:border-box}
+#musteriForm>div:first-child{position:sticky;top:0;background:#fff;z-index:2;flex-wrap:wrap;padding:8px}
+#musteriForm .erp-modal-footer{position:sticky;bottom:0;background:#fff;z-index:2;display:flex;flex-wrap:wrap;gap:8px;padding:12px}
+@media(max-width:600px){#musteriFormOverlay{padding:8px;align-items:center}#musteriFormOverlay .erp-modal{width:100%!important;max-height:calc(100dvh - 16px)}#musteriForm .erp-form-grid{grid-template-columns:minmax(0,1fr)!important}#musteriForm .erp-form-grid .full{grid-column:1!important}#musteriForm input,#musteriForm select,#musteriForm textarea{font-size:16px;min-height:44px}#musteriForm [data-musteri-step]{flex:1;min-height:44px}#musteriForm .erp-modal-footer button{flex:1;min-height:44px}}
