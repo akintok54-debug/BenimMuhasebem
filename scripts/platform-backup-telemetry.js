@@ -5,7 +5,7 @@ const mongoose = require("mongoose");
 async function recordBackup(file) {
     const ownConnection = mongoose.connection.readyState === 0;
     try {
-        if (ownConnection) await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 });
+        if (ownConnection) await mongoose.connect(process.env.MONGODB_URI, { autoIndex: false, serverSelectionTimeoutMS: 5000 });
         await require("../src/modules/platform/models/PlatformAuditLog").create({
             action: "BACKUP_COMPLETED", resource: "backup", success: true,
             details: { encrypted: true, bytes: fs.statSync(file).size, restoreVerified: false }

@@ -50,6 +50,7 @@ async function main({ connect = true, output = true } = {}) {
         ...tumAlislar.map((b) => anahtar(b.tenantId, "ALIS", b._id)),
         ...tumSatislar.map((b) => anahtar(b.tenantId, "SATIS", b._id))
     ]);
+    const satisDuzeltmeCikislari = new Set(stoklar.filter(h => h.kaynak === "SATIS_DUZELTME" && h.tip === "SAYIM_EKSI" && Number(h.miktar) > 0).map(h => anahtar(h.tenantId, h.kaynakId, h.urunId)));
     const hatalar = [];
 
     for (const belge of alislar) {
@@ -68,7 +69,8 @@ async function main({ connect = true, output = true } = {}) {
             const siparis = satisSiparisleri.get(anahtar(belge.tenantId, belge._id));
             const dogrudan = stokSet.has(anahtar(belge.tenantId, "SATIS", belge._id, urunId));
             const eskiSiparisIzi = siparis && stokSet.has(anahtar(belge.tenantId, "SIPARIS", siparis._id, urunId));
-            if (!dogrudan && !eskiSiparisIzi) hataEkle(hatalar, "SATIS", belge, `stok hareketi:${urunId}`);
+            const duzeltmeIzi = satisDuzeltmeCikislari.has(anahtar(belge.tenantId, belge._id, urunId));
+            if (!dogrudan && !eskiSiparisIzi && !duzeltmeIzi) hataEkle(hatalar, "SATIS", belge, `stok hareketi:${urunId}`);
         }
         if (!cariSet.has(anahtar(belge.tenantId, "SATIS", belge._id, "BORC"))) hataEkle(hatalar, "SATIS", belge, "müşteri borç hareketi");
         if (Number(belge.odenenTutar || 0) > 0) {
