@@ -2931,3 +2931,30 @@ body {
 #musteriForm>div:first-child{position:sticky;top:0;background:#fff;z-index:2;flex-wrap:wrap;padding:8px}
 #musteriForm .erp-modal-footer{position:sticky;bottom:0;background:#fff;z-index:2;display:flex;flex-wrap:wrap;gap:8px;padding:12px}
 @media(max-width:600px){#musteriFormOverlay{padding:8px;align-items:center}#musteriFormOverlay .erp-modal{width:100%!important;max-height:calc(100dvh - 16px)}#musteriForm .erp-form-grid{grid-template-columns:minmax(0,1fr)!important}#musteriForm .erp-form-grid .full{grid-column:1!important}#musteriForm input,#musteriForm select,#musteriForm textarea{font-size:16px;min-height:44px}#musteriForm [data-musteri-step]{flex:1;min-height:44px}#musteriForm .erp-modal-footer button{flex:1;min-height:44px}}
+
+/* Document preview: readable cards on phones; printed tables retain A4 layout. */
+.invoice-toolbar-actions { flex-wrap: wrap; min-width: 0; }
+.invoice-toolbar-actions > * { max-width: 100%; }
+.invoice-toolbar .erp-modal-close { position: static; width: auto; height: auto; font-size: 14px; line-height: 1.4; }
+@media screen and (max-width: 760px) {
+    .invoice-preview-shell { width: 100%; max-height: calc(100dvh - 16px); overflow-x: hidden; }
+    .invoice-toolbar { position: static; padding: 12px; gap: 10px; }
+    .invoice-toolbar-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .invoice-toolbar-actions button, .invoice-toolbar-actions select { width: 100%; min-width: 0; min-height: 44px; margin: 0; white-space: normal; overflow-wrap: anywhere; }
+    .invoice-toolbar-actions select { grid-column: 1 / -1; }
+    .invoice-page { width: 100%; min-width: 0; min-height: 0; margin: 0; padding: 16px; box-sizing: border-box; }
+    .invoice-header { gap: 14px; }
+    .invoice-brand { font-size: 20px; line-height: 1.35; overflow-wrap: anywhere; }
+    .invoice-meta, .invoice-party, .invoice-notes, .invoice-totals { min-width: 0; overflow-wrap: anywhere; }
+    .invoice-meta > div { flex-wrap: wrap; }
+    .invoice-parties, .invoice-bottom { gap: 12px; }
+    .invoice-table-wrap { overflow: visible; }
+    .invoice-table, .invoice-table tbody, .invoice-table tr { display: block; width: 100%; min-width: 0; }
+    .invoice-table thead { display: none; }
+    .invoice-table tbody tr { margin: 12px 0; padding: 8px; border: 1px solid #dbe1ea; border-radius: 10px; box-sizing: border-box; }
+    .invoice-table td { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 12px; padding: 8px 4px; white-space: normal; overflow-wrap: anywhere; font-size: 13px; line-height: 1.5; }
+    .invoice-table td::before { content: attr(data-mobile-label); color: #64748b; font-size: 12px; font-weight: 600; }
+    .invoice-table td > * { min-width: 0; overflow-wrap: anywhere; }
+    .invoice-table td[colspan] { display: block; }
+    .invoice-table td[colspan]::before { content: none; }
+}

@@ -2558,7 +2558,8 @@
         else if (belgeTercihi.belgeBasligi) marka.textContent = belgeTercihi.belgeBasligi;
         const not = belgeSayfasi.querySelector(".invoice-notes p");
         if (not && !belge.notlar && !belge.aciklama && belgeTercihi.dipnot) not.textContent = belgeTercihi.dipnot;
-        document.body.appendChild(overlay); overlay.querySelector(".erp-modal-close").addEventListener("click", musteriModalKapat);
+        belgeMobilEtiketleri(overlay);
+            document.body.appendChild(overlay); overlay.querySelector(".erp-modal-close").addEventListener("click", musteriModalKapat);
         const musteriAdi = musteri.unvan || musteri.adSoyad || musteri.kod;
         const metin = profesyonelPaylasimMesaji({ firmaAdi: firma.unvan, musteriAdi, belgeAdi: baslik, belgeNo: no, ek: true });
         document.getElementById("belgePdf").addEventListener("click", () => {
@@ -3905,6 +3906,15 @@
         catch (error) { alert(error.message); }
     }
 
+    function belgeMobilEtiketleri(overlay) {
+        overlay.querySelectorAll('.invoice-table').forEach(table => {
+            const labels = [...table.querySelectorAll('thead th')].map(th => th.textContent.trim());
+            table.querySelectorAll('tbody tr').forEach(row => [...row.cells].forEach((cell, i) => {
+                if (cell.colSpan === 1) cell.dataset.mobileLabel = labels[i] || '';
+            }));
+        });
+    }
+
     async function cariEkstreAc(tip, id) {
         try {
             const tarafTipi = tip === "musteri" ? "MUSTERI" : "TEDARIKCI";
@@ -4056,6 +4066,7 @@
                 </div>
             `;
 
+            belgeMobilEtiketleri(overlay);
             document.body.appendChild(overlay);
 
             document.getElementById("cariKapat").onclick = () => overlay.remove();
