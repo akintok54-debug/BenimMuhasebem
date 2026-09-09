@@ -3928,7 +3928,7 @@
 
             const rows = hareketler.map(h => {
                 const kayitliDegisim = Number(h.bakiyeDegisimi);
-                const degisim = h.bakiyeDegisimi !== null && h.bakiyeDegisimi !== undefined && Number.isFinite(kayitliDegisim)
+                const degisim = h.durum === "IPTAL" ? 0 : h.bakiyeDegisimi !== null && h.bakiyeDegisimi !== undefined && Number.isFinite(kayitliDegisim)
                     ? kayitliDegisim
                     : (h.tip === "BORC" ? Number(h.tutar || 0) : -Number(h.tutar || 0));
                 return {
@@ -3938,7 +3938,7 @@
                     alacak: degisim < 0 ? Math.abs(degisim) : 0
                 };
             });
-            let yuruyen = 0;
+            let yuruyen = Number(taraf?.cariAcilisBakiyesi ?? [...rows].reverse()[0]?.oncekiBakiye ?? 0);
             [...rows].reverse().forEach(row => {
                 yuruyen += row.borc - row.alacak;
                 row.yuruyenBakiye = yuruyen;

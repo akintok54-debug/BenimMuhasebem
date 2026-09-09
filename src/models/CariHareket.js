@@ -51,6 +51,8 @@ const CariHareketSchema = new mongoose.Schema(
             default: "MANUEL"
         },
 
+        sourceType: { type: String, enum: ["SALE"], default: undefined },
+        sourceId: { type: mongoose.Schema.Types.ObjectId, default: undefined },
         kaynakId: {
             type: mongoose.Schema.Types.ObjectId,
             default: null
@@ -112,8 +114,10 @@ CariHareketSchema.index({
     tarih: -1
 });
 
+CariHareketSchema.index({tenantId:1,sourceType:1,sourceId:1}, {unique:true,partialFilterExpression:{sourceType:"SALE"}});
 CariHareketSchema.index({ tenantId: 1, islemAnahtari: 1 }, { unique: true, sparse: true });
 CariHareketSchema.pre("validate", function () {
+    if (this.kaynak === "SATIS" && this.tip === "BORC" && this.kaynakId) { this.sourceType = "SALE"; this.sourceId = this.kaynakId; }
     const transactionId = this.transactionId || require("../services/islemBaglami").aktifTransactionId();
     if (this.isNew && !this.islemAnahtari && transactionId) {
         this.islemAnahtari = ["TX", transactionId, "CARI", this.tarafTipi, this.tarafId, this.tip, this.kaynak].map(String).join(":");

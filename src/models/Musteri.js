@@ -141,6 +141,7 @@ const MusteriSchema = new mongoose.Schema(
             default: true
         },
 
+        cariAcilisBakiyesi: { type: Number, default: null },
         b2b: {
             gorunum: {
                 stok: { type: Boolean, default: false },
