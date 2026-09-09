@@ -41,3 +41,7 @@ Eksik kaynaklı raporlar: dönem başı mal mevcudu, satılan malın maliyeti, d
 Değişiklikler: package.json, package-lock.json, scripts/backup-safety.js, mongodb-backup.js, mongodb-restore-check.js, platform-backup-telemetry.js, muhasebe-butunluk-audit.js, tests/backupSafety.test.js ve sürüm notları.
 
 Yerel kanıtlar backups/delivery-audit-2026-09-10/ altında: reports.log, duplicates.log, dependencies.json (düzeltme öncesi), stock-link.json, final-tests.log. Finansal tanı dosyaları git/web yayınına dahil edilmez. Kaynak ZIP'i tam veritabanı yedeği değildir. Bilinmeyen veya engellenen kontrol başarılı sayılmamıştır.
+
+## Yayın sonucu
+
+v1.4.10, dpl_F7ZG21DsQY3EYM76zegHt2oJmaKd ile canlıya yayımlandı. Yayın sonrası ERP/B2B/sağlık 200, kontrol edilen korumalı API uçları 401; statik kaynak eşleşmeleri başarılı. Kaynak arşivi ve manifest backups/release-1.4.10/ altında. Genel teslim kararı değişmedi: onaylanmadı.
