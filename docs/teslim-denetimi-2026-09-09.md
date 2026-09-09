@@ -56,3 +56,7 @@ Yerel kanıtlar `backups/delivery-audit/` ve `backups/release-1.4.8/` altındad�
 ## Değişen alanlar
 
 `src/models/CariHareket.js`, `src/models/Musteri.js`, `src/services/satisCariEsitlemeServisi.js`, satış ve cari controller'ları; ERP/paylaşılan ekstre görünümü; iki bakım scripti; satış-cari/ekstre testleri; sürüm ve bu rapor. Mevcut route ve auth altyapısı yeniden yazılmadı.
+
+## Canlı yayın sonucu
+
+v1.4.8, `dpl_xWNkyyZiYjaffMm1znh65s38yoSj` ile production ortamına yayımlandı. Canlı ERP/B2B sayfaları ve sağlık ucu 200; kontrol edilen korumalı B2B/tenant/platform API uçları oturumsuz erişimde 401 verdi. ERP/B2B statik dosyaları yerel kaynak hashleriyle eşleşti. Bu kontrol gerçek kullanıcıyla finansal işlem kabul testinin yerine geçmez. Sürüm kaynak arşivi, SHA-256 manifesti ve test logu `backups/release-1.4.8/` altında kaydedildi.
