@@ -152,7 +152,7 @@ async function hareketler(req, res, next) {
         return res.json({
             basarili: true,
             toplam: hareketler.length,
-            hareketler
+            hareketler: req.query.detay === "1" ? await require("../services/cariEkstreDetayServisi").detaylandir(filter.tenantId, hareketler) : hareketler
         });
     } catch (error) {
         next(error);
@@ -252,14 +252,14 @@ async function paylasilanEkstre(req, res, next) {
         if (!paylasim) return res.status(404).json({ basarili: false, mesaj: "Ekstre bağlantısı geçersiz veya süresi dolmuş." });
 
         const [musteri, hareketler, tenant] = await Promise.all([
-            Musteri.findOne({ _id: paylasim.musteriId, tenantId: paylasim.tenantId }).select("kod unvan adSoyad bakiye cariAcilisBakiyesi").lean(),
-            CariHareket.find({ tenantId: paylasim.tenantId, tarafTipi: "MUSTERI", tarafId: paylasim.musteriId }).sort({ tarih: 1, createdAt: 1 }).select("tip tutar aciklama kaynak belgeNo tarih durum bakiyeDegisimi oncekiBakiye sonrakiBakiye").lean(),
+            Musteri.findOne({ _id: paylasim.musteriId, tenantId: paylasim.tenantId }).select("kod unvan adSoyad bakiye cariAcilisBakiyesi telefon email adres").lean(),
+            CariHareket.find({ tenantId: paylasim.tenantId, tarafTipi: "MUSTERI", tarafId: paylasim.musteriId }).sort({ tarih: 1, createdAt: 1 }).select("tarafTipi tarafId tip tutar aciklama kaynak kaynakId sourceId belgeNo tarih durum bakiyeDegisimi oncekiBakiye sonrakiBakiye odemeYontemi createdAt").lean(),
             Tenant.findById(paylasim.tenantId).select("name firmaBilgileri").lean()
         ]);
         if (!musteri) return res.status(404).json({ basarili: false, mesaj: "Müşteri bulunamadı." });
 
         const f = tenant?.firmaBilgileri || {};
-        return res.json({ basarili: true, musteri, hareketler, firma: { unvan: f.unvan || tenant?.name || "İşletme", telefon: f.telefon || "", email: f.email || "", web: f.web || "" }, olusturmaTarihi: paylasim.createdAt, sonGecerlilik: paylasim.sonGecerlilik });
+        return res.json({ basarili: true, musteri, hareketler: await require("../services/cariEkstreDetayServisi").detaylandir(paylasim.tenantId, hareketler), firma: { unvan: f.unvan || tenant?.name || "İşletme", telefon: f.telefon || "", email: f.email || "", web: f.web || "", adres: f.adres || "" }, olusturmaTarihi: paylasim.createdAt, sonGecerlilik: paylasim.sonGecerlilik });
     } catch (error) {
         next(error);
     }

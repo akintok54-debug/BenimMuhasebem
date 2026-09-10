@@ -1,0 +1,2 @@
+
+(async()=>{const app=document.getElementById('app');try{const token=new URLSearchParams(location.search).get('token');if(!token)throw Error('Ekstre bağlantısı eksik.');const response=await fetch('/api/tenant/cari/paylasim/'+encodeURIComponent(token),{cache:'no-store',referrerPolicy:'no-referrer'}),data=await response.json();if(!response.ok)throw Error(data.mesaj || 'Ekstre açılamadı.');CariEkstre.mount(app,data);}catch(e){app.textContent=e.message;}})();

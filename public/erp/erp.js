@@ -3932,188 +3932,20 @@
 
     async function cariEkstreAc(tip, id) {
         try {
-            const tarafTipi = tip === "musteri" ? "MUSTERI" : "TEDARIKCI";
-
-            const [hareketData, firmaData] = await Promise.all([
-                api(`/api/tenant/cari/hareketler?tarafTipi=${encodeURIComponent(tarafTipi)}&tarafId=${encodeURIComponent(id)}`),
-                api("/api/tenant/firma")
+            const tarafTipi = tip === 'musteri' ? 'MUSTERI' : 'TEDARIKCI';
+            const [hareketData,firmaData,tarafData] = await Promise.all([
+                api('/api/tenant/cari/hareketler?detay=1&tarafTipi='+tarafTipi+'&tarafId='+encodeURIComponent(id)),
+                api('/api/tenant/firma'), api(tip === 'musteri' ? '/api/tenant/musteriler' : '/api/tenant/tedarikciler')
             ]);
-
-            const tarafData = tip === "musteri"
-                ? await api("/api/tenant/musteriler")
-                : await api("/api/tenant/tedarikciler");
-
-            const taraf = (tip === "musteri"
-                ? tarafData.musteriler
-                : tarafData.tedarikciler
-            ).find(x => String(x._id) === String(id));
-
-            const firma = firmaData.firmaBilgileri || {};
-            const hareketler = hareketData.hareketler || [];
-
-            const rows = hareketler.map(h => {
-                const kayitliDegisim = Number(h.bakiyeDegisimi);
-                const degisim = h.durum === "IPTAL" ? 0 : h.bakiyeDegisimi !== null && h.bakiyeDegisimi !== undefined && Number.isFinite(kayitliDegisim)
-                    ? kayitliDegisim
-                    : (h.tip === "BORC" ? Number(h.tutar || 0) : -Number(h.tutar || 0));
-                return {
-                    ...h,
-                    tarihText: h.tarih ? new Date(h.tarih).toLocaleDateString("tr-TR") : "-",
-                    borc: degisim > 0 ? degisim : 0,
-                    alacak: degisim < 0 ? Math.abs(degisim) : 0
-                };
-            });
-            let yuruyen = Number(taraf?.cariAcilisBakiyesi ?? [...rows].reverse()[0]?.oncekiBakiye ?? 0);
-            [...rows].reverse().forEach(row => {
-                yuruyen += row.borc - row.alacak;
-                row.yuruyenBakiye = yuruyen;
-            });
-
-            const overlay = document.createElement("div");
-            overlay.className = "erp-modal-overlay";
-
-            overlay.innerHTML = `
-                <div class="invoice-preview-shell">
-                    <div class="invoice-toolbar">
-                        <div>
-                            <strong>Cari Ekstre</strong>
-                            <span>${escapeHtml(taraf?.unvan || taraf?.adSoyad || "-")}</span>
-                        </div>
-
-                        <div class="invoice-toolbar-actions">
-                            ${tip === "musteri" ? `<button id="cariManuel" class="erp-small-button">+ Cari İşlem</button><button id="cariPaylas" class="erp-small-button">Ekstre Linki Paylaş</button>` : ""}
-                            <button id="normalEkstre" class="erp-small-button">Normal Ekstre</button>
-                            <button id="detayliEkstre" class="erp-small-button">Detaylı Ekstre</button>
-                            <button id="cariYazdir" class="erp-primary-button">
-                                Yazdır / PDF
-                            </button>
-                            <button id="cariKapat" class="erp-small-button">
-                                Kapat
-                            </button>
-                        </div>
-                    </div>
-
-                    <div id="cariEkstreSayfa" class="invoice-page">
-                        <div class="invoice-header">
-                            <div>
-                                <div class="invoice-brand">
-                                    ${escapeHtml(firma.unvan || "Firma")}
-                                </div>
-                                <div class="invoice-subtitle">Cari Hesap Ekstresi</div>
-                                <div class="invoice-subtitle">
-                                    ${escapeHtml(firma.adres || "")}
-                                </div>
-                            </div>
-
-                            <div class="invoice-meta">
-                                <div>
-                                    <span>Tarih</span>
-                                    <strong>${new Date().toLocaleDateString("tr-TR")}</strong>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="invoice-parties">
-                            <div class="invoice-party">
-                                <span>${tip === "musteri" ? "MÜŞTERİ" : "TEDARİKÇİ"}</span>
-                                <strong>${escapeHtml(taraf?.unvan || taraf?.adSoyad || "-")}</strong>
-                                <small>Kod: ${escapeHtml(taraf?.kod || "-")}</small>
-                                <small>Tel: ${escapeHtml(taraf?.whatsapp || taraf?.telefon || "-")}</small>
-                            </div>
-
-                            <div class="invoice-party">
-                                <span>GÜNCEL BAKİYE</span>
-                                <strong>${para(taraf?.bakiye)}</strong>
-                            </div>
-                        </div>
-
-                        <div class="invoice-table-wrap">
-                            <table class="invoice-table">
-                                <thead>
-                                    <tr>
-                                        <th>Tarih</th>
-                                        <th>Tür</th>
-                                        <th>Açıklama</th>
-                                        <th class="ekstre-detay">Kaynak / Belge</th>
-                                        <th>Borç</th>
-                                        <th>Alacak</th>
-                                        <th>Bakiye</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${rows.length ? rows.map(row => `
-                                        <tr>
-                                            <td>${escapeHtml(row.tarihText)}</td>
-                                            <td>${escapeHtml(row.tip || "-")}</td>
-                                            <td>${escapeHtml(row.aciklama || "-")}</td>
-                                            <td class="ekstre-detay">${escapeHtml(row.kaynak || "-")}${row.kaynakId ? ` · ${escapeHtml(row.kaynakId)}` : ""}</td>
-                                            <td>${row.borc ? para(row.borc) : "-"}</td>
-                                            <td>${row.alacak ? para(row.alacak) : "-"}</td>
-                                            <td><strong>${para(row.yuruyenBakiye)}</strong></td>
-                                        </tr>
-                                    `).join("") : `
-                                        <tr>
-                                            <td colspan="7" style="text-align:center">
-                                                Henüz cari hareket bulunmuyor.
-                                            </td>
-                                        </tr>
-                                    `}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="invoice-bottom">
-                            <div class="invoice-notes">
-                                <strong>Normal Ekstre</strong>
-                                <p>Cari hesaba ait hareketlerin tarih ve bakiye bazında özeti.</p>
-                                <strong>Detaylı Ekstre</strong>
-                                <p>Belge ve ürün detayları ayrıca raporlanabilir.</p>
-                            </div>
-
-                            <div class="invoice-totals">
-                                <div>
-                                    <span>Güncel Bakiye</span>
-                                    <strong>${para(taraf?.bakiye)}</strong>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            belgeMobilEtiketleri(overlay);
-            document.body.appendChild(overlay);
-
-            document.getElementById("cariKapat").onclick = () => overlay.remove();
-            const detayGoster = goster => overlay.querySelectorAll(".ekstre-detay").forEach(x => x.style.display = goster ? "" : "none");
-            document.getElementById("normalEkstre").onclick = () => detayGoster(false);
-            document.getElementById("detayliEkstre").onclick = () => detayGoster(true);
-            if (tip === "musteri") {
-                document.getElementById("cariManuel").onclick = () => { overlay.remove(); cariManuelHareketFormu(id); };
-                document.getElementById("cariPaylas").onclick = async () => {
-                    try {
-                        const result = await api(`/api/tenant/cari/musteri/${encodeURIComponent(id)}/ekstre-paylas`, { method: "POST" });
-                        const firma = await firmaProfiliGetir();
-                        const mesaj = profesyonelPaylasimMesaji({ firmaAdi: firma.unvan, musteriAdi: taraf?.unvan || taraf?.adSoyad, belgeAdi: "Cari Hesap Ekstresi", link: result.link });
-                        if (navigator.share) await navigator.share({ title: `${firma.unvan} · Cari Hesap Ekstresi`, text: mesaj, url: result.link });
-                        else {
-                            await navigator.clipboard.writeText(result.link);
-                            alert("Ekstre bağlantısı panoya kopyalandı. Bağlantı 30 gün geçerlidir.");
-                        }
-                    } catch (error) { if (error.name !== "AbortError") alert(error.message); }
-                };
-            }
-            document.getElementById("cariYazdir").onclick = () => {
-                const page = document.getElementById("cariEkstreSayfa");
-                const old = document.body.innerHTML;
-                document.body.innerHTML = page.outerHTML;
-                window.print();
-                document.body.innerHTML = old;
-                window.location.reload();
-            };
-        } catch (error) {
-            alert(error.message);
-        }
+            const taraf=(tarafData.musteriler || tarafData.tedarikciler || []).find(x=>String(x._id)===String(id));
+            if(!taraf) throw new Error('Cari hesap bulunamadı.');
+            const overlay=document.createElement('div');overlay.className='erp-modal-overlay';
+            overlay.innerHTML='<section class="ce-modal" role="dialog" aria-modal="true" aria-label="Cari Ekstre"><div class="ce-modal-close"><button type="button">Kapat</button></div><div class="ce-host"></div></section>';
+            overlay.querySelector('button').onclick=()=>overlay.remove();document.body.appendChild(overlay);
+            window.CariEkstre.mount(overlay.querySelector('.ce-host'),{musteri:taraf,firma:firmaData.firmaBilgileri || {},hareketler:hareketData.hareketler || []},{manual:tip==='musteri'?()=>{overlay.remove();cariManuelHareketFormu(id);}:null,share:tip==='musteri'?async()=>{
+                const result=await api('/api/tenant/cari/musteri/'+encodeURIComponent(id)+'/ekstre-paylas',{method:'POST'});return result.link;
+            }:null});
+        }catch(error){alert(error.message);}
     }
 
     let tedarikciV2Liste = [];
