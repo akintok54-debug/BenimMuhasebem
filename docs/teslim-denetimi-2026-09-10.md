@@ -61,3 +61,7 @@ Kanıtlar: backups/delivery-audit-2026-09-10/restore-verification.json, real-htt
 Genel teslim onayı hâlâ verilmemiştir: eksik tarihsel maliyet belgeleri, sağlayıcı uçtan uca gönderim/webhook testleri, cron ve bildirim teslimi, tüm roller/MFA/IDOR, bütün finansal dönüşüm ve çıktı kombinasyonları, yük testi ve sürekli yedek saklama kabulü tamamlanmamıştır.
 
 Son regresyon: npm test ile 310 test geçti, 0 başarısız, 0 atlanan. Birim/statik testler ve yukarıda ayrı belirtilen gerçek API/tarayıcı kanıtları birlikte değerlendirilmiştir.
+
+### v1.4.11 canlı doğrulama
+
+v1.4.11 (bbf22bb), dpl_EKSFLw4hKUfnvWLMZ4hkcnn2XXwb dağıtımıyla READY durumunda yayımlandı. Yayın sonrası ERP, B2B ve sağlık 200; kontrol edilen dört korumalı API oturumsuz 401. Beş ERP/B2B JS/CSS kaynağı yerel sürümle eşleşti. Kaynak ZIP, 310 test çıktısı, manifest ve canlı kontrol sonucu backups/release-1.4.11/ altında kayıtlıdır. Bu doğrulama oturumlu tüm canlı iş akışlarının kabulü anlamına gelmez.
