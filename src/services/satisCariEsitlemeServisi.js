@@ -1,5 +1,6 @@
 const Cari = require("../models/CariHareket");
 const Musteri = require("../models/Musteri");
+const CekSenetPortfoy = require("../models/CekSenetPortfoy");
 const fail = message => Object.assign(new Error(message), {status:409});
 const para = value => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 function degisim(row) {
@@ -50,12 +51,20 @@ async function esitle({satis,session}) {
     if(source.tip!=="BORC" || (source.kaynakId && String(source.kaynakId)!==String(satis._id))) throw fail("Satış kaynak bağlantısı çelişkili.");
     const related=await Cari.find({tenantId,kaynakId:satis._id,kaynak:{$in:["SATIS_DUZELTME","SATIS_IPTAL","SATIS_TAHSILAT"]}}).session(session).lean();
     if(related.some(row=>row.tarafTipi!=="MUSTERI" || !customerIds.includes(String(row.tarafId)))) throw fail("Satışın bağlı hareketlerinde farklı cari hesap var; inceleme gerekli.");
+    const musteriDegisti = String(source.tarafId)!==String(satis.musteriId);
+    if(musteriDegisti){
+        const evraklar=await CekSenetPortfoy.find({tenantId,kaynak:"SATIS",kaynakId:satis._id}).session(session).lean();
+        if(evraklar.some(row=>!customerIds.includes(String(row.musteriId))))throw fail("Satışın çek/senet kaydı farklı cariye bağlı; inceleme gerekli.");
+    }
     const openings=new Map();for(const id of customerIds)openings.set(id,await capture(tenantId,id,session));
     const total=Number(satis.genelToplam);if(!Number.isFinite(total)||total<0)throw fail("Satış toplamı geçersiz.");
     await Cari.updateOne({_id:source._id,tenantId},{$set:{sourceType:"SALE",sourceId:satis._id,kaynak:"SATIS",kaynakId:satis._id,tarafId:satis.musteriId,tutar:total,bakiyeDegisimi:total,belgeNo:satis.belgeNo,tarih:satis.tarih,durum:satis.durum==="IPTAL"?"IPTAL":"AKTIF"}},{session,runValidators:true});
     // Old delta rows must no longer affect the now-updated original SALE row.
     await Cari.updateMany({tenantId,kaynakId:satis._id,kaynak:{$in:["SATIS_DUZELTME","SATIS_IPTAL"]},durum:{$ne:"IPTAL"}},{$set:{durum:"IPTAL",iptalTarihi:new Date(),iptalNedeni:"Ana satış hareketi ile tekil mutabakat"}},{session});
-    if(String(source.tarafId)!==String(satis.musteriId))await Cari.updateMany({tenantId,kaynak:"SATIS_TAHSILAT",kaynakId:satis._id,tarafTipi:"MUSTERI",tarafId:source.tarafId},{$set:{tarafId:satis.musteriId}},{session});
+    if(musteriDegisti){
+        await Cari.updateMany({tenantId,kaynak:"SATIS_TAHSILAT",kaynakId:satis._id,tarafTipi:"MUSTERI",tarafId:source.tarafId},{$set:{tarafId:satis.musteriId}},{session});
+        await CekSenetPortfoy.updateMany({tenantId,kaynak:"SATIS",kaynakId:satis._id,musteriId:source.tarafId},{$set:{musteriId:satis.musteriId}},{session,runValidators:true});
+    }
     const balances={};for(const id of customerIds)balances[id]=await rebuild(tenantId,id,openings.get(id),session);
     return {hareketId:source._id,balances,musteriBakiye:balances[String(satis.musteriId)]};
 }

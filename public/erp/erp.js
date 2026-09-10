@@ -22,6 +22,21 @@
     metinGozlemcisi.observe(document.body, { childList: true, subtree: true });
 
     const content = document.getElementById("content");
+    function mobilKayitTablolariniHazirla() {
+        content.querySelectorAll('table').forEach(table => {
+            if (table.classList.contains('invoice-table') || table.querySelector('input:not([type="checkbox"]), select, textarea')) return;
+            const head = table.tHead;
+            if (!head || head.rows.length !== 1) return;
+            const labels = [...head.rows[0].cells].map(cell => cell.textContent.trim());
+            if (labels.length < 2) return;
+            table.classList.add('mobile-record-table');
+            [...table.tBodies].forEach(body => [...body.rows].forEach(row => [...row.cells].forEach((cell, i) => {
+                if (cell.colSpan === 1 && cell.dataset.mobileLabel !== labels[i]) cell.dataset.mobileLabel = labels[i] || '';
+            })));
+        });
+    }
+    new MutationObserver(mobilKayitTablolariniHazirla).observe(content, {childList: true, subtree: true});
+
     const pageTitle = document.getElementById("pageTitle");
 
     function token() {
@@ -5995,6 +6010,23 @@
         } catch(error) { errorBox(error); }
     }
 
+    async function whatsappYukle() {
+        setTitle('WhatsApp');
+        try {
+            const [data,customers]=await Promise.all([api('/api/tenant/whatsapp/mesajlar'),api('/api/tenant/musteriler')]);
+            const list=customers.musteriler || [],messages=data.mesajlar || [];
+            content.innerHTML=`<div class="dashboard-panel"><div class="panel-heading"><h2>Müşteriyle WhatsApp Görüşmesi</h2><button id="waRefresh" class="erp-small-button">Yenile</button></div><p>Mesajı WhatsApp'ta açıp gönderimi orada onaylayın. Burada görüşmeyi açmak, mesajın gönderildiği anlamına gelmez.</p><form id="waCompose" class="erp-form-grid"><label class="full">Müşteri<select name="musteriId" required><option value="">Müşteri seçin</option>${list.map(x=>`<option value="${escapeHtml(x._id)}">${escapeHtml(x.kod)} · ${escapeHtml(x.unvan || x.adSoyad)}</option>`).join('')}</select></label><label class="full">Mesaj<textarea name="mesaj" rows="5" maxlength="4096" required></textarea></label><div class="full"><button class="erp-primary-button">WhatsApp'ta Aç</button></div></form></div><div class="dashboard-panel"><h2>Kayıtlı Mesajlar</h2><p>Bekleyen kayıtlar teslim edilmiş mesaj değildir.</p><div class="table-scroll"><table><thead><tr><th>Tarih</th><th>Müşteri</th><th>Mesaj</th><th>Durum</th></tr></thead><tbody>${messages.map(x=>`<tr><td>${tarihKisa(x.createdAt)}</td><td>${escapeHtml(x.musteriId?.unvan || x.musteriId?.adSoyad || '-')}</td><td>${escapeHtml(x.mesaj)}</td><td>${escapeHtml(x.durum==='GONDERILDI'?'Gönderildi':x.durum==='BASARISIZ'?'Başarısız':'Gönderilmedi / Bekliyor')}</td></tr>`).join('') || '<tr><td colspan="4">Kayıtlı mesaj yok.</td></tr>'}</tbody></table></div></div>`;
+            content.querySelector('#waRefresh').onclick=whatsappYukle;
+            content.querySelector('#waCompose').onsubmit=event=>{
+                event.preventDefault();const form=new FormData(event.currentTarget),customer=list.find(x=>String(x._id)===form.get('musteriId'));
+                let phone=String(customer?.whatsapp || customer?.telefon || '').replace(/\D/g,'');
+                if(phone.startsWith('00'))phone=phone.slice(2);if(phone.length===10&&phone.startsWith('5'))phone='90'+phone;if(phone.length===11&&phone.startsWith('0'))phone='9'+phone;
+                if(!/^[1-9][0-9]{9,14}$/.test(phone))return alert('Müşterinin geçerli telefon numarasını müşteri kartından kaydedin.');
+                window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(String(form.get('mesaj')||'').trim()),'_blank','noopener,noreferrer');
+            };
+        }catch(error){errorBox(error);}
+    }
+
     async function sayfaYukle(page) {
         const buYukleme = ++sayfaYuklemeNo;
         aktifMenuyuGuncelle(page);
@@ -6008,6 +6040,8 @@
             await dashboardYukle();
             return;
         }
+
+        if (page === 'whatsapp') { await whatsappYukle(); return; }
 
         if (page === "b2b") { setTitle("B2B Bayi Yönetimi"); await window.B2BAdmin(content, api); return; }
 

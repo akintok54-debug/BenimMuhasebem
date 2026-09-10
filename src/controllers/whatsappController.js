@@ -7,12 +7,17 @@ function tenantId(req) {
     return new mongoose.Types.ObjectId(String(req.tenantId));
 }
 
+function musteriKapsami(req) {
+    const rol=String(req.currentUser?.rol || req.user?.rol || req.kullanici?.rol || '').toUpperCase();
+    const actor=req.currentUser?._id || req.user?.kullaniciId || req.kullanici?.kullaniciId;
+    return ['SALES','SATIS'].includes(rol) ? {$or:[{temsilciId:actor},{olusturanKullaniciId:actor}]} : {};
+}
 async function listele(req, res, next) {
     try {
-        const mesajlar = await WhatsAppMesaj.find({
-            tenantId: tenantId(req)
-        })
-            .populate("musteriId", "kod unvan adSoyad telefon whatsapp")
+        const tId=tenantId(req),filter={tenantId:tId},kapsam=musteriKapsami(req);
+        if(kapsam.$or){const customers=await Musteri.find({tenantId:tId,...kapsam}).select('_id').lean();filter.musteriId={$in:customers.map(x=>x._id)};}
+        const mesajlar = await WhatsAppMesaj.find(filter)
+            .populate({path:'musteriId',select:'kod unvan adSoyad telefon whatsapp',match:{tenantId:tId}})
             .sort({ createdAt: -1 })
             .lean();
 
@@ -40,7 +45,7 @@ async function kuyrugaEkle(req, res, next) {
 
         const musteri = await Musteri.findOne({
             _id: body.musteriId,
-            tenantId: tId
+            tenantId: tId, ...musteriKapsami(req)
         });
 
         if (!musteri) {

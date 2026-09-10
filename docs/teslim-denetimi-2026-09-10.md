@@ -45,3 +45,19 @@ Yerel kanıtlar backups/delivery-audit-2026-09-10/ altında: reports.log, duplic
 ## Yayın sonucu
 
 v1.4.10, dpl_F7ZG21DsQY3EYM76zegHt2oJmaKd ile canlıya yayımlandı. Yayın sonrası ERP/B2B/sağlık 200, kontrol edilen korumalı API uçları 401; statik kaynak eşleşmeleri başarılı. Kaynak arşivi ve manifest backups/release-1.4.10/ altında. Genel teslim kararı değişmedi: onaylanmadı.
+
+## Devam denetimi — v1.4.11
+
+Önceki açık işler listesindeki yedek ve test ortamı engeli bu devam çalışmasında giderildi. Gerçek kaynak veritabanından 664.427 bayt şifreli yedek alındı, boş ve ayrı restore_test_delivery_20260910_01 veritabanına geri yüklendi. 56 koleksiyonun 55'i içerik özetiyle eşleşti; audit koleksiyonundaki tek fark yedek sonrası BACKUP_COMPLETED kaydıydı. Bu, sürekli yedekleme/harici saklama veya atomik anlık görüntü garantisi değildir.
+
+Gerçek Express API ve geri yüklenmiş MongoDB ile 8 kontrol geçti: ERP/B2B ayrı parola girişleri, yabancı tenant reddi, bayi oturumuyla ERP reddi, iki oturumun birlikte çalışması, yanlış portal girişinin reddi, tenant kullanıcısına platform reddi, eşzamanlı satış düzenlemede tek işlem ve aynı cari satırın güncellenmesi, satış iptalinde bağlı cari iptali. Test kullanıcıları ve işlem değişiklikleri yalnızca geri yüklenen veritabanındadır. Canlıya demo kayıt eklenmedi.
+
+20 ana ekran 390/768/1440 genişlikte 60 kez gerçek API ile açıldı. Mobilde sayfa taşması ve gizlenen çıkış düğmesi düzeltildi; liste tabloları etiketli kartlara dönüştürüldü. Bu tarama bütün alt formların işlevsel kabul testi değildir. Bazı tablet tablolarında içeride yatay kaydırma sürer. WhatsApp ekranı ayrıca üç boyutta kontrol edildi; gerçek kayıtları ve müşteri görüşmesi açmayı sunar, otomatik gönderim iddiası yoktur. Dış sağlayıcı gönderimi yapılmadı.
+
+Satış müşterisi değişiminde bağlı çek/senetin müşteri bağlantısı aynı transaction içinde taşınır; çelişkili müşteri kaydı işlemi durdurur. WhatsApp kayıtları satış temsilcisinin müşteri kapsamıyla ve tenant güvenli populate ile sınırlandırıldı. Yeni endpoint eklenmedi.
+
+Kanıtlar: backups/delivery-audit-2026-09-10/restore-verification.json, real-http-e2e.json, real-browser-pages-after.json, real-browser-whatsapp.json ve mobil ekran görüntüleri. Test ortamı ayrı veritabanı olarak korunmuştur.
+
+Genel teslim onayı hâlâ verilmemiştir: eksik tarihsel maliyet belgeleri, sağlayıcı uçtan uca gönderim/webhook testleri, cron ve bildirim teslimi, tüm roller/MFA/IDOR, bütün finansal dönüşüm ve çıktı kombinasyonları, yük testi ve sürekli yedek saklama kabulü tamamlanmamıştır.
+
+Son regresyon: npm test ile 310 test geçti, 0 başarısız, 0 atlanan. Birim/statik testler ve yukarıda ayrı belirtilen gerçek API/tarayıcı kanıtları birlikte değerlendirilmiştir.
