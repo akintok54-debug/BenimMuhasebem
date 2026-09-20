@@ -4,10 +4,11 @@ test('External prices honor VAT mode including zero VAT and explicit zero price'
   assert.deepEqual(f.kanalFiyati({satisFiyati:100,perakendeFiyati:150,kdv},'TRENDYOL'),{salePrice:100+kdv,listPrice:150*(1+kdv/100),vatRate:kdv});
   for(const included of [false,true]){
    const out=f.ideasoftDegisiklik({taxIncluded:included,tax:20},{salePrice:100,vatRate:kdv});assert.equal(out.price1,included?100+kdv:100);
-   assert.deepEqual(f.ideasoftNet({...out,taxIncluded:included}),{net:100,kdv});
+   const back=f.ideasoftNet({...out,taxIncluded:included});assert.equal(back.kdv,kdv);assert.ok(Math.abs(back.net-100)<1e-9);
   }
  }
  assert.equal(f.ideasoftNet({price1:0,tax:0,taxIncluded:1}).net,0);
+ const fractional=f.ideasoftNet({price1:100,tax:20,taxIncluded:1});assert.equal(f.ideasoftDegisiklik({taxIncluded:1,tax:20},{salePrice:fractional.net}).price1,100);
  for(const taxIncluded of [undefined,null,'no'])assert.throws(()=>f.ideasoftDegisiklik({taxIncluded,tax:20},{salePrice:100}));
 });
 test('External order stores net unit prices, conserves totals and rejects unallocated fees/discounts',()=>{

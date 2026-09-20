@@ -1,7 +1,7 @@
 # ERP denetimi — 20 Eylül 2026
 
 Çalışma dizini: `C:\Users\Win10\OneDrive\Desktop\bahadır\BAHADIR-ERP-V2`.
-Git: `https://github.com/akintok54-debug/BenimMuhasebem.git`, `main`, başlangıç HEAD `b8bb2bb`. Önceden bulunan kullanıcı değişiklikleri korunmuştur; Asıl çalışma dizininin Git durumu korunmuştur. Yayın kopyası `backups/railway-release-20260920` içinde `ee5cfd8534dfa440908bad9751692e12493c6bf4` olarak commit edilmiştir; GitHub push 403 ile reddedilmiştir.
+Git: `https://github.com/akintok54-debug/BenimMuhasebem.git`, `main`, başlangıç HEAD `b8bb2bb`. Kaynak ve test değişiklikleri yerel main dalında commit edilmiştir. GitHub gönderimi yazma yetkisi 403 nedeniyle yapılamadı.
 
 ## Tamamlanan değişiklikler
 
@@ -67,3 +67,15 @@ Bu kanıtlar tüm finansal geçmişin doğru olduğunu veya tüm modüllerin bü
 - VS Code: kaydedilmemiş denetim raporu yalnız başlık içeriyordu; `vscode-unsaved-report.txt` olarak yedeklendi. Diskteki tam rapora uygulanmadı. Masaüstü aracının native pipe bağlantısı bulunamadığından açık sekme durumu değiştirilmedi.
 - Kaynak denetiminde 112 eski ajan/geçici dosya, dosyalar silinmeden ignore edildi; gerçek kaynak değişiklikleri test edildi. Yerel IDE ayarları ve Copilot teşhis çıktısı yayın kaydına dahil edilmez.
 - Resmi kaynaklar: https://www.ideasoft.com.tr/yardim/urun-fiyat-yonetimi/ ; https://apidoc.ideasoft.dev/ ; https://developers.trendyol.com/docs/stok-ve-fiyat-g%C3%BCncelleme-updatepriceandinventory .
+
+## Nihai canlı doğrulama — 1.4.16
+
+- Canlı deployment `dpl_D4CSNP2DePPuZLjmqToRottVidND`, `https://moto-parca-nx2pjqtpu-bahadir2.vercel.app`, üretim `https://www.benimmuhasebe.com`. `/api/ready`200 ve version1.4.16; ERP/B2B/sağlık200; kimliksiz fiyat denetimi401.
+- Kullanıcı fiyat farkları gösterildikten sonra açıkça “ERP fiyatlarını esas al, IdeaSoft fiyatlarını güncelle” dedi. Beş eşleşmenin ERP kaydı ve önceki dış fiyatları yedeklendi. ERP fiyatları/stokları değiştirilmedi.
+- Fiyat gönderim işi `6aafc3d0ca54eafcddaf3224`: SUCCESS, processed5/success5/errors0. Kaynak KDV ve IdeaSoft dahil/hariç modu korunarak yalnız dış fiyat güncellendi.
+- Sonraki bağımsız GET kontrolü: bağlı mağazadaki 5/5 eşleşmenin tamamı UYUMLU; tarama nextOffset=null. KT4795 net100, KT47568 net569,33, KT47567 net2.314,40, KT48087 net2.655,40, KT48039 net2.017,40; KDV%20. KDV dahil sağlayıcı fiyatından geri bölmede kuruş altı fark beklenir; karşılaştırma toleransı0,011TL.
+- Kanıtlar: `price-reconciliation-before.json`, `live-price-check-before.json`, `price-push-result.json`, `live-price-check.json`. Bu sonuç yalnız bağlı/eşleştirilmiş 5 ürün içindir; bağlantısı olmayan pazaryerleri için canlı doğrulama iddia edilmez.
+- Kayıtlı IdeaSoft pilotunun ham PARTIAL değeri eski boolean/sayaç karışıklığından gelir; tüm gerekli aşamalar kayıtlı olduğundan mevcut pilotDurumu hesabı SUCCESS döner. Kontrol atlanmadı veya sonuç uydurularak değiştirilmedi.
+- Vercel senkronizasyonu isteği yanıtlamadan işi tamamlamayı bekler. Net fiyatın ara aşamada iki haneye yuvarlanıp bir kuruş fark oluşturması önlendi; para toplamında ortak yuvarlama kullanılır. Son fiyat/entegrasyon odaklı testler40/40, toplam355 farklı test doğrulandı; kaynak205JS.
+- Mevcut iki IdeaSoft ERP siparişi IPTAL durumundadır; kayıtlı toplam ile ortak hesaplama uyumludur. Yeni sipariş, tahsilat veya stok hareketi oluşturulmadı.
+- VS Code kaydedilmemiş rapor sekmesi native pipe erişimi olmadığından açık kaldı; yalnız başlık içeren tampon yedeklendi, diskteki tam rapor korunmuştur. Kaynak denetimi geçici dosyalar silinmeden düzenlenip gerçek kaynak ve testler yerel Git geçmişine alınmıştır.
