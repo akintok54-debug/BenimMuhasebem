@@ -1,6 +1,6 @@
 {
   "name": "bahadir-erp-v2",
-  "version": "1.4.12",
+  "version": "1.4.15",
   "description": "",
   "main": "src/sunucu.js",
   "directories": {
@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "nodemon src/sunucu.js",
     "start": "node src/sunucu.js",
-    "test": "node --test",
+    "test": "node scripts/test-runner.js",
+    "check": "node scripts/check-source.js",
     "db:indexes": "node scripts/mongodb-index-sync.js",
     "audit:accounting": "node scripts/muhasebe-butunluk-audit.js",
     "audit:stock": "node scripts/stok-butunluk-audit.js",

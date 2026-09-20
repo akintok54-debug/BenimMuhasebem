@@ -221,7 +221,7 @@ async function bankaOlustur(req, res, next) {
         const body = req.body || {}, bakiye = Number(body.bakiye || 0);
         if (!metin(body.kod) || !metin(body.bankaAdi)) return res.status(400).json({ basarili: false, mesaj: "Banka kodu ve banka adı zorunludur." });
         if (!Number.isFinite(bakiye)) return res.status(400).json({ basarili: false, mesaj: "Açılış bakiyesi geçersizdir." });
-        const banka = await Banka.create({ tenantId: tenantId(req), kod: metin(body.kod).toUpperCase(), bankaAdi: metin(body.bankaAdi), sube: metin(body.sube), iban: metin(body.iban).replace(/\s+/g, "").toUpperCase(), hesapNo: metin(body.hesapNo), bakiye, paraBirimi: paraBirimi(body.paraBirimi), aktif: body.aktif !== false, aciklama: metin(body.aciklama) });
+        const banka = await Banka.create({ tenantId: tenantId(req), kod: metin(body.kod).toUpperCase(), bankaAdi: metin(body.bankaAdi), hesapSahibi: metin(body.hesapSahibi), sube: metin(body.sube), iban: metin(body.iban).replace(/\s+/g, "").toUpperCase(), hesapNo: metin(body.hesapNo), bakiye, paraBirimi: paraBirimi(body.paraBirimi), aktif: body.aktif !== false, aciklama: metin(body.aciklama) });
         await acilisHareketi(req, "BANKA", banka);
         res.status(201).json({ basarili: true, mesaj: "Banka hesabı oluşturuldu.", banka });
     } catch (error) { next(error); }
@@ -242,7 +242,7 @@ async function hesapGuncelle(req, res, next) {
             hesap.kasaTuru = kasaTuru;
         }
         if (tip === "BANKA" && body.bankaAdi !== undefined) hesap.bankaAdi = metin(body.bankaAdi);
-        for (const alan of ["sube", "hesapNo", "sorumlu", "aciklama"]) if (tip === "BANKA" || ["sube", "sorumlu", "aciklama"].includes(alan)) if (body[alan] !== undefined) hesap[alan] = metin(body[alan]);
+        for (const alan of ["sube", "hesapNo", "hesapSahibi", "sorumlu", "aciklama"]) if (tip === "BANKA" || ["sube", "sorumlu", "aciklama"].includes(alan)) if (body[alan] !== undefined) hesap[alan] = metin(body[alan]);
         if (tip === "BANKA" && body.iban !== undefined) hesap.iban = metin(body.iban).replace(/\s+/g, "").toUpperCase();
         if (body.aktif !== undefined) hesap.aktif = body.aktif === true;
         if (body.paraBirimi !== undefined && Number(hesap.bakiye || 0) === 0) hesap.paraBirimi = paraBirimi(body.paraBirimi);

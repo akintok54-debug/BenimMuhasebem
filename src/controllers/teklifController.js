@@ -14,27 +14,7 @@ const yonetici = req => ["OWNER", "ADMIN"].includes(String(req.currentUser?.rol 
 const sahiplik = req => yonetici(req) ? {} : { kullaniciId: aktorId(req) };
 const musteriSahiplik = req => yonetici(req) ? {} : { $or: [{ temsilciId: aktorId(req) }, { olusturanKullaniciId: aktorId(req) }] };
 
-function hesapla(item) {
-    const miktar = Number(item.miktar || 0);
-    const birimFiyat = Number(item.birimFiyat || 0);
-    const kdv = Number(item.kdv ?? 20);
-    const iskonto = Number(item.iskonto || 0);
-
-    const brut = miktar * birimFiyat;
-    const iskontoTutari = brut * iskonto / 100;
-    const araToplam = brut - iskontoTutari;
-    const kdvTutari = araToplam * kdv / 100;
-
-    return {
-        miktar,
-        birimFiyat,
-        kdv,
-        iskonto,
-        araToplam,
-        kdvTutari,
-        toplam: araToplam + kdvTutari
-    };
-}
+function hesapla(kalem) { return require('../services/fiyatServisi').kalem(kalem); }
 
 async function listele(req, res, next) {
     try {

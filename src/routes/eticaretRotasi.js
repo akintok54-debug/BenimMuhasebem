@@ -17,6 +17,13 @@ router.post("/connections", yetkiKontrol("ecommerce.settings"), merkez.connectio
 router.patch("/connections/:id", yetkiKontrol("ecommerce.settings"), merkez.connectionUpdate);
 router.delete("/connections/:id", yetkiKontrol("ecommerce.settings"), merkez.connectionDisable);
 router.post("/connections/:id/test", yetkiKontrol("ecommerce.settings"), merkez.connectionTest);
+router.get('/connections/:id/price-check',yetkiKontrol('ecommerce.settings'),async(req,res,next)=>{
+    try{const connection=await require('../models/IntegrationConnection').findOne({_id:req.params.id,tenantId:req.tenantId,active:true}).select('+encryptedCredentials');
+        if(!connection)return res.status(404).json({basarili:false,mesaj:'Bağlantı bulunamadı.'});
+        const adapter=require('../integrations/marketplace/adapterFactory').marketplaceAdapter(connection);
+        res.set('Cache-Control','no-store').json({basarili:true,...await require('../services/disKanalDogrulamaServisi').fiyatKontrol(req.tenantId,connection,adapter,Number(req.query.offset||0))});
+    }catch(e){next(e);}
+});
 router.post("/connections/:id/ideasoft/pilot-test", yetkiKontrol("ecommerce.settings", "ecommerce.sync"), tekIslemKontrol("IDEASOFT_PILOT"), merkez.ideasoftPilot);
 router.post("/sync", yetkiKontrol("ecommerce.sync"), merkez.syncCreate);
 router.get("/sync-jobs", yetkiKontrol("ecommerce.view"), merkez.syncJobs);

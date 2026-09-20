@@ -143,6 +143,11 @@ const MusteriSchema = new mongoose.Schema(
 
         cariAcilisBakiyesi: { type: Number, default: null },
         b2b: {
+            musteriTipi: { type: String, enum: ["BAYI", "PERAKENDE"], default: "BAYI" },
+            ticariBasvuru: { type: Boolean, default: false },
+            kayitKaynagi: { type: String, default: "ERP" },
+            bayiOnayTarihi: { type: Date, default: null },
+            bayiOnaylayanId: { type: mongoose.Schema.Types.ObjectId, ref: "Kullanici", default: null },
             gorunum: {
                 stok: { type: Boolean, default: false },
                 katalogFiyati: { type: Boolean, default: false },

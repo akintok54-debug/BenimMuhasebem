@@ -1,6 +1,9 @@
 ﻿(function () {
     "use strict";
 
+    const platformGirisi = new URLSearchParams(location.search).get('next') === 'platform';
+    const authRoot = platformGirisi ? '/api/auth/platform' : '/api/auth';
+    const csrfKey = platformGirisi ? 'bmPlatformCsrfToken' : 'bmCsrfToken';
     const form = document.getElementById("loginForm");
     const mesaj = document.getElementById("mesaj");
     const btn = document.getElementById("girisBtn");
@@ -15,11 +18,11 @@
 
     async function mevcutOturumuKontrolEt() {
         try {
-            const response = await fetch("/api/auth/profil", { headers: { Accept: "application/json" }, credentials: "include" });
+            const response = await fetch(authRoot + "/profil", { headers: { Accept: "application/json" }, credentials: "include" });
             if (!response.ok) return;
             const data = await response.json();
             if (!data?.basarili) return;
-            if (data.csrfToken) sessionStorage.setItem("bmCsrfToken", data.csrfToken);
+            if (data.csrfToken) sessionStorage.setItem(data.kullanici?.rol === "SUPER_ADMIN" ? "bmPlatformCsrfToken" : csrfKey, data.csrfToken);
             if (data.kullanici?.rol === "BAYI") { window.location.replace("/b2b/"); return; }
             window.location.replace(data.kullanici?.rol === "SUPER_ADMIN" ? "/platform/" : "/erp/");
         } catch (_) {
@@ -27,6 +30,7 @@
         }
     }
 
+    if(platformGirisi) { document.title='Platform Yönetimi · Giriş'; formBaslik.textContent='Platform Yönetimi Girişi'; formAciklama.textContent='SUPER_ADMIN hesabınızla giriş yapın. ERP ve bayi oturumlarınız açık kalır.'; registerTab.hidden=true; }
     mevcutOturumuKontrolEt();
 
     function ekranDegistir(kayitAcik) {
@@ -81,7 +85,7 @@
 
         try {
 
-            const response = await fetch("/api/auth/login", {
+            const response = await fetch(authRoot + "/login", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -98,7 +102,7 @@
             if (response.ok && data.ikiFaktorGerekli) {
                 const kod = window.prompt("Kimlik doğrulama uygulamanızdaki 6 haneli kodu veya kurtarma kodunu girin:");
                 if (!kod) throw new Error("İki faktörlü doğrulama gerekli.");
-                const ikinci = await fetch("/api/auth/2fa-dogrula", { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify({ challengeToken: data.challengeToken, kod }) });
+                const ikinci = await fetch(authRoot + "/2fa-dogrula", { method: "POST", headers: { "Content-Type": "application/json", "Accept": "application/json" }, body: JSON.stringify({ challengeToken: data.challengeToken, kod }) });
                 data = await ikinci.json();
                 if (!ikinci.ok) throw new Error(data.mesaj || "İki faktörlü doğrulama başarısız.");
             }
@@ -113,7 +117,7 @@
             localStorage.removeItem("token");
             localStorage.removeItem("accessToken");
 
-            if (data.csrfToken) sessionStorage.setItem("bmCsrfToken", data.csrfToken);
+            if (data.csrfToken) sessionStorage.setItem(data.kullanici?.rol === "SUPER_ADMIN" ? "bmPlatformCsrfToken" : csrfKey, data.csrfToken);
 
             if (data.kullanici?.rol === "BAYI") { window.location.replace("/b2b/"); return; }
             window.location.replace(data.kullanici?.rol === "SUPER_ADMIN" ? "/platform/" : "/erp/");
@@ -152,7 +156,7 @@
             localStorage.removeItem("tenantToken");
             localStorage.removeItem("token");
             localStorage.removeItem("accessToken");
-            if (data.csrfToken) sessionStorage.setItem("bmCsrfToken", data.csrfToken);
+            if (data.csrfToken) sessionStorage.setItem(data.kullanici?.rol === "SUPER_ADMIN" ? "bmPlatformCsrfToken" : csrfKey, data.csrfToken);
             kayitMesaj.classList.add("success");
             kayitMesaj.textContent = "Hesabınız hazır. Yönetim ekranı açılıyor...";
             window.location.replace("/erp/");

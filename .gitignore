@@ -15,4 +15,9 @@ private-backup-keys/
 *.backup-*
 *.before-*
 .tmp-*
+.local-agent*/
+.local-agent*.cjs
+.agent-logs/
+.vscode/
+public/erp/## GitHub Copilot Chat.md
 .env*

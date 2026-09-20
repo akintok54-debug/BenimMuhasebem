@@ -9,6 +9,7 @@ async function kimlikKontrol(req, res, next) {
         const token = cookieToken || bearer;
         if (!token) return res.status(401).json({ basarili: false, mesaj: "Yetkilendirme tokenı gerekli." });
         const kullanici = tokenDogrula(token);
+        if (kullanici.purpose || (kullanici.oturumAlani && kullanici.oturumAlani !== require('../services/oturumGuvenligi').oturumAlani(req))) return res.status(401).json({basarili:false,mesaj:'Bu oturum farklı bir portala ait.'});
         req.kullanici = kullanici; req.user = kullanici; req.authKaynak = cookieToken ? "cookie" : "bearer";
         await require("../modules/platform/services/sessionTelemetry").observe(req, token, kullanici);
         next();

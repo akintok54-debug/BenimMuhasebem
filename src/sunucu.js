@@ -7,7 +7,7 @@ const { productionGuvenlikDogrula } = require("./services/productionGuvenlikServ
 const { ideasoftOtomatikSenkronizasyonBaslat } = require("./services/eticaretSyncServisi");
 
 const PORT = Number(process.env.PORT) || 5000;
-const HOST = "127.0.0.1";
+const HOST = process.env.HOST || (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1");
 
 async function baslat() {
     try {
@@ -35,7 +35,23 @@ async function baslat() {
             console.error("");
             console.error("SUNUCU HATASI:");
             console.error(error);
+            process.exit(1);
         });
+
+        let stopping = false;
+        const stop = () => {
+            if (stopping) return;
+            stopping = true;
+            const deadline = setTimeout(() => process.exit(1), 25000);
+            deadline.unref();
+            server.close(async () => {
+                await require('mongoose').disconnect();
+                clearTimeout(deadline);
+                process.exit(0);
+            });
+        };
+        process.once('SIGTERM', stop);
+        process.once('SIGINT', stop);
 
     } catch (error) {
         console.error("");
@@ -48,11 +64,13 @@ async function baslat() {
 process.on("uncaughtException", (error) => {
     console.error("BEKLENMEYEN HATA:");
     console.error(error);
+    process.exit(1);
 });
 
 process.on("unhandledRejection", (error) => {
     console.error("PROMISE HATASI:");
     console.error(error);
+    process.exit(1);
 });
 
 baslat();

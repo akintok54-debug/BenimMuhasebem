@@ -27,14 +27,14 @@ async function main({ connect = true, output = true } = {}) {
     if (connect) await mongoose.connect(process.env.MONGODB_URI, { autoIndex: false, serverSelectionTimeoutMS: 10000 });
 
     const [alislar, satislar, tumAlislar, tumSatislar, siparisler, stoklar, cariler, paralar, portfoyler, urunler, depolar, musteriler, tedarikciler, kasalar, bankalar] = await Promise.all([
-        Alis.find(aktif).select("tenantId belgeNo kalemler odenenTutar belgeOdemeTutari belgeOdemeAyrildi hesapId durum").limit(50000).lean(),
+        Alis.find(aktif).select("tenantId belgeNo kalemler odenenTutar belgeOdemeTutari belgeOdemeAyrildi hesapTipi hesapId durum").limit(50000).lean(),
         Satis.find(aktif).select("tenantId belgeNo kalemler odenenTutar odemeTipi hesapId durum").limit(50000).lean(),
         Alis.find({}).select("tenantId _id").limit(50000).lean(),
         Satis.find({}).select("tenantId _id").limit(50000).lean(),
         Siparis.find({ satisId: { $ne: null } }).select("tenantId _id satisId").limit(50000).lean(),
-        StokHareket.find(aktif).select("tenantId urunId depoId kaynak kaynakId tip").limit(100000).lean(),
-        CariHareket.find(aktif).select("tenantId tarafTipi tarafId kaynak kaynakId tip").limit(100000).lean(),
-        ParaHareket.find(aktif).select("tenantId hesapTipi hesapId kaynak kaynakId tip").limit(100000).lean(),
+        StokHareket.find(aktif).select("tenantId urunId depoId kaynak kaynakId tip miktar").limit(100000).lean(),
+        CariHareket.find(aktif).select("tenantId tarafTipi tarafId kaynak kaynakId tip tutar").limit(100000).lean(),
+        ParaHareket.find(aktif).select("tenantId hesapTipi hesapId kaynak kaynakId tip tutar").limit(100000).lean(),
         CekSenetPortfoy.find(aktif).select("tenantId kaynak kaynakId tur hareketTipi").limit(50000).lean(),
         Urun.find({}).select("tenantId _id").lean(), Depo.find({}).select("tenantId _id").lean(),
         Musteri.find({}).select("tenantId _id").lean(), Tedarikci.find({}).select("tenantId _id").lean(),
@@ -44,6 +44,12 @@ async function main({ connect = true, output = true } = {}) {
     const stokSet = new Set(stoklar.map((h) => anahtar(h.tenantId, h.kaynak, h.kaynakId, h.urunId)));
     const cariSet = new Set(cariler.map((h) => anahtar(h.tenantId, h.kaynak, h.kaynakId, h.tip)));
     const paraSet = new Set(paralar.map((h) => anahtar(h.tenantId, h.kaynak, h.kaynakId)));
+    // Alış ödemesinde para kaydı cari ödeme hareketine de bağlanabilir.
+    const cariOdemeler = new Map(cariler.filter(h => h.kaynak === 'ALIS_ODEME' && h.tip === 'ODEME').map(h => [anahtar(h.tenantId,h._id),h]));
+    const alisParaSet = new Set(paralar.filter(h => h.kaynak === 'ALIS_ODEME' && h.tip === 'CIKIS').map(h => {
+        const cari = cariOdemeler.get(anahtar(h.tenantId,h.kaynakId));
+        return anahtar(h.tenantId,cari?.kaynakId || h.kaynakId,h.hesapTipi,h.hesapId,Number(h.tutar).toFixed(2));
+    }));
     const portfoySet = new Set(portfoyler.map((h) => anahtar(h.tenantId, h.kaynak, h.kaynakId, h.tur)));
     const satisSiparisleri = new Map(siparisler.map((siparis) => [anahtar(siparis.tenantId, siparis.satisId), siparis]));
     const belgeSet = new Set([
@@ -60,7 +66,7 @@ async function main({ connect = true, output = true } = {}) {
         if (!cariSet.has(anahtar(belge.tenantId, "ALIS", belge._id, "ALACAK"))) hataEkle(hatalar, "ALIS", belge, "tedarikçi borç hareketi");
         if (belge.belgeOdemeAyrildi && Number(belge.belgeOdemeTutari || 0) > 0) {
             if (!cariSet.has(anahtar(belge.tenantId, "ALIS_ODEME", belge._id, "ODEME"))) hataEkle(hatalar, "ALIS", belge, "tedarikçi ödeme hareketi");
-            if (belge.hesapId && !paraSet.has(anahtar(belge.tenantId, "ALIS_ODEME", belge._id))) hataEkle(hatalar, "ALIS", belge, "kasa/banka çıkışı");
+            if (belge.hesapId && !alisParaSet.has(anahtar(belge.tenantId,belge._id,belge.hesapTipi,belge.hesapId,Number(belge.belgeOdemeTutari).toFixed(2)))) hataEkle(hatalar, "ALIS", belge, "kasa/banka çıkışı");
         }
     }
 

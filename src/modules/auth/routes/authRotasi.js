@@ -5,6 +5,11 @@ const tenantKontrol = require("../../../middleware/tenantKontrol");
 const { rateLimit } = require("../../../middleware/guvenlikKatmani");
 
 const router = express.Router();
+const platformGirisi = (req,res,next) => {req.platformOturumu=true;next();};
+router.post('/platform/login', platformGirisi, rateLimit({pencereMs:15*60*1000,limit:10,anahtar:req=>'platform-login:'+req.ip}),controller.login);
+router.post('/platform/2fa-dogrula', platformGirisi, rateLimit({pencereMs:5*60*1000,limit:10,anahtar:req=>'platform-2fa:'+req.ip}),controller.ikiFaktorDogrula);
+router.post('/platform/logout',controller.logout);
+router.get('/platform/profil',kimlikKontrol,require('../../platform/middleware/superAdmin'),controller.profil);
 
 router.post("/login", rateLimit({ pencereMs: 15 * 60 * 1000, limit: 10, anahtar: req => `login:${req.ip}:${String(req.body?.kimlik || req.body?.email || "").toLowerCase()}` }), controller.login);
 router.post("/kayit", rateLimit({ pencereMs: 60 * 60 * 1000, limit: 5, anahtar: req => `kayit:${req.ip}:${String(req.body?.email || "").toLowerCase()}` }), controller.kayit);

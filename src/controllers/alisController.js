@@ -20,29 +20,7 @@ function tenantObjectId(req) {
 }
 function kullaniciId(req) { return req.currentUser?._id || req.kullanici?.kullaniciId || req.user?.kullaniciId || req.kullanici?._id || req.user?._id || null; }
 
-function hesaplaKalem(kalem) {
-    const miktar = Number(kalem.miktar || 0);
-    const birimFiyat = Number(kalem.birimFiyat || 0);
-    const kdv = Number(kalem.kdv ?? 20);
-    const iskonto = Number(kalem.iskonto || 0);
-
-    const brut = miktar * birimFiyat;
-    const iskontoTutari = brut * (iskonto / 100);
-    const araToplam = brut - iskontoTutari;
-    const kdvTutari = araToplam * (kdv / 100);
-    const toplam = araToplam + kdvTutari;
-
-    return {
-        ...kalem,
-        miktar,
-        birimFiyat,
-        kdv,
-        iskonto,
-        araToplam,
-        kdvTutari,
-        toplam
-    };
-}
+function hesaplaKalem(kalem) { return require('../services/fiyatServisi').kalem(kalem); }
 
 function kalemGecerliMi(kalem) {
     return Number.isFinite(kalem.miktar) && kalem.miktar > 0 &&

@@ -1,4 +1,4 @@
-﻿const mongoose = require("mongoose");
+const mongoose = require("mongoose");
 
 const Urun = require("../models/Urun");
 const Depo = require("../models/Depo");
@@ -320,6 +320,7 @@ async function listele(req, res, next) {
 }
 
 async function hareket(req, res, next) {
+    let session;
     try {
         const tId = tenantId(req);
         const body = req.body || {};
@@ -385,64 +386,40 @@ async function hareket(req, res, next) {
             });
         }
 
-        let stok = await Stok.findOne({
-            tenantId: tId,
-            urunId: urun._id,
-            depoId: depo._id
-        });
+        session = await mongoose.startSession();
+        let stok, stokHareket;
+        await session.withTransaction(async () => {
+            const giris = girisTipleri.includes(tip);
+            const stokFiltre = {
+                tenantId: tId,
+                urunId: urun._id,
+                depoId: depo._id
+            };
+            if (!giris) stokFiltre.miktar = { $gte: miktar };
+            const stokAlanlari = { sonHareketTarihi: new Date() };
+            if (giris && birimMaliyet !== null) stokAlanlari.maliyet = birimMaliyet;
+            stok = await Stok.findOneAndUpdate(stokFiltre, {
+                $inc: { miktar: giris ? miktar : -miktar },
+                $set: stokAlanlari
+            }, { new: true, upsert: giris, setDefaultsOnInsert: true, session });
+            if (!stok) throw Object.assign(new Error("Yetersiz stok."), { status: 409 });
 
-        if (!stok && cikisTipleri.includes(tip)) {
-            return res.status(409).json({
-                basarili: false,
-                mesaj: "Yetersiz stok."
-            });
-        }
-
-        if (!stok) {
-            stok = await Stok.create({
+            [stokHareket] = await StokHareket.create([{
                 tenantId: tId,
                 urunId: urun._id,
                 depoId: depo._id,
-                miktar: 0,
-                maliyet: 0
-            });
-        }
-
-        if (girisTipleri.includes(tip)) {
-            stok.miktar += miktar;
-        }
-        else if (cikisTipleri.includes(tip)) {
-            if (stok.miktar < miktar) {
-                return res.status(409).json({
-                    basarili: false,
-                    mesaj: "Yetersiz stok."
-                });
-            }
-
-            stok.miktar -= miktar;
-        }
-        if (birimMaliyet !== null && girisTipleri.includes(tip)) {
-            stok.maliyet = birimMaliyet;
-        }
-
-        stok.sonHareketTarihi = new Date();
-
-        await stok.save();
-
-        const stokHareket = await StokHareket.create({
-            tenantId: tId,
-            urunId: urun._id,
-            depoId: depo._id,
-            tip,
-            miktar,
-            tarih: body.tarih || new Date(),
-            birimMaliyet: birimMaliyet ?? stok.maliyet ?? 0,
-            maliyetDogrulandi: Number(birimMaliyet ?? stok.maliyet ?? 0) > 0,
-            maliyetKaynagi: birimMaliyet !== null ? "MANUEL_GIRIS" : "STOK_KARTI",
-            kaynak: body.kaynak || "MANUEL",
-            kaynakId: body.kaynakId || null,
-            aciklama: body.aciklama || "",
-            kullaniciId: req.kullanici?._id || req.user?._id || null
+                tip,
+                miktar,
+                tarih: body.tarih || new Date(),
+                birimMaliyet: birimMaliyet ?? stok.maliyet ?? 0,
+                maliyetDogrulandi: Number(birimMaliyet ?? stok.maliyet ?? 0) > 0,
+                maliyetKaynagi: birimMaliyet !== null ? "MANUEL_GIRIS" : "STOK_KARTI",
+                kaynak: body.kaynak || "MANUEL",
+                kaynakId: body.kaynakId || null,
+                aciklama: body.aciklama || "",
+                kullaniciId: req.currentUser?._id || req.kullanici?.kullaniciId || req.user?.kullaniciId || req.kullanici?._id || req.user?._id || null,
+                islemAnahtari: `TX:${req.transactionId || require("node:crypto").randomUUID()}:STOK:MANUEL`
+            }], { session });
         });
 
         res.status(201).json({
@@ -452,6 +429,8 @@ async function hareket(req, res, next) {
         });
     } catch (error) {
         next(error);
+    } finally {
+        if (session) await session.endSession();
     }
 }
 

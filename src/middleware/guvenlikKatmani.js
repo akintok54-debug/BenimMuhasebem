@@ -45,6 +45,7 @@ function httpsZorunlulugu(req, res, next) {
 
 function kanonikAlanAdi(req, res, next) {
     if (process.env.NODE_ENV !== "production") return next();
+    if (process.env.BACKEND_API_ONLY === 'true' && /^\/api(?:\/|$)/.test(req.path)) return next();
 
     const kanonikHost = String(process.env.CANONICAL_HOST || "www.benimmuhasebe.com")
         .trim()

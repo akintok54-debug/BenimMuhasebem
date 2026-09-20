@@ -18,6 +18,8 @@ const superAdminKontrol = require("./modules/platform/middleware/superAdmin");
 const uygulama = express();
 if (process.env.NODE_ENV === "production") uygulama.set("trust proxy", 1);
 
+// Deployment probe must work before redirects, authentication and rate limits.
+uygulama.get('/api/ready', require('./routes/hazirlikRotasi'));
 uygulama.use(kanonikAlanAdi);
 
 uygulama.get("/api/assets/xlsx.js", (req, res) => {
@@ -42,7 +44,8 @@ uygulama.use(helmet({
     contentSecurityPolicy: {
         directives: {
             ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-            "img-src": ["'self'", "data:", "https:"]
+            "img-src": ["'self'", "data:", "https:"],
+            "frame-src": ["'self'", "https://www.paytr.com"]
         }
     }
 }));
@@ -74,6 +77,11 @@ uygulama.use(rateLimit({ pencereMs: 15 * 60 * 1000, limit: 500, anahtar: req => 
 uygulama.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev", { skip: req => req.path === "/api/saglik" || req.path === "/api/tenant/eticaret/ideasoft/oauth/callback" }));
 
 const publicKlasoru = path.join(__dirname, "..", "public");
+uygulama.get('/platform/login', (req,res)=>res.redirect(302,'/erp/login.html?next=platform'));
+uygulama.use(['/platform','/admin'], (req,res,next)=>{
+    if(req.method==='GET' && String(req.headers.accept || '').includes('text/html') && !require('./services/oturumGuvenligi').cookieOku(req).bm_platform_session && !req.headers.authorization) return res.redirect(302,'/erp/login.html?next=platform');
+    next();
+});
 const platformPaneliGonder = (req, res) => {
     res.set("Cache-Control", "no-store");
     res.sendFile(path.join(publicKlasoru, "platform", "index.html"));
@@ -84,7 +92,7 @@ uygulama.use((req, res, next) => {
     if (/^\/api\/(tenant|auth|platform)(\/|$)/.test(req.path)) res.set("Cache-Control", "private, no-store");
     let yol;
     try { yol = path.posix.normalize(decodeURIComponent(req.path).replace(/\\/g, "/")); } catch (_) { return res.sendStatus(400); }
-    if (/(?:\.backup(?:-|$)|\.SNAPSHOT(?:-|$)|\.before-|\.bak$|\.md$|\.map$|(?:^|\/)\.env(?:\.|$))/i.test(yol)) return res.sendStatus(404);
+    if (/(?:\.backup(?:-|$)|\.SNAPSHOT(?:-|$)|\.before-|\.BOZUK-|\.bak$|\.md$|\.map$|(?:^|\/)\.env(?:\.|$))/i.test(yol)) return res.sendStatus(404);
     // Protect encoded static paths too; express.static decodes URLs independently.
     if (/^\/platform(?:\/|$)/i.test(yol)) return kimlikKontrol(req, res, error => {
         if (error) return next(error);
@@ -213,8 +221,6 @@ try {
 uygulama.use(hataYonetici);
 
 module.exports = uygulama;
-
-
 
 
 

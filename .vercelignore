@@ -19,3 +19,17 @@ public/erp/## GitHub Copilot Chat.md
 .tmp-*
 tests/
 docs/releases/
+.local-agent*
+.agent-logs/
+.vscode/
+src/*-test.js
+public/**/*.BOZUK-*
+public/**/*.md
+.env.example
+/*.txt
+docs
+backups
+portable-backups
+.agent-logs
+.vscode
+tests

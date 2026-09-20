@@ -9,7 +9,7 @@ const MarketplaceProductMappingSchema = new mongoose.Schema({
     categoryAttributes: { type: mongoose.Schema.Types.Mixed, default: {} },
     safetyStock: { type: Number, min: 0, default: 0 }, reservedStock: { type: Number, min: 0, default: 0 },
     syncStatus: { type: String, enum: ["NOT_LINKED", "PENDING", "SYNCED", "PARTIAL", "ERROR"], default: "NOT_LINKED" },
-    lastStockSent: { type: Number, default: null }, lastPriceSent: { type: Number, default: null }, lastSyncedAt: { type: Date, default: null }, lastError: { type: String, default: "" }
+    lastStockSent: { type: Number, default: null }, lastPriceSent: { type: Number, default: null }, lastPriceSignature: { type: String, default: null }, lastSyncedAt: { type: Date, default: null }, lastError: { type: String, default: "" }
 }, { timestamps: true });
 MarketplaceProductMappingSchema.index({ tenantId: 1, productId: 1, storeConnectionId: 1 }, { unique: true });
 module.exports = mongoose.model("MarketplaceProductMapping", MarketplaceProductMappingSchema);

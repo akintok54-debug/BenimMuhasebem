@@ -79,8 +79,9 @@ test("Ürün Excel arayüzü farklı pazar yeri kolonlarını ve alıştan yeni 
     const js = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "erp.js"), "utf8");
     const html = fs.readFileSync(path.join(__dirname, "..", "public", "erp", "index.html"), "utf8");
     assert.match(html, /\/api\/assets\/xlsx\.js/);
-    assert.match(js, /Trendyol ve IdeaSoft kolonlarını otomatik tanır/);
-    assert.match(js, /\/api\/tenant\/urunler\/toplu-aktar/);
+    const bulk = fs.readFileSync(path.join(__dirname, '..', 'public', 'erp', 'urun-toplu.js'),'utf8');
+    assert.match(bulk, /Trendyol ve IdeaSoft kolonlarını otomatik tanır/);
+    assert.match(bulk, /\/api\/tenant\/urunler\/toplu-aktar/);
     assert.match(js, /id="tedYeniUrun"/);
     assert.match(js, /Dolar \(\$\)/);
     assert.match(js, /Euro \(€\)/);

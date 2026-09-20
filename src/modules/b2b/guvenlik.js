@@ -22,7 +22,9 @@ async function bayiKontrol(req, res, next) {
         if (!customer) return res.sendStatus(403);
         const access = await tenantAboneliginiKontrolEt(String(user.tenantId));
         if (!access.erisim) return res.status(403).json({ basarili: false, mesaj: "Firma erişimi aktif değil." });
-        req.currentUser = user; req.tenantId = user.tenantId; req.bayi = customer;
+        const shop = require("./magazaServisi");
+        const settings = shop.retail(customer) ? await require("./models/MagazaAyar").findById(user.tenantId).lean() : null;
+        req.currentUser = user; req.tenantId = user.tenantId; req.bayi = settings ? shop.perakendeMusteri(customer, settings) : customer;
         next();
     } catch (error) { next(error); }
 }

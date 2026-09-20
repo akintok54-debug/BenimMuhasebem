@@ -14,13 +14,14 @@ test("Ürün kartı yüzde 0-100 varsayılan iskonto alanını destekler", () =>
     assert.equal(alan.options.max, 100);
 });
 
-test("Toplu ürün servisi stok ve depo kayıtlarını hareket iziyle günceller", () => {
-    const kaynak = fs.readFileSync(path.join(__dirname, "controllers", "urunController.js"), "utf8");
-    assert.match(kaynak, /stokMiktari/);
-    assert.match(kaynak, /depoKodu/);
-    assert.match(kaynak, /Stok\.findOneAndUpdate/);
-    assert.match(kaynak, /kaynak:\s*"URUN_EXCEL"/);
-    assert.match(kaynak, /kod:\s*"ANA",\s*ad:\s*"Ana Depo"/);
+test("Toplu stok aktarımı aktif depoyu açıkça eşler ve belirsiz depoyu reddeder", () => {
+    const {aktarimPlani}=require('./services/urunTopluServisi');
+    const depolar=[{_id:'000000000000000000000001',kod:'ANA'},{_id:'000000000000000000000002',kod:'SUBE'}];
+    const row={kod:'NEW',ad:'Parça',stokMiktari:5,depoKodu:'SUBE'};
+    const plan=aktarimPlani([row],[],depolar);
+    assert.equal(plan.hatalar.length,0);assert.equal(plan.satirlar[0].stok.depoId,depolar[1]._id);
+    assert.equal(plan.satirlar[0].stok.miktar,5);
+    assert.equal(aktarimPlani([{...row,depoKodu:''}],[],depolar).hatalar.length,1);
 });
 
 test("Ürün Excel ekranı pazar yeri görsellerini, stokları ve iskontoyu tanır", () => {

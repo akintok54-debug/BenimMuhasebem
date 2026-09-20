@@ -141,7 +141,7 @@ test("IdeaSoft adapter yalnız resmi HTTPS mağaza domainini ve doğrulanmış A
 
 test("IdeaSoft stok ve fiyat güncellemesi resmi Product GET/PUT kaynağını kullanır", async () => {
     const calls = [], adapter = new IdeaSoftAdapter({ _id: "507f1f77bcf86cd799439011", tenantId: "507f1f77bcf86cd799439012", provider: "IDEASOFT", apiBaseUrl: "https://akn-motosiklet.myideasoft.com", active: true }, { clientId: "client", clientSecret: "secret", accessToken: "token" });
-    adapter.request = async (url, options = {}) => { calls.push({ url, options }); return options.method === "PUT" ? options.body : { id: 123, name: "Ürün", sku: "SKU-1", stockAmount: 2, price1: 10 }; };
+    adapter.request = async (url, options = {}) => { calls.push({ url, options }); return options.method === "PUT" ? options.body : { id: 123, name: "Ürün", sku: "SKU-1", stockAmount: 2, price1: 10, tax:20, taxIncluded:0 }; };
     await adapter.updateStock([{ externalProductId: "123", quantity: 7 }]);
     await adapter.updatePrice([{ externalProductId: "123", salePrice: 15.5 }]);
     assert.deepEqual(calls.map(x => [x.url, x.options.method || "GET"]), [["/admin-api/products/123", "GET"], ["/admin-api/products/123", "PUT"], ["/admin-api/products/123", "GET"], ["/admin-api/products/123", "PUT"]]);

@@ -39,10 +39,8 @@
     }
 
     function csrfToken() {
-        const session = sessionStorage.getItem("bmCsrfToken");
-        if (session) return session;
-        const cookie = document.cookie.split(";").map(x => x.trim()).find(x => x.startsWith("bm_csrf="));
-        return cookie ? decodeURIComponent(cookie.slice("bm_csrf=".length)) : "";
+        const cookie = document.cookie.split(';').map(x=>x.trim()).find(x=>x.startsWith('bm_platform_csrf='));
+        return cookie ? decodeURIComponent(cookie.slice('bm_platform_csrf='.length)) : '';
     }
 
     async function api(url, options = {}) {
@@ -180,9 +178,9 @@
     document.getElementById("logoutButton").addEventListener("click", async () => {
         if (destekOturumu) { try { await api("/api/platform/support/"+destekOturumu._id+"/close", { method:"POST", body:JSON.stringify({ onay:"ONAYLIYORUM" }) }); } catch (_) {} }
         sessionStorage.removeItem("platformSupportId");
-        try { await api("/api/auth/logout", { method: "POST" }); } catch (_) { /* Oturum zaten kapanmış olabilir. */ }
-        sessionStorage.removeItem("bmCsrfToken");
-        location.replace("/erp/login.html");
+        try { await api("/api/auth/platform/logout", { method: "POST" }); } catch (_) { /* Oturum zaten kapanmış olabilir. */ }
+        sessionStorage.removeItem("bmPlatformCsrfToken");
+        location.replace("/erp/login.html?next=platform");
     });
 
     (async()=>{const id=sessionStorage.getItem('platformSupportId');if(id){try{const d=await api('/api/platform/support/'+encodeURIComponent(id));destekOturumu=d.support;destekBanner();}catch(_){sessionStorage.removeItem('platformSupportId');}}await bolumAc(destekOturumu?'support':'dashboard');})();

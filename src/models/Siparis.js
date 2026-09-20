@@ -105,6 +105,10 @@ const SiparisSchema = new mongoose.Schema(
         teslimTarihi: { type: Date, default: null },
         sevkAdresi: { type: String, trim: true, maxlength: 700, default: "" },
         odemeKosullari: { type: String, trim: true, maxlength: 500, default: "" },
+        musteriTipi: { type: String, enum: ["BAYI", "PERAKENDE"], default: "BAYI" },
+        magazaOdemeYontemi: { type: String, enum: ["", "HAVALE", "KAPIDA", "KART"], default: "" },
+        magazaOdemeDurumu: { type: String, enum: ["BEKLIYOR", "ODENDI", "BASARISIZ", "TEST"], default: "BEKLIYOR" },
+        magazaTahsilatId: { type: mongoose.Schema.Types.ObjectId, ref: "CariHareket", default: null },
 
         durum: {
             type: String,

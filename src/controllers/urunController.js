@@ -266,11 +266,16 @@ async function listele(req, res, next) {
             .sort({ createdAt: -1 })
             .lean();
 
-        res.json({
-            basarili: true,
-            toplam: urunler.length,
-            urunler
-        });
+        const f = require('../services/fiyatServisi');
+        const campaigns = await f.kampanyalariOku(tenantId(req));
+        let customer = {}, group = null;
+        if (req.query.musteriId) {
+            const scope = ['OWNER','ADMIN'].includes(req.currentUser?.rol) ? {} : { $or:[{temsilciId:req.currentUser?._id},{olusturanKullaniciId:req.currentUser?._id}] };
+            customer = await require('../models/Musteri').findOne({_id:req.query.musteriId,tenantId:tenantId(req),...scope}).lean();
+            if (!customer) return res.status(404).json({basarili:false,mesaj:'Müşteri bulunamadı.'});
+            if (customer.b2b?.grupId) group = await require('../modules/b2b/models/BayiGrubu').findOne({_id:customer.b2b.grupId,tenantId:tenantId(req)}).lean();
+        }
+        res.json({basarili:true,toplam:urunler.length,urunler:urunler.map(u=>({...u,fiyatlar:Object.fromEntries(['SATIS','BAYI','PERAKENDE'].map(t=>[t,f.fiyatlandir(u,customer,group,campaigns,new Date(),t)]))}))});
     } catch (error) {
         next(error);
     }
@@ -452,94 +457,10 @@ async function guncelle(req, res, next) {
 }
 
 async function topluAktar(req, res, next) {
-    try {
-        const satirlar = Array.isArray(req.body?.urunler) ? req.body.urunler : [];
-        if (!satirlar.length) return res.status(400).json({ basarili: false, mesaj: "Aktarılacak ürün satırı bulunamadı." });
-        if (satirlar.length > 2000) return res.status(400).json({ basarili: false, mesaj: "Tek seferde en fazla 2000 ürün aktarılabilir." });
-
-        const tId = tenantId(req);
-        const mevcutlar = await Urun.find({ tenantId: tId });
-        const stokAktarilacak = satirlar.some(x => x?.stokMiktari !== undefined && x?.stokMiktari !== "");
-        let depolar = await Depo.find({ tenantId: tId }).sort({ aktif: -1, createdAt: 1 });
-        if (stokAktarilacak && !depolar.some(x => x.aktif !== false)) {
-            let anaDepo = depolar.find(x => metin(x.kod).toUpperCase() === "ANA");
-            if (anaDepo) { anaDepo.aktif = true; await anaDepo.save(); }
-            else anaDepo = await Depo.create({ tenantId: tId, kod: "ANA", ad: "Ana Depo", aktif: true });
-            depolar = [anaDepo, ...depolar.filter(x => String(x._id) !== String(anaDepo._id))];
-        }
-        const aktifDepolar = depolar.filter(x => x.aktif !== false);
-        const depoMap = new Map(aktifDepolar.map(x => [metin(x.kod).toUpperCase(), x]));
-        const varsayilanDepo = aktifDepolar[0] || null;
-        const kodMap = new Map(mevcutlar.map(x => [metin(x.kod).toUpperCase(), x]));
-        const barkodMap = new Map(mevcutlar.filter(x => metin(x.barkod)).map(x => [metin(x.barkod), x]));
-        const sonuc = { eklenen: 0, guncellenen: 0, stokGuncellenen: 0, atlanan: 0, hatalar: [] };
-
-        for (let index = 0; index < satirlar.length; index++) {
-            try {
-                const kaynak = satirlar[index] || {};
-                const kod = metin(kaynak.kod).toUpperCase();
-                const barkod = metin(kaynak.barkod);
-                const ad = metin(kaynak.ad);
-                if (!kod || !ad) throw Object.assign(new Error("Ürün kodu ve ürün adı zorunludur."), { status: 400 });
-                const stokVar = kaynak.stokMiktari !== undefined && kaynak.stokMiktari !== "";
-                const stokMiktari = stokVar ? Number(kaynak.stokMiktari) : null;
-                if (stokVar && (!Number.isFinite(stokMiktari) || stokMiktari < 0)) throw Object.assign(new Error("Stok miktarı sıfır veya daha büyük olmalıdır."), { status: 400 });
-                const depoKodu = metin(kaynak.depoKodu).toUpperCase();
-                const depo = stokVar ? (depoKodu ? depoMap.get(depoKodu) : varsayilanDepo) : null;
-                if (stokVar && !depo) throw Object.assign(new Error(depoKodu ? `Depo bulunamadı: ${depoKodu}` : "Stok aktarımı için aktif depo bulunamadı."), { status: 400 });
-
-                const kodEslesmesi = kodMap.get(kod);
-                const barkodEslesmesi = barkod ? barkodMap.get(barkod) : null;
-                if (kodEslesmesi && barkodEslesmesi && String(kodEslesmesi._id) !== String(barkodEslesmesi._id)) {
-                    throw Object.assign(new Error("Ürün kodu ve barkod farklı ürünlerle eşleşiyor."), { status: 409 });
-                }
-
-                const urun = kodEslesmesi || barkodEslesmesi || new Urun({ tenantId: tId });
-                const yeni = urun.isNew;
-                const veri = Object.fromEntries(TOPLU_ALANLAR.filter(alan => kaynak[alan] !== undefined && kaynak[alan] !== "").map(alan => [alan, kaynak[alan]]));
-                veri.kod = kod;
-                veri.ad = ad;
-                if (barkod) veri.barkod = barkod;
-                sayilariDogrula(veri);
-
-                for (const [alan, value] of Object.entries(veri)) {
-                    if (alan === "gorsel") urun[alan] = gorselDogrula(value);
-                    else if (alan === "ekGorseller") urun[alan] = (Array.isArray(value) ? value : []).filter(Boolean).map(gorselDogrula).slice(0, 2);
-                    else if (alan === "paraBirimi") urun[alan] = paraBirimiDogrula(value);
-                    else if (SAYISAL_ALANLAR.includes(alan)) urun[alan] = Number(value);
-                    else if (alan === "uyumluluk") urun[alan] = Array.isArray(value) ? value.map(metin).filter(Boolean) : metin(value).split(",").map(metin).filter(Boolean);
-                    else urun[alan] = value;
-                }
-
-                await urun.save();
-                if (stokVar) {
-                    const mevcutStok = await Stok.findOne({ tenantId: tId, urunId: urun._id, depoId: depo._id });
-                    const oncekiMiktar = Number(mevcutStok?.miktar || 0), fark = stokMiktari - oncekiMiktar;
-                    await Stok.findOneAndUpdate(
-                        { tenantId: tId, urunId: urun._id, depoId: depo._id },
-                        { $set: { miktar: stokMiktari, maliyet: Number(urun.alisFiyati || 0), sonHareketTarihi: new Date() } },
-                        { new: true, upsert: true, setDefaultsOnInsert: true }
-                    );
-                    if (fark) await StokHareket.create({
-                        tenantId: tId, urunId: urun._id, depoId: depo._id,
-                        tip: fark > 0 ? "SAYIM_ARTI" : "SAYIM_EKSI", miktar: Math.abs(fark),
-                        tarih: new Date(), birimMaliyet: Number(urun.alisFiyati || 0), maliyetDogrulandi: Number(urun.alisFiyati || 0) > 0, maliyetKaynagi: "URUN_EXCEL", kaynak: "URUN_EXCEL",
-                        aciklama: "Excel ürün aktarımı stok güncellemesi",
-                        kullaniciId: req.kullanici?._id || req.user?._id || null
-                    });
-                    sonuc.stokGuncellenen++;
-                }
-                kodMap.set(metin(urun.kod).toUpperCase(), urun);
-                if (metin(urun.barkod)) barkodMap.set(metin(urun.barkod), urun);
-                if (yeni) sonuc.eklenen++; else sonuc.guncellenen++;
-            } catch (error) {
-                sonuc.atlanan++;
-                sonuc.hatalar.push({ satir: index + 2, mesaj: error.code === 11000 ? "Ürün kodu veya barkod zaten kullanılıyor." : error.message });
-            }
-        }
-
-        res.json({ basarili: true, mesaj: `${sonuc.eklenen} ürün eklendi, ${sonuc.guncellenen} ürün güncellendi, ${sonuc.stokGuncellenen} stok kaydı işlendi, ${sonuc.atlanan} satır atlandı.`, varsayilanDepo: varsayilanDepo ? { kod: varsayilanDepo.kod, ad: varsayilanDepo.ad } : null, ...sonuc });
-    } catch (error) { next(error); }
+    try { res.json(await require('../services/urunTopluServisi').calistir(req, 'EXCEL')); } catch (e) { next(e); }
+}
+async function topluFiyat(req, res, next) {
+    try { res.json(await require('../services/urunTopluServisi').calistir(req, 'FIYAT')); } catch (e) { next(e); }
 }
 
 module.exports = {
@@ -554,6 +475,7 @@ module.exports = {
     hizliSatisUrunuOlustur,
     guncelle,
     topluAktar,
+    topluFiyat,
     ozelFiyatlariListele,
     ozelFiyatOlustur,
     ozelFiyatGuncelle,

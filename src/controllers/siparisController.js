@@ -60,11 +60,17 @@ async function guncelle(req, res, next) {
     try {
         const tId=tenantId(req), body=req.body||{}; const siparis=await Siparis.findOne({_id:req.params.id,tenantId:tId,...sahiplik(req)});
         if(!siparis) return res.status(404).json({basarili:false,mesaj:"Sipariş bulunamadı."});
+        if(siparis.musteriTipi === "PERAKENDE") return res.status(409).json({basarili:false,mesaj:"Perakende mağaza siparişlerini Mağaza / Bayi yönetiminden takip edin. Ödeme tutarı korunur."});
         if(siparis.satisId || siparis.durum==="TAMAMLANDI") return res.status(409).json({basarili:false,mesaj:"Satışa dönüşmüş sipariş değiştirilemez."});
         if(!Array.isArray(body.kalemler)||!body.kalemler.length) return res.status(400).json({basarili:false,mesaj:"En az bir sipariş kalemi gerekir."});
         const oncekiDurum=siparis.durum;
         const kalemler=[]; let araToplam=0,toplamKdv=0,genelToplam=0;
-        for(const item of body.kalemler){const urun=await Urun.findOne({_id:item.urunId,tenantId:tId});if(!urun)return res.status(404).json({basarili:false,mesaj:"Ürün bulunamadı."});const miktar=Number(item.miktar||0),birimFiyat=Number(item.birimFiyat??urun.satisFiyati),kdv=Number(item.kdv??urun.kdv),iskonto=Number(item.iskonto||0);if(miktar<=0)return res.status(400).json({basarili:false,mesaj:"Miktar geçersiz."});const brut=miktar*birimFiyat,kalemAra=brut-(brut*iskonto/100),kdvTutari=kalemAra*kdv/100;kalemler.push({urunId:urun._id,miktar,birimFiyat,kdv,iskonto,araToplam:kalemAra,kdvTutari,toplam:kalemAra+kdvTutari});araToplam+=kalemAra;toplamKdv+=kdvTutari;genelToplam+=kalemAra+kdvTutari;}
+        for(const item of body.kalemler){
+            const urun=await Urun.findOne({_id:item.urunId,tenantId:tId});
+            if(!urun)return res.status(404).json({basarili:false,mesaj:"Ürün bulunamadı."});
+            kalemler.push(require('../services/fiyatServisi').kalem({urunId:urun._id,miktar:item.miktar,birimFiyat:item.birimFiyat??urun.satisFiyati,kdv:item.kdv??urun.kdv,iskonto:item.iskonto??0,kdvDahil:item.kdvDahil===true}));
+        }
+        ({araToplam,toplamKdv,genelToplam}=require('../services/fiyatServisi').hesapla(kalemler));
         siparis.siparisNo=String(body.siparisNo||siparis.siparisNo).trim().toUpperCase();siparis.tarih=body.tarih||siparis.tarih;siparis.depoId=body.depoId||siparis.depoId;siparis.kalemler=kalemler;siparis.araToplam=araToplam;siparis.toplamKdv=toplamKdv;siparis.genelToplam=genelToplam;siparis.notlar=body.notlar??siparis.notlar;siparis.durum=body.durum||siparis.durum;
         ["paraBirimi", "teslimTarihi", "sevkAdresi", "odemeKosullari"].forEach(k => { if (body[k] !== undefined) siparis[k] = body[k] || null; });
         await siparis.save();
@@ -93,16 +99,7 @@ async function olustur(req, res, next) {
         for (const item of body.kalemler) {
             const urun = await Urun.findOne({ _id: item.urunId, tenantId: tId });
             if (!urun) return res.status(404).json({ basarili: false, mesaj: "Ürün bulunamadı." });
-            const miktar = Number(item.miktar || 0);
-            const birimFiyat = Number(item.birimFiyat ?? urun.satisFiyati ?? 0);
-            const kdv = Number(item.kdv ?? urun.kdv ?? 20);
-            const iskonto = Number(item.iskonto || 0);
-            if (miktar <= 0 || birimFiyat < 0) return res.status(400).json({ basarili: false, mesaj: "Kalem miktarı/fiyatı geçersiz." });
-            const brut = miktar * birimFiyat;
-            const kalemAra = brut - (brut * iskonto / 100);
-            const kdvTutari = kalemAra * kdv / 100;
-            kalemler.push({ urunId: urun._id, miktar, birimFiyat, kdv, iskonto, araToplam: kalemAra, kdvTutari, toplam: kalemAra + kdvTutari });
-            araToplam += kalemAra; toplamKdv += kdvTutari; genelToplam += kalemAra + kdvTutari;
+            kalemler.push(require('../services/fiyatServisi').kalem({urunId:urun._id,miktar:item.miktar,birimFiyat:item.birimFiyat??urun.satisFiyati??0,kdv:item.kdv??urun.kdv??20,iskonto:item.iskonto??0,kdvDahil:item.kdvDahil===true}));
         }
         const siparis = await Siparis.create({
             tenantId: tId, siparisNo: String(body.siparisNo).trim().toUpperCase(),
@@ -207,13 +204,15 @@ async function satisdonustur(req, res, next) {
                 durum: { $in: satisDurumlari }
             }).session(session);
             if (!guncelSiparis) throw Object.assign(new Error("Sipariş başka bir işlem tarafından satışa dönüştürüldü."), { status: 409 });
+            const perakende = guncelSiparis.musteriTipi === "PERAKENDE";
+            if (perakende && (guncelSiparis.magazaOdemeDurumu !== "ODENDI" || !guncelSiparis.magazaTahsilatId)) throw Object.assign(new Error("Perakende siparişinin tahsilatı doğrulanmadan satışa çevrilemez."), { status: 409 });
 
             [satis] = await Satis.create([{
                 tenantId: tId, belgeNo, tarih: new Date(), musteriId: musteri._id,
                 depoId: depo._id, kalemler: guncelSiparis.kalemler,
                 araToplam: guncelSiparis.araToplam, toplamKdv: guncelSiparis.toplamKdv,
-                genelToplam: guncelSiparis.genelToplam, odemeDurumu: "ACIK",
-                odemeTipi: "ACIK_HESAP", odenenTutar: 0, kalanTutar: guncelSiparis.genelToplam,
+                genelToplam: guncelSiparis.genelToplam, odemeDurumu: perakende ? "ODENDI" : "ACIK",
+                odemeTipi: perakende ? ({ HAVALE: "BANKA", KART: "KART", KAPIDA: "NAKIT" }[guncelSiparis.magazaOdemeYontemi] || "DIGER") : "ACIK_HESAP", odenenTutar: perakende ? guncelSiparis.genelToplam : 0, kalanTutar: perakende ? 0 : guncelSiparis.genelToplam,
                 notlar: `Sipariş ${guncelSiparis.siparisNo}`, kullaniciId: aktorId(req)
             }], { session });
 

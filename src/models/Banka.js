@@ -22,6 +22,8 @@ const BankaSchema = new mongoose.Schema(
             trim: true
         },
 
+        hesapSahibi: { type: String, trim: true, maxlength: 200, default: "" },
+        demo: { type: Boolean, default: false },
         sube: {
             type: String,
             trim: true,
