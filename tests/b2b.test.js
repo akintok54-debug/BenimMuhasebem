@@ -18,6 +18,8 @@ test("B2B net pricing precedence and input validation", () => {
     assert.notEqual(service.siparisNo(userId, "0123456789abcdef"), service.siparisNo(foreignId, "0123456789abcdef"));
 });
 test("B2B HTTP authentication, isolation and privacy", async t => {
+    t.mock.method(require('../src/models/BayiIcerik'), 'find', filter => { assert.equal(String(filter.tenantId),tenantId); return q([]); });
+    t.mock.method(require('../src/modules/b2b/models/MagazaAyar'), 'findById', () => q(null));
     const hash = await bcrypt.hash("correct-test-password", 4);
     let enabled = true, userActive = true;
     const customer = { _id: customerId, tenantId, aktif: true, unvan: "Own company", bakiye: 25, b2b: { aktif: true, siparisYetkisi: true, depoId: depotId }, limit: 1000, riskLimiti: 2000, vadeGun: 30 };
@@ -140,6 +142,7 @@ test("B2B HTTP authentication, isolation and privacy", async t => {
     });
 });
 test("B2B quote and order reuse ERP models and persisted totals", async t => {
+    t.mock.method(require('../src/models/BayiIcerik'), 'find', filter => { assert.equal(String(filter.tenantId),tenantId); return q([]); });
     const customer = { _id: new mongoose.Types.ObjectId(customerId), tenantId: new mongoose.Types.ObjectId(tenantId), b2b: { aktif: true, depoId: depotId, negatifStok: true, siparisYetkisi: true, minimumSiparis: 0 }, bakiye: 10, limit: 500, riskLimiti: 500, vadeGun: 30 };
     const product = { _id: new mongoose.Types.ObjectId(productId), ad: "Product", kod: "P1", paraBirimi: "TRY", bayiFiyati: 100, satisFiyati: 150, kdv: 20 };
     t.mock.method(Depot, "findOne", () => q({ _id: depotId })); t.mock.method(Group, "findOne", () => q(null));
