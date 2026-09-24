@@ -107,6 +107,7 @@ uygulama.use(
 );
 
 uygulama.get("/api/saglik", saglikRotasi);
+uygulama.use("/api/integrations/akn", require("./routes/aknEntegrasyonRotasi"));
 uygulama.use(require("./services/belgeTutarOzetiServisi").belgeSunumMiddleware);
 const paylasimRotasi = require("./routes/paylasimRotasi");
 uygulama.use("/api/paylasim", paylasimRotasi.publicRouter);
