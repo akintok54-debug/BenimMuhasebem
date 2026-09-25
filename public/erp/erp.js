@@ -2444,7 +2444,7 @@
             const hedefUrun = urunler.find(x => String(x._id) === String(button.dataset.belgeUrun));
             if (!hedefUrun) return;
             let hedef = [...kalemlerEl.querySelectorAll(".belge-kalem")].find(row => row.querySelector("select[name=urunId]")?.value === String(hedefUrun._id));
-            if (hedef) { const miktar = hedef.querySelector("input[name=miktar]"); miktar.value = Number(miktar.value || 0) + 1; miktar.dispatchEvent(new Event("input")); urunArama.value = ""; urunSonuclari.hidden = true; urunArama.focus({ preventScroll: true }); return; }
+            if (hedef) { kalemHizliPencereAc(hedef, overlay.querySelector(".erp-modal")); urunArama.value = ""; urunSonuclari.hidden = true; return; }
             hedef = [...kalemlerEl.querySelectorAll(".belge-kalem")].find(row => !row.querySelector("select[name=urunId]").value);
             if (!hedef) {
                 kalemlerEl.insertAdjacentHTML("beforeend", satirHtml({ urunId: hedefUrun._id }));
@@ -2454,6 +2454,7 @@
             const select = hedef.querySelector("select[name=urunId]");
             select.value = hedefUrun._id;
             select.dispatchEvent(new Event("change"));
+            kalemHizliPencereAc(hedef, overlay.querySelector(".erp-modal"));
             urunArama.value = "";
             urunSonuclari.hidden = true;
             urunArama.focus({ preventScroll: true });
