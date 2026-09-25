@@ -47,12 +47,13 @@ test("IdeaSoft cron tetikleyicisi CRON_SECRET olmadan devre dışıdır ve sabit
     assert.match(source, /ideasoftSiparisleriniOtomatikSirayaAl/);
 });
 
-test("IdeaSoft cron rotası uygulamaya bağlanır ve Vercel cron zamanlaması tanımlanır", () => {
+test("IdeaSoft cron rotası korunur; V2 geçişinde çift zamanlama kapalıdır", () => {
     const uygulamaSource = read("src/uygulama.js");
     assert.match(uygulamaSource, /require\("\.\/routes\/cronRotasi"\)/);
     assert.match(uygulamaSource, /uygulama\.use\("\/api\/cron", cronRotasi\)/);
     const vercelConfig = JSON.parse(read("vercel.json"));
-    assert.ok(Array.isArray(vercelConfig.crons) && vercelConfig.crons.some(x => x.path === "/api/cron/ideasoft-siparisleri"));
+    assert.deepEqual(vercelConfig.crons, []);
+    assert.equal(vercelConfig.git.deploymentEnabled, false);
 });
 
 test("IdeaSoft cron hata loglaması ham hata nesnesini değil yalnızca ad/mesaj alanlarını yazar", () => {

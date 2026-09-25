@@ -55,6 +55,7 @@ uygulama.use(require("./middleware/hataIzlemeMiddleware"));
 const corsIzinleri = new Set([
     ...String(process.env.CORS_ORIGINS || "").split(","),
     process.env.PUBLIC_APP_URL,
+    ...[process.env.VERCEL_URL, process.env.VERCEL_PROJECT_PRODUCTION_URL].filter(Boolean).map(host => `https://${host}`),
     "https://www.benimmuhasebe.com"
 ].map(x => String(x || "").trim().replace(/\/$/, "")).filter(Boolean));
 uygulama.use(cors({

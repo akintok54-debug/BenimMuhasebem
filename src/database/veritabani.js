@@ -9,7 +9,8 @@ async function veritabaniBaglan() {
 
     await mongoose.connect(uri, {
         serverSelectionTimeoutMS: Number(process.env.MONGODB_SERVER_SELECTION_TIMEOUT_MS || 10000),
-        autoIndex: process.env.NODE_ENV !== "production"
+        autoIndex: process.env.NODE_ENV !== "production",
+        autoCreate: process.env.NODE_ENV !== "production"
     });
 
     // İndeks DDL işlemleri sunucu başlangıcından tamamen ayrıdır. Vercel aynı anda

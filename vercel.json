@@ -1,15 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "crons": [
-    {
-      "path": "/api/cron/ideasoft-siparisleri",
-      "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/cron/platform-kontrol",
-      "schedule": "15 3 * * *"
-    }
-  ],
+  "crons": [],
   "routes": [
     {
       "src": "/(.*)",
@@ -50,5 +41,17 @@
       "src": "/api(?:/.*)?",
       "dest": "/api"
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": false
+  },
+  "buildCommand": "npm run check",
+  "installCommand": "npm ci",
+  "outputDirectory": "public",
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 60,
+      "includeFiles": "{src/**,public/**,node_modules/xlsx/dist/xlsx.full.min.js,node_modules/jszip/dist/jszip.min.js}"
+    }
+  }
 }

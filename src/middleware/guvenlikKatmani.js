@@ -57,7 +57,8 @@ function kanonikAlanAdi(req, res, next) {
         .trim()
         .toLowerCase();
 
-    if (!kanonikHost || istekHost === kanonikHost) return next();
+    const vercelHosts = [process.env.VERCEL_URL, process.env.VERCEL_PROJECT_PRODUCTION_URL].filter(Boolean).map(host => host.trim().toLowerCase());
+    if (!kanonikHost || istekHost === kanonikHost || vercelHosts.includes(istekHost)) return next();
     return res.redirect(308, `https://${kanonikHost}${req.originalUrl}`);
 }
 
