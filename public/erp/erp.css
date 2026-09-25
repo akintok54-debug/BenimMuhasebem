@@ -2972,3 +2972,21 @@ body {
     #content .mobile-record-table td[colspan] { display: block; }
     #content .mobile-record-table td[colspan]::before { content: none; }
 }
+
+
+/* Compact transaction dialogs */
+.document-entry-modal { width:min(860px,92vw); max-height:88vh; }
+.document-entry-modal .erp-modal-header { padding:14px 18px; }
+.document-entry-modal form { padding:14px 18px; gap:12px; }
+.document-entry-modal .form-section,
+.document-entry-modal .sales-payment-box { padding:12px; }
+.document-entry-modal .document-shortcuts { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
+#kalemHizliOverlay .erp-modal { max-width:560px !important; max-height:82vh; }
+#kalemHizliOverlay .erp-modal-header { padding:12px 16px; }
+#kalemHizliOverlay form { padding:14px 16px; gap:10px; }
+@media (max-width:700px) {
+  .document-entry-modal { width:96vw; max-height:90vh; }
+  .document-entry-modal .erp-modal-header,
+  .document-entry-modal form { padding:10px 12px; }
+  #kalemHizliOverlay .erp-modal { width:94vw !important; }
+}
