@@ -2181,12 +2181,38 @@
         return detay;
     }
 
+    function kalemHizliPencereAc(row, modal) {
+        if (!row || !modal) return;
+        const eski = document.getElementById("kalemHizliOverlay"); eski?.remove();
+        const alan = ad => row.querySelector(`[name="${ad}"]`);
+        const urunSelect = alan("urunId");
+        const depoSelect = modal.querySelector('[name="depoId"]');
+        const o = document.createElement("div"); o.id="kalemHizliOverlay"; o.className="erp-modal-overlay";
+        const urunAdi = urunSelect?.selectedOptions?.[0]?.textContent || "Kalem";
+        const val = ad => escapeHtml(String(alan(ad)?.value ?? ""));
+        o.innerHTML=`<div class="erp-modal" style="max-width:620px;width:94%"><div class="erp-modal-header"><div><span class="modal-eyebrow">KALEM</span><h2>${escapeHtml(urunAdi)}</h2></div><button type="button" class="erp-modal-close">×</button></div><form class="erp-form-grid">
+        <label>Miktar (Ad)<input name="q" type="number" min="0.0001" step="0.0001" value="${val("miktar")}"></label>
+        ${depoSelect ? `<label>Depo<select name="depo">${[...depoSelect.options].map(x=>`<option value="${escapeHtml(x.value)}" ${x.selected?"selected":""}>${escapeHtml(x.textContent)}</option>`).join("")}</select></label>`:""}
+        <label>Fiyat<input name="price" type="number" min="0" step="0.01" value="${val("birimFiyat")}"></label>
+        <label>KDV (%)<input name="vat" type="number" min="0" step="0.01" value="${val("kdv")}"></label>
+        <label>İndirim (%)<input name="disc" type="number" min="0" max="100" step="0.01" value="${val("iskonto")}"></label>
+        <label>TOPLAM<strong data-kalem-total style="font-size:1.25rem">₺0,00</strong></label>
+        <label class="full">Açıklama<input name="desc" value="${escapeHtml(row.dataset.aciklama||"")}" placeholder="İsteğe bağlı açıklama"></label>
+        <div class="erp-modal-footer full"><button type="button" class="erp-small-button secondary" data-close>Vazgeç</button><button type="submit" class="erp-primary-button">+ Ekle / Güncelle</button></div></form></div>`;
+        document.body.appendChild(o);
+        const f=o.querySelector("form"), total=()=>{const q=Number(f.q.value||0),p=Number(f.price.value||0),v=Number(f.vat.value||0),i=Number(f.disc.value||0);o.querySelector("[data-kalem-total]").textContent=para(q*p*(1-i/100)*(1+v/100));};
+        f.querySelectorAll("input").forEach(x=>x.addEventListener("input",total)); total();
+        const close=()=>o.remove(); o.querySelector(".erp-modal-close").onclick=close;o.querySelector("[data-close]").onclick=close;
+        f.onsubmit=e=>{e.preventDefault(); alan("miktar").value=f.q.value;alan("birimFiyat").value=f.price.value;alan("kdv").value=f.vat.value;alan("iskonto").value=f.disc.value;row.dataset.aciklama=f.desc.value;if(depoSelect&&f.depo.value){depoSelect.value=f.depo.value;depoSelect.dispatchEvent(new Event("change"));} ["miktar","birimFiyat","kdv","iskonto"].forEach(n=>alan(n)?.dispatchEvent(new Event("input",{bubbles:true})));close();};
+        setTimeout(()=>f.q.focus(),0);
+    }
+
     function kompaktIslemSatiri(row) {
         if (row.querySelector(".transaction-line-toggle")) return;
         const button = document.createElement("button");
         button.type = "button";
         button.className = "erp-small-button transaction-line-toggle";
-        button.textContent = "Adet / fiyat / iskonto";
+        button.textContent = "Kalem";
         button.setAttribute("aria-expanded", "false");
         const miktarOzeti = document.createElement("small");
         const miktarYaz = () => { miktarOzeti.textContent = `Adet: ${BelgeSunum.miktar(row.querySelector('[name="miktar"]')?.value || 0)} · ${row.querySelector("[data-line-stock]")?.textContent || ""}`; };
@@ -2194,10 +2220,8 @@
         row.addEventListener("change", miktarYaz);
         queueMicrotask(miktarYaz);
         row.addEventListener("change", () => queueMicrotask(miktarYaz));
-        button.onclick = () => {
-            const acik = row.classList.toggle("transaction-line-expanded");
-            button.setAttribute("aria-expanded", String(acik));
-        };
+        button.onclick = () => kalemHizliPencereAc(row, row.closest(".erp-modal"));
+
         row.cells[0].append(miktarOzeti, button);
     }
 
