@@ -2191,8 +2191,8 @@
         const urunAdi = urunSelect?.selectedOptions?.[0]?.textContent || "Kalem";
         const val = ad => escapeHtml(String(alan(ad)?.value ?? ""));
         o.innerHTML=`<div class="erp-modal" style="max-width:620px;width:94%"><div class="erp-modal-header"><div><span class="modal-eyebrow">KALEM</span><h2>${escapeHtml(urunAdi)}</h2></div><button type="button" class="erp-modal-close">×</button></div><form class="erp-form-grid">
+        <label class="full">Ürün<input name="productSearch" autocomplete="off" value="${escapeHtml(urunSelect?.selectedOptions?.[0]?.textContent || "")}" placeholder="Ürün adı, kod veya barkod yazın..."><div data-product-results class="belge-urun-sonuclari" hidden></div></label>
         <label>Miktar (Ad)<input name="q" type="number" min="0.0001" step="0.0001" value="${val("miktar")}"></label>
-        ${depoSelect ? `<label>Depo<select name="depo">${[...depoSelect.options].map(x=>`<option value="${escapeHtml(x.value)}" ${x.selected?"selected":""}>${escapeHtml(x.textContent)}</option>`).join("")}</select></label>`:""}
         <label>Fiyat<input name="price" type="number" min="0" step="0.01" value="${val("birimFiyat")}"></label>
         <label>KDV (%)<input name="vat" type="number" min="0" step="0.01" value="${val("kdv")}"></label>
         <label>İndirim (%)<input name="disc" type="number" min="0" max="100" step="0.01" value="${val("iskonto")}"></label>
@@ -2200,11 +2200,15 @@
         <label class="full">Açıklama<input name="desc" value="${escapeHtml(row.dataset.aciklama||"")}" placeholder="İsteğe bağlı açıklama"></label>
         <div class="erp-modal-footer full"><button type="button" class="erp-small-button secondary" data-close>Vazgeç</button><button type="submit" class="erp-primary-button">+ Ekle / Güncelle</button></div></form></div>`;
         document.body.appendChild(o);
-        const f=o.querySelector("form"), total=()=>{const q=Number(f.q.value||0),p=Number(f.price.value||0),v=Number(f.vat.value||0),i=Number(f.disc.value||0);o.querySelector("[data-kalem-total]").textContent=para(q*p*(1-i/100)*(1+v/100));};
-        f.querySelectorAll("input").forEach(x=>x.addEventListener("input",total)); total();
+        const f=o.querySelector("form"), productSearch=f.productSearch, productResults=o.querySelector("[data-product-results]"), allProducts=[...urunSelect.options].filter(x=>x.value);
+        const renderProducts=()=>{const q=String(productSearch.value||"").toLocaleLowerCase("tr-TR").trim();const found=allProducts.filter(x=>!q||String(x.textContent||"").toLocaleLowerCase("tr-TR").includes(q)).slice(0,10);productResults.innerHTML=found.map(x=>`<button type="button" class="belge-urun-sonuc" data-product-id="${escapeHtml(x.value)}">${escapeHtml(x.textContent)}</button>`).join("");productResults.hidden=!q;};
+        productSearch.addEventListener("input",renderProducts); productSearch.addEventListener("focus",renderProducts);
+        productResults.addEventListener("click",e=>{const b=e.target.closest("[data-product-id]");if(!b)return;urunSelect.value=b.dataset.productId;urunSelect.dispatchEvent(new Event("change"));productSearch.value=urunSelect.selectedOptions[0]?.textContent||"";productResults.hidden=true;});
+        const total=()=>{const q=Number(f.q.value||0),p=Number(f.price.value||0),v=Number(f.vat.value||0),i=Number(f.disc.value||0);o.querySelector("[data-kalem-total]").textContent=para(q*p*(1-i/100)*(1+v/100));};
+        f.querySelectorAll("input:not([name=productSearch])").forEach(x=>x.addEventListener("input",total)); total();
         const close=()=>o.remove(); o.querySelector(".erp-modal-close").onclick=close;o.querySelector("[data-close]").onclick=close;
-        f.onsubmit=e=>{e.preventDefault(); alan("miktar").value=f.q.value;alan("birimFiyat").value=f.price.value;alan("kdv").value=f.vat.value;alan("iskonto").value=f.disc.value;row.dataset.aciklama=f.desc.value;if(depoSelect&&f.depo.value){depoSelect.value=f.depo.value;depoSelect.dispatchEvent(new Event("change"));} ["miktar","birimFiyat","kdv","iskonto"].forEach(n=>alan(n)?.dispatchEvent(new Event("input",{bubbles:true})));close();};
-        setTimeout(()=>f.q.focus(),0);
+        f.onsubmit=e=>{e.preventDefault(); alan("miktar").value=f.q.value;alan("birimFiyat").value=f.price.value;alan("kdv").value=f.vat.value;alan("iskonto").value=f.disc.value;row.dataset.aciklama=f.desc.value;["miktar","birimFiyat","kdv","iskonto"].forEach(n=>alan(n)?.dispatchEvent(new Event("input",{bubbles:true})));close();};
+        setTimeout(()=>productSearch.focus(),0);
     }
 
     function kompaktIslemSatiri(row) {
